@@ -210,8 +210,7 @@ class modelNet:
 
     def getMinF(self):
         inputs = self.dataset_samples
-        if self.config.device == "cuda":
-            inputs = torch.Tensor(inputs).cuda()
+        inputs = torch.Tensor(inputs).to(self.config.device)
 
         outputs = l2r(self.model(inputs))
         self.best_f = np.percentile(outputs, self.config.al.EI_max_percentile)
@@ -375,6 +374,8 @@ class modelNet:
             elif output == "Variance":
                 return np.var(out, axis=1)
             elif output == "Both":
+                return np.average(out, axis=1), np.var(out, axis=1)
+            else:
                 return np.average(out, axis=1), np.var(out, axis=1)
 
     def loadEnsemble(self, models):
