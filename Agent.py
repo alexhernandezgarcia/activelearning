@@ -11,7 +11,8 @@ import torch
 from tqdm import tqdm
 import math
 import torch.functional as F
-#from torch.utils.tensorboard import SummaryWriter
+
+# from torch.utils.tensorboard import SummaryWriter
 from utils import *
 from replay_buffer import QuerySelectionReplayMemory, ParameterUpdateReplayMemory
 from oracle import Oracle
@@ -42,13 +43,19 @@ class DQN:
         """
 
         torch.manual_seed(config.seeds.model)
-        #self.writer = SummaryWriter(log_dir=f"C:/Users/Danny/Desktop/ActiveLearningPipeline/logs/exp{datetime.now().strftime('D%Y-%m-%dT%H-%M-%S')}")
+        # self.writer = SummaryWriter(log_dir=f"C:/Users/Danny/Desktop/ActiveLearningPipeline/logs/exp{datetime.now().strftime('D%Y-%m-%dT%H-%M-%S')}")
         self.config = config
-        self.exp_name = 'learned_'
+        self.exp_name = "learned_"
         self.load = False if config.querier.model_ckpt is None else True
-        self.singleton_state_variables = 5 # [test loss, test std, n proxy models, cluster cutoff and elapsed time]
-        self.state_dataset_size = int(config.querier.model_state_size * 5 + self.singleton_state_variables) # This depends on size of dataset V
-        self.model_state_latent_dimension = config.al.q_network_width # latent dim of model state
+        self.singleton_state_variables = (
+            5  # [test loss, test std, n proxy models, cluster cutoff and elapsed time]
+        )
+        self.state_dataset_size = int(
+            config.querier.model_state_size * 5 + self.singleton_state_variables
+        )  # This depends on size of dataset V
+        self.model_state_latent_dimension = (
+            config.al.q_network_width
+        )  # latent dim of model state
         self.action_size = config.al.action_state_size
         self.device = config.device
         self.epsilon = 0.5
@@ -82,20 +89,18 @@ class DQN:
 
         self._create_and_load_optimizer(**self.optimizer_param)
 
-    def _load_models(self, file_name = 'policy_agent'):
+    def _load_models(self, file_name="policy_agent"):
         """Load trained policy agent for experiments. Needs to know file_name. File expected in
         project working directory.
         """
 
-        try: # reload model
+        try:  # reload model
             policy_checkpoint = torch.load(f"{file_name}.pt")
             self.model.load_state_dict(policy_checkpoint["model_state_dict"])
         except:
-            raise ValueError(
-                "No agent checkpoint found."
-            )
+            raise ValueError("No agent checkpoint found.")
 
-    def save_models(self, file_name = 'policy_agent'):
+    def save_models(self, file_name="policy_agent"):
         """Save trained policy agent for experiments. Needs to know file_name. File expected in
         project working directory.
         """
@@ -130,11 +135,13 @@ class DQN:
 
         if opt_choice == "SGD":
             self.optimizer = torch.optim.SGD(
-                params=filter(lambda p: p.requires_grad, self.policy_net.parameters()), **opt_kwargs
+                params=filter(lambda p: p.requires_grad, self.policy_net.parameters()),
+                **opt_kwargs,
             )
         elif opt_choice == "RMSprop":
             self.optimizer = torch.optim.RMSprop(
-                params=filter(lambda p: p.requires_grad, self.policy_net.parameters()), lr=lr_dqn
+                params=filter(lambda p: p.requires_grad, self.policy_net.parameters()),
+                lr=lr_dqn,
             )
 
         name = exp_name_toload if load_opt and len(exp_name_toload) > 0 else exp_name
@@ -170,18 +177,30 @@ class DQN:
 
         # sample uncertainties
         self.model_state = torch.cat(
-            (self.model_state, torch.Tensor(model_state_dict["best cluster deviations"]))
+            (
+                self.model_state,
+                torch.Tensor(model_state_dict["best cluster deviations"]),
+            )
         )
 
         # internal dist, dataset dist, random set dist
         self.model_state = torch.cat(
-            (self.model_state, torch.tensor(model_state_dict["best clusters internal diff"]))
+            (
+                self.model_state,
+                torch.tensor(model_state_dict["best clusters internal diff"]),
+            )
         )
         self.model_state = torch.cat(
-            (self.model_state, torch.tensor(model_state_dict["best clusters dataset diff"]))
+            (
+                self.model_state,
+                torch.tensor(model_state_dict["best clusters dataset diff"]),
+            )
         )
         self.model_state = torch.cat(
-            (self.model_state, torch.tensor(model_state_dict["best clusters random set diff"]))
+            (
+                self.model_state,
+                torch.tensor(model_state_dict["best clusters random set diff"]),
+            )
         )
 
         # n proxy models,         # clustering cutoff,         # progress fraction
@@ -202,31 +221,38 @@ class DQN:
         # model state samples
         self.modelStateSamples = model_state_dict["best cluster samples"]
         # training dataset
-        self.trainingSamples = np.load('datasets/' + self.config.dataset.oracle + '.npy', allow_pickle=True).item()
-        self.trainingSamples = self.trainingSamples['samples']
+        self.trainingSamples = np.load(
+            "datasets/" + self.config.dataset.oracle + ".npy", allow_pickle=True
+        ).item()
+        self.trainingSamples = self.trainingSamples["samples"]
         # large random sample
-        numSamples = min(int(1e4), self.config.dataset.dict_size ** self.config.dataset.max_length // 100) # either 1e4, or 1% of the sample space, whichever is smaller
+        numSamples = min(
+            int(1e4),
+            self.config.dataset.dict_size ** self.config.dataset.max_length // 100,
+        )  # either 1e4, or 1% of the sample space, whichever is smaller
         dataoracle = Oracle(
-            seed = self.config.seeds.dataset,
-            seq_len = self.config.dataset.max_length,
-            dict_size = self.config.dataset.dict_size,
-            min_len = self.config.dataset.min_length,
-            max_len = self.config.dataset.max_length,
-            oracle = self.config.dataset.oracle,
-            variable_len = self.config.dataset.variable_length,
-            init_len = self.config.dataset.init_length,
-            energy_weight = self.config.dataset.nupack_energy_reweighting,
-            nupack_target_motif = self.config.dataset.nupack_target_motif,
-            seed_toy = self.config.seeds.toy_oracle,
+            seed=self.config.seeds.dataset,
+            seq_len=self.config.dataset.max_length,
+            dict_size=self.config.dataset.dict_size,
+            min_len=self.config.dataset.min_length,
+            max_len=self.config.dataset.max_length,
+            oracle=self.config.dataset.oracle,
+            variable_len=self.config.dataset.variable_length,
+            init_len=self.config.dataset.init_length,
+            energy_weight=self.config.dataset.nupack_energy_reweighting,
+            nupack_target_motif=self.config.dataset.nupack_target_motif,
+            seed_toy=self.config.seeds.toy_oracle,
         )
-        self.randomSamples = dataoracle.initializeDataset(save=False, returnData=True, customSize=numSamples) # get large random dataset
-        self.randomSamples = self.randomSamples['samples']
+        self.randomSamples = dataoracle.initializeDataset(
+            save=False, returnData=True, customSize=numSamples
+        )  # get large random dataset
+        self.randomSamples = self.randomSamples["samples"]
 
         return previous_model_state, self.model_state
 
-
     def evaluate(self, sample, output="Average"):  # just evaluate the proxy
         return self.proxyModel.evaluate(sample, output=output)
+
 
 class ParameterUpdateAgent(DQN):
     def __init__(self, config):
@@ -234,59 +260,73 @@ class ParameterUpdateAgent(DQN):
         self.memory = ParameterUpdateReplayMemory(self.config.al.buffer_size)
 
     def _create_models(self):
-        """Creates the Online and Target DQNs
-
-        """
+        """Creates the Online and Target DQNs"""
         # Query network (and target network for DQN)
         self.policy_net = ParameterUpdateDQN(
             model_state_length=self.state_dataset_size,
             model_state_latent_dimension=self.model_state_latent_dimension,
-            action_size = self.action_size,
+            action_size=self.action_size,
             bias_average=1,  # TODO Figure out the query network bias trick from 2018 paper.
         ).to(self.device)
         self.target_net = ParameterUpdateDQN(
             model_state_length=self.state_dataset_size,
             model_state_latent_dimension=self.model_state_latent_dimension,
-            action_size = self.action_size,
+            action_size=self.action_size,
             bias_average=1,  # TODO Figure out the query network bias trick from 2018 paper. #MK what are we biasing
         ).to(self.device)
-        self.target_net.load_state_dict(self.policy_net.state_dict()) # sync parameters.
-        printRecord("Policy network has " + str(get_n_params(self.policy_net)) + " parameters.")
+        self.target_net.load_state_dict(
+            self.policy_net.state_dict()
+        )  # sync parameters.
+        printRecord(
+            "Policy network has " + str(get_n_params(self.policy_net)) + " parameters."
+        )
 
         # print("DQN Models created!")
+
     def train_from_file(self, BATCH_SIZE=32, GAMMA=0.999, dqn_epochs=30000):
-        memory_from_file = np.load('C:/Users/Danny/Desktop/ActiveLearningPipeline/memory.npy', allow_pickle=True)
+        memory_from_file = np.load(
+            "C:/Users/Danny/Desktop/ActiveLearningPipeline/memory.npy",
+            allow_pickle=True,
+        )
         self.memory.memory = memory_from_file
         self.policy_net.train()
 
         for ep in tqdm(range(dqn_epochs)):
             memory_batch = self.memory.sample(BATCH_SIZE)
             self.optimizer.zero_grad()
-            transitions = memory_batch#self.memory.sample(BATCH_SIZE)
+            transitions = memory_batch  # self.memory.sample(BATCH_SIZE)
             loss_item = 0
             for transition in transitions:
                 # Get Target q-value function value for the action at s_t+1
                 # that yields the highest discounted return
                 with torch.no_grad():
                     # Get Q-values for every action
-                    q_vals_ = self.target_net(transition["next_model_state"].to(self.device))
+                    q_vals_ = self.target_net(
+                        transition["next_model_state"].to(self.device)
+                    )
 
                     action_i = torch.argmax(q_vals_)
 
-                max_next_q_value = self.policy_net(transition["next_model_state"].to(self.device))[action_i]
+                max_next_q_value = self.policy_net(
+                    transition["next_model_state"].to(self.device)
+                )[action_i]
 
                 # Get Predicted Q-values at s_t
-                online_q_value = self.policy_net(transition["model_state"].to(self.device))[
-                    np.argmax(transition["action"])
-                ]
+                online_q_value = self.policy_net(
+                    transition["model_state"].to(self.device)
+                )[np.argmax(transition["action"])]
                 # Compute the Target Q values (No future return if terminal).
                 # Use Bellman Equation which essentially states that sum of r_t+1 and the max_q_value at time t+1
                 # is the target/expected value of the Q-function at time t.
                 if transition["terminal"]:
-                    target_q_value = torch.tensor(transition["reward"], device=self.device)
+                    target_q_value = torch.tensor(
+                        transition["reward"], device=self.device
+                    )
                 else:
-                    target_q_value = torch.tensor((max_next_q_value * GAMMA) + transition["reward"], device=self.device)
-
+                    target_q_value = torch.tensor(
+                        (max_next_q_value * GAMMA) + transition["reward"],
+                        device=self.device,
+                    )
 
                 # Compute MSE loss Comparing Q(s) obtained from Online Policy to
                 # target Q value (Q'(s)) obtained from Target Network + Bellman Equation
@@ -294,14 +334,14 @@ class ParameterUpdateAgent(DQN):
                 loss_item += loss.item()
                 loss.backward()
             self.policy_error += [loss.detach().cpu().numpy()]
-            #self.writer.add_scalar('Error', loss, ep)
+            # self.writer.add_scalar('Error', loss, ep)
             self.optimizer.step()
             if ep % self.target_sync_interval == 0:
                 self.target_net.load_state_dict(self.policy_net.state_dict())
-        #self.writer.close()
+        # self.writer.close()
         self.save_models()
 
-    #TODO sample within train funciton self.memory_buffer.sample(self.config.q_batch_size)
+    # TODO sample within train funciton self.memory_buffer.sample(self.config.q_batch_size)
     def train(self, BATCH_SIZE=32, GAMMA=0.999, dqn_epochs=20):
         """Train a q-function estimator on a minibatch.
 
@@ -320,39 +360,47 @@ class ParameterUpdateAgent(DQN):
         # Code adapted from https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
         memory_batch = self.memory.sample(self.config.al.q_batch_size)
         self.episode += 1
-        print(f'Policy Net Training Episode #{self.episode}')
+        print(f"Policy Net Training Episode #{self.episode}")
         if len(memory_batch) < BATCH_SIZE:
-            print(f'Cancelled due to small transition batch size: {len(memory_batch)}')
+            print(f"Cancelled due to small transition batch size: {len(memory_batch)}")
             return
-        print(f'Transition Batch Size of {len(memory_batch)}')
+        print(f"Transition Batch Size of {len(memory_batch)}")
         self.policy_net.train()
         loss_item = 0
         for ep in range(dqn_epochs):
             self.optimizer.zero_grad()
-            transitions = memory_batch#self.memory.sample(BATCH_SIZE)
+            transitions = memory_batch  # self.memory.sample(BATCH_SIZE)
             for transition in transitions:
                 # Get Target q-value function value for the action at s_t+1
                 # that yields the highest discounted return
                 with torch.no_grad():
                     # Get Q-values for every action
-                    q_vals_ = self.target_net(transition["next_model_state"].to(self.device))
+                    q_vals_ = self.target_net(
+                        transition["next_model_state"].to(self.device)
+                    )
 
                     action_i = torch.argmax(q_vals_)
 
-                max_next_q_value = self.policy_net(transition["next_model_state"].to(self.device))[action_i]
+                max_next_q_value = self.policy_net(
+                    transition["next_model_state"].to(self.device)
+                )[action_i]
 
                 # Get Predicted Q-values at s_t
-                online_q_value = self.policy_net(transition["model_state"].to(self.device))[
-                    np.argmax(transition["action"])
-                ]
+                online_q_value = self.policy_net(
+                    transition["model_state"].to(self.device)
+                )[np.argmax(transition["action"])]
                 # Compute the Target Q values (No future return if terminal).
                 # Use Bellman Equation which essentially states that sum of r_t+1 and the max_q_value at time t+1
                 # is the target/expected value of the Q-function at time t.
                 if transition["terminal"]:
-                    target_q_value = torch.tensor(transition["reward"], device=self.device)
+                    target_q_value = torch.tensor(
+                        transition["reward"], device=self.device
+                    )
                 else:
-                    target_q_value = torch.tensor((max_next_q_value * GAMMA) + transition["reward"], device=self.device)
-
+                    target_q_value = torch.tensor(
+                        (max_next_q_value * GAMMA) + transition["reward"],
+                        device=self.device,
+                    )
 
                 # Compute MSE loss Comparing Q(s) obtained from Online Policy to
                 # target Q value (Q'(s)) obtained from Target Network + Bellman Equation
@@ -365,12 +413,11 @@ class ParameterUpdateAgent(DQN):
             del loss
             del transitions
         if self.episode % self.target_sync_interval == 0:
-            print(f'Updating Target Network Parameters.')
+            print(f"Updating Target Network Parameters.")
             self.target_net.load_state_dict(self.policy_net.state_dict())
 
-
     def evaluateQ(self):
-        """ get the q-value for a particular sample, given its 'action state'
+        """get the q-value for a particular sample, given its 'action state'
 
         :param model_state: (torch.Variable) Torch tensor containing the model state representation.
         :param steps_done: (int) Number of aptamers labeled so far.
@@ -398,8 +445,6 @@ class ParameterUpdateAgent(DQN):
 
         return action
 
-    def push_to_buffer(
-        self, model_state, action, next_model_state, reward, terminal
-    ):
+    def push_to_buffer(self, model_state, action, next_model_state, reward, terminal):
         """Saves a transition."""
         self.memory.push(model_state, action, next_model_state, reward, terminal)

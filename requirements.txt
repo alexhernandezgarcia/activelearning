@@ -93,6 +93,7 @@ testpath==0.5.0
 threadpoolctl==2.2.0
 toml==0.10.2
 tomli==1.2.1
+torch==1.12.1
 tornado==6.1
 tqdm==4.62.0
 traitlets==5.0.5
