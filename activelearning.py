@@ -88,3 +88,7 @@ class Querier:
     
     def buildQuery(self):
         return
+<<<<<<< HEAD
+=======
+
+>>>>>>> 69f2d33dc58cb75023d10416579afcf04aa00430

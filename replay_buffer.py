@@ -9,7 +9,14 @@ EPS_DECAY = 10
 # Definition needed to store memory replay in pickle
 Query_Transition = namedtuple(
     "Transition",
-    ("model_state", "action_state", "next_model_state", "next_action_state", "reward", "terminal"),
+    (
+        "model_state",
+        "action_state",
+        "next_model_state",
+        "next_action_state",
+        "reward",
+        "terminal",
+    ),
 )
 
 Parameter_Transition = namedtuple(
@@ -29,7 +36,13 @@ class QuerySelectionReplayMemory(object):
         self.position = 0
 
     def push(
-        self, model_state, action_state, next_model_state, next_action_state, reward, terminal
+        self,
+        model_state,
+        action_state,
+        next_model_state,
+        next_action_state,
+        reward,
+        terminal,
     ):
         """Saves a transition."""
         if len(self.memory) < self.capacity:
@@ -37,7 +50,12 @@ class QuerySelectionReplayMemory(object):
 
         self.memory[self.position] = None
         self.memory[self.position] = Query_Transition(
-            model_state, action_state, next_model_state, next_action_state, reward, terminal
+            model_state,
+            action_state,
+            next_model_state,
+            next_action_state,
+            reward,
+            terminal,
         )
         self.position = (self.position + 1) % self.capacity
 
@@ -54,6 +72,7 @@ class QuerySelectionReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
+
 class ParameterUpdateReplayMemory(object):
     """
     Class that encapsulates the experience replay buffer, the push and sampling method
@@ -67,23 +86,21 @@ class ParameterUpdateReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
-    def push(
-        self, model_state, action, next_model_state, reward, terminal
-    ):
+    def push(self, model_state, action, next_model_state, reward, terminal):
         """Saves a transition."""
         if len(self.memory) < self.capacity:
             self.memory.append(None)
 
         self.memory[self.position] = None
-        #self.memory[self.position] = Parameter_Transition(
+        # self.memory[self.position] = Parameter_Transition(
         #    model_state.cpu(), action, next_model_state.cpu(), reward, terminal
-        #)
+        # )
         self.memory[self.position] = {
-            "model_state":model_state.cpu(),
-            "action":action,
-            "next_model_state":next_model_state.cpu(),
-            "reward":reward,
-            "terminal":terminal
+            "model_state": model_state.cpu(),
+            "action": action,
+            "next_model_state": next_model_state.cpu(),
+            "reward": reward,
+            "terminal": terminal,
         }
         self.position = (self.position + 1) % self.capacity
 
