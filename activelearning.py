@@ -13,6 +13,9 @@ class ActiveLearning:
         self.gflownet = GFlowNet(self.config, self.env)
         self.querier = Querier(self.config, self.gflownet)
 
+        #setup function that creates the directories to save data, ...
+        self.setup()
+
     
     def runPipeline(self):
         self.iter = None
@@ -35,6 +38,9 @@ class ActiveLearning:
             queries = self.querier.buildQuery()
             energies = self.oracle.score(queries)
             self.oracle.updateDataset(queries, energies)
+    
+    def setup(self):
+        return
 
 
 
