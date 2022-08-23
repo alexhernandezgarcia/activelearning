@@ -1,10 +1,20 @@
+#To load the config
 from omegaconf import DictConfig, OmegaConf
 import hydra
+
+#Import main components of the pipeline
+from oracle import Oracle
+from proxy import Proxy
+from acquisition import AcquisitionFunction
+from env import Env
+from gflownet import GFlowNet
+from querier import Querier
 
 #--------------------------------
 '''
 AL Global pipeline
 '''
+
 #TODO : instantiate the config with hydra . Once we have the config object we can pass it to other functions
 class ActiveLearning:
     def __init__(self, config):
@@ -75,275 +85,284 @@ class Statistics():
     def init_comet(self):
         return
     
-    
-#---------------------------------------------
+
+
+
+
+
 '''
-ORACLE
-'''
 
-class Oracle:
-    '''
-    Generic Class for the oracle. 
-    The different oracles (can be classes (MLP-toy oracle eg) or just a single function calling another annex program)
-    can be called according to a config param in the method score
-    '''
-    def __init__(self, config, transition):
-        self.config = config
-        self.transition = transition
+WHAT FOLLOWS IS THE SKELETON, SEE IN THE RELEVANT FOLDER FOR DETAILS
 
-    def initializeDataset(self):
-        return
-    
-    def score(self, queries):
-        '''
-        Calls the specific oracle (class/function) and apply its "score" method on the dataset
-        '''
-        #the transition.base2oracle method will be called to transform the queries in the input format of the oracle
-        return
+'''   
+# #---------------------------------------------
+# '''
+# ORACLE
+# '''
 
-    def updateDataset(self, queries, energies):
-        return
+# class Oracle:
+#     '''
+#     Generic Class for the oracle. 
+#     The different oracles (can be classes (MLP-toy oracle eg) or just a single function calling another annex program)
+#     can be called according to a config param in the method score
+#     '''
+#     def __init__(self, config, transition):
+#         self.config = config
+#         self.transition = transition
 
+#     def initializeDataset(self):
+#         return
+    
+#     def score(self, queries):
+#         '''
+#         Calls the specific oracle (class/function) and apply its "score" method on the dataset
+#         '''
+#         #the transition.base2oracle method will be called to transform the queries in the input format of the oracle
+#         return
 
-#---------------------------------------------
-'''
-PROXY
-'''
-class Proxy:
-    def __init__(self, config, transition):
-        self.config = config
-        self.transition = transition
-        self.init_model()
-    
-    def init_model(self):
-        '''
-        Initialize the proxy we want (cf config). Each possible proxy is a class (MLP, transformer ...)
-        Ensemble methods will be another separate class
-        '''
-        return
-    
-    def load_model(self):
-        '''
-        will not have to be used normally because the global object ActiveLearning.proxy will be continuously updated
-        '''
-        return
-    
-    def converge(self):
-        '''
-        will call getDataLoaders/train / test / checkConvergencce 
-        '''
-        return
-    
-    def train(self):
-        ''' 
-        will call getLoss
-        '''
-        return
-    
-    def test(self):
-        return
-    
-    def getLoss(self):
-        return
-    
-    def checkConvergence(self):
-        return
-    
-    def getDataLoaders(self):
-        '''
-        will instantiate the training dataset and shuffle/work on it
-        '''
-        dataset = BuildDataset(self.config, self.transition)
-        return
-    
-    def evaluate(self):
-        return
-    
-class BuildDataset:
-    '''
-    Will load the dataset scored by the oracle and convert it in the right format for the proxy with transition.base2proxy
-    '''
-    def __init__(self, config, transition):
-        self.config = config
-        self.transition = transition
+#     def updateDataset(self, queries, energies):
+#         return
 
 
-#----------------------------------------
-'''
-ACQUISITION FUNCTION
-'''
+# #---------------------------------------------
+# '''
+# PROXY
+# '''
+# class Proxy:
+#     def __init__(self, config, transition):
+#         self.config = config
+#         self.transition = transition
+#         self.init_model()
+    
+#     def init_model(self):
+#         '''
+#         Initialize the proxy we want (cf config). Each possible proxy is a class (MLP, transformer ...)
+#         Ensemble methods will be another separate class
+#         '''
+#         return
+    
+#     def load_model(self):
+#         '''
+#         will not have to be used normally because the global object ActiveLearning.proxy will be continuously updated
+#         '''
+#         return
+    
+#     def converge(self):
+#         '''
+#         will call getDataLoaders/train / test / checkConvergencce 
+#         '''
+#         return
+    
+#     def train(self):
+#         ''' 
+#         will call getLoss
+#         '''
+#         return
+    
+#     def test(self):
+#         return
+    
+#     def getLoss(self):
+#         return
+    
+#     def checkConvergence(self):
+#         return
+    
+#     def getDataLoaders(self):
+#         '''
+#         will instantiate the training dataset and shuffle/work on it
+#         '''
+#         dataset = BuildDataset(self.config, self.transition)
+#         return
+    
+#     def evaluate(self):
+#         return
+    
+# class BuildDataset:
+#     '''
+#     Will load the dataset scored by the oracle and convert it in the right format for the proxy with transition.base2proxy
+#     '''
+#     def __init__(self, config, transition):
+#         self.config = config
+#         self.transition = transition
+
+
+# #----------------------------------------
+# '''
+# ACQUISITION FUNCTION
+# '''
        
-class AcquisitionFunction:
-    '''
-    Cf Oracle class : generic AF class which calls the right AF sub_class
-    '''
-    def __init__(self, config, proxy):
-        self.config = config
-        self.proxy = proxy
+# class AcquisitionFunction:
+#     '''
+#     Cf Oracle class : generic AF class which calls the right AF sub_class
+#     '''
+#     def __init__(self, config, proxy):
+#         self.config = config
+#         self.proxy = proxy
         
-        #the specific class of the exact AF is instantiated here
+#         #the specific class of the exact AF is instantiated here
     
-    def load_best_proxy(self):
-        '''
-        In case, loads the latest version of the proxy (no need normally)
-        '''
-        return
+#     def load_best_proxy(self):
+#         '''
+#         In case, loads the latest version of the proxy (no need normally)
+#         '''
+#         return
     
-    def get_reward_batch(self):
-        '''
-        calls the get_reward method of the appropriate Acquisition Class (MUtual Information, Expected Improvement, ...)
-        '''
+#     def get_reward_batch(self):
+#         '''
+#         calls the get_reward method of the appropriate Acquisition Class (MUtual Information, Expected Improvement, ...)
+#         '''
 
 
-#----------------------------------------
-'''
-ENVIRONMENT
-'''
+# #----------------------------------------
+# '''
+# ENVIRONMENT
+# '''
 
-class Env:
-    def __init__(self, config, acq):
-        self.config = config
-        self.acq = acq
+# class Env:
+#     def __init__(self, config, acq):
+#         self.config = config
+#         self.acq = acq
 
-        self.init_env()
+#         self.init_env()
 
-    def init_env(self, idx = 0):
-        #should we initialize in terms of state rather  ? self.state = ([], None)
-        self.seq = []
-        self.fid = None
-        self.done = False
-        self.idx = idx
+#     def init_env(self, idx = 0):
+#         #should we initialize in terms of state rather  ? self.state = ([], None)
+#         self.seq = []
+#         self.fid = None
+#         self.done = False
+#         self.idx = idx
     
-    def get_action_space(self):
-        '''
-        get all possible actions to get the parents
-        '''
-        return
+#     def get_action_space(self):
+#         '''
+#         get all possible actions to get the parents
+#         '''
+#         return
     
-    def get_mask(self):
-        '''
-        for sampling in GFlownet and masking in the loss function
-        '''
-        return
+#     def get_mask(self):
+#         '''
+#         for sampling in GFlownet and masking in the loss function
+#         '''
+#         return
     
-    def get_parents(self):
-        '''
-        to build the training batch (for the inflows)
-        '''
-        return
+#     def get_parents(self):
+#         '''
+#         to build the training batch (for the inflows)
+#         '''
+#         return
     
-    def step(self):
-        '''
-        for forward sampling
-        '''
+#     def step(self):
+#         '''
+#         for forward sampling
+#         '''
     
-    def acq2rewards(self):
-        '''
-        correction of the value of the AF for positive reward (or to scale it)
-        '''
+#     def acq2rewards(self):
+#         '''
+#         correction of the value of the AF for positive reward (or to scale it)
+#         '''
 
-        return
+#         return
     
-    def get_reward(self):
-        '''
-        get the reward values of a batch of candidates
-        '''
+#     def get_reward(self):
+#         '''
+#         get the reward values of a batch of candidates
+#         '''
 
 
-#-------------------------------
-'''
-GFLOWNET
-'''
+# #-------------------------------
+# '''
+# GFLOWNET
+# '''
 
-class GFlowNet:
-    def __init__(self, config, env):
-        self.config = config
-        self.env = env
+# class GFlowNet:
+#     def __init__(self, config, env):
+#         self.config = config
+#         self.env = env
 
-        #set loss function, device, buffer ...
+#         #set loss function, device, buffer ...
     
-    def init_model(self, load_best_model = True):
-        '''
-        Initializes the GFN policy network (separate class for MLP for now), and load the best one (random if not best GFN yet)
-        '''
+#     def init_model(self, load_best_model = True):
+#         '''
+#         Initializes the GFN policy network (separate class for MLP for now), and load the best one (random if not best GFN yet)
+#         '''
         
-        return
+#         return
     
-    def get_training_data(self):
-        '''
-        Calls the buffer to get some interesting training data
-        Performs backward sampling for off policy data and forward sampling
-        Calls the utils method forward sampling and backward sampling
-        '''
-        return
+#     def get_training_data(self):
+#         '''
+#         Calls the buffer to get some interesting training data
+#         Performs backward sampling for off policy data and forward sampling
+#         Calls the utils method forward sampling and backward sampling
+#         '''
+#         return
     
-    def forward_sampling(self):
-        return
+#     def forward_sampling(self):
+#         return
     
-    def backward_sampling(self):
-        return
+#     def backward_sampling(self):
+#         return
     
-    def flowmatch_loss(self):
-        return
+#     def flowmatch_loss(self):
+#         return
     
-    def trajectory_balance(self):
-        return
+#     def trajectory_balance(self):
+#         return
     
-    def train(self):
-        return
+#     def train(self):
+#         return
     
-    def sample(self):
-        '''
-        Just performs forward sampling with the trained GFlownet
-        '''
-        return
+#     def sample(self):
+#         '''
+#         Just performs forward sampling with the trained GFlownet
+#         '''
+#         return
  
-class Buffer:
-    '''
-    BUffer of data : 
-    - loads the data from oracle and put the best ones as offline training data
-    - maintains a replay buffer composed of the best trajectories sampled for training
-    '''
-    def __init__(self) -> None:
-        pass
+# class Buffer:
+#     '''
+#     BUffer of data : 
+#     - loads the data from oracle and put the best ones as offline training data
+#     - maintains a replay buffer composed of the best trajectories sampled for training
+#     '''
+#     def __init__(self) -> None:
+#         pass
 
 
-#-------------------------------
-'''
-QUERIER
-'''
+# #-------------------------------
+# '''
+# QUERIER
+# '''
 
-class Querier:
-    '''
-    Samples with the GFlownet latest model and then do post post processing to enhance the candidates and get statistics on them
-    '''
-    def __init__(self, config, gflownet):
-        self.config = config
-        self.gflownet = gflownet
+# class Querier:
+#     '''
+#     Samples with the GFlownet latest model and then do post post processing to enhance the candidates and get statistics on them
+#     '''
+#     def __init__(self, config, gflownet):
+#         self.config = config
+#         self.gflownet = gflownet
     
-    def load_model(self):
-        '''
-        loads the best GFlownet (no need normally)
-        '''
-        return
+#     def load_model(self):
+#         '''
+#         loads the best GFlownet (no need normally)
+#         '''
+#         return
     
-    def buildQuery(self):
-        '''
-        calls gflownet.sample() through sampleForQuery and then do post processing on it
-        '''
-        return
+#     def buildQuery(self):
+#         '''
+#         calls gflownet.sample() through sampleForQuery and then do post processing on it
+#         '''
+#         return
     
-    def sample4query(self):
-        return
+#     def sample4query(self):
+#         return
     
-    def enhance_queries(self):
-        '''
-        runs filtering, annealing, ...
-        '''
-        return
+#     def enhance_queries(self):
+#         '''
+#         runs filtering, annealing, ...
+#         '''
+#         return
     
-    def construct_query(self):
-        '''
-        Final filtering with fancy tools : clustering ...
-        '''
-        return
+#     def construct_query(self):
+#         '''
+#         Final filtering with fancy tools : clustering ...
+#         '''
+#         return
