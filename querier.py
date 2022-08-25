@@ -4,31 +4,31 @@ class Querier:
     '''
     def __init__(self, config, gflownet):
         self.config = config
-        self.gflownet = gflownet
+        self.gflownet = gflownet.gflownet
+        self.n_queries = self.config.al.queries_per_it
+
     
-    def load_model(self):
-        '''
-        loads the best GFlownet (no need normally)
-        '''
-        return
-    
-    def buildQuery(self):
+    def build_query(self):
         '''
         calls gflownet.sample() through sampleForQuery and then do post processing on it
         '''
-        return
+        queries = self.sample4query()
+        queries = self.enhance_queries(queries)
+        queries = self.construct_query(queries)
+        return queries
     
     def sample4query(self):
+        self.gflownet.sample_sequence(self.n_queries)
         return
-    
-    def enhance_queries(self):
+  
+    def enhance_queries(self, queries):
         '''
         runs filtering, annealing, ...
         '''
-        return
-    
-    def construct_query(self):
+        return queries
+
+    def construct_query(self, queries):
         '''
         Final filtering with fancy tools : clustering ...
         '''
-        return
+        return queries

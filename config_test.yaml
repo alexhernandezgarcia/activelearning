@@ -1,2 +1,72 @@
+device : "cpu"
+debug : True
 al:
   n_iter: 10
+  queries_per_it: 100
+
+path :
+  data_oracle : "./storage/data_oracle/database.npy"
+  model_proxy : "./storage/model_proxy/proxy"
+  model_gfn : "./storage/model_gfn/gfn"
+  model_oracle_MLP : "./storage/model_oracle/oracle_MLP"
+
+env:
+  main : "aptamers"
+  dict_size : 4
+  min_len : 10
+  max_len : 40
+  min_word_len : 1
+  max_word_len : 1
+
+oracle:
+  main : "toy"
+  init_dataset:
+    seed : 0
+    init_len : 100
+  
+proxy:
+  model : "mlp" #the architecture is specified in ProxyMLP class
+  training:
+    eps : 1.0e-4
+    dropout : 0.1
+    max_epochs : 200
+    training_batch : 10
+    history : 20
+  data:
+    shuffle: True
+    seed : 10
+
+gflownet:
+  policy_model : 
+  loss : 
+    function: "flowmatch"
+    flowmatch_eps: 1.0e-10
+  view_progress : True
+  training_data : 
+    online : 
+      seed : 1
+      random_action_prob : 0.1
+    offline :
+      pct_batch_empirical : 0.1
+  training_process:
+    batch_size : 16
+    training_steps : 2000
+    clip_grad_norm : 10
+    dropout: 0.1
+    opt : "adam"
+    adam_beta1 : 0.9
+    adam_beta2 : 0.99
+    momentum : 0.8
+    learning_rate : 1.0e-4
+    lr_decay_period : 1.0e+6
+    lr_decay_gamma : 0.75
+
+acquisition:
+  main: "proxy"
+  
+
+  
+
+    
+
+
