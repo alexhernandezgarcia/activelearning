@@ -9,6 +9,9 @@ import os
 #for mother class of Oracle
 from abc import abstractmethod
 
+'''
+Oracle Wrapper, callable in the AL pipeline, with key methods
+'''
 class Oracle:
     '''
     Generic Class for the oracle. 
@@ -31,8 +34,8 @@ class Oracle:
             raise NotImplementedError
 
     def initialize_dataset(self, save = True, return_data = False):
-        #caracteristics to create the first random samples, it can be changed to be not random later
-        #the first samples are in the "base format", so as to be directly saved as such. 
+        #the method to initialize samples in the BASE format is specific to each oracle for now. It can be changed.
+        #the first samples are in the "base format", so as to be directly saved as such and sent for query (base2oracle transition) 
 
         samples = self.oracle.initialize_samples_base()
 
@@ -65,7 +68,10 @@ class Oracle:
 
 
 #For generalization purposes, the oracles are outside the main class of oracle
-#First, general a general wrapper for oracles
+#First, general a general wrapper for oracles. All the other files.py follow the same formalism for modularity 
+'''
+BaseClass model for all other oracles
+'''
 class OracleBase:
     def __init__(self, config):
         self.config = config
@@ -79,7 +85,7 @@ class OracleBase:
         '''
         Transition from base format (format of the queries and stored data) to a format callable by the oracle
         '''
-        return
+        pass
     
     @abstractmethod
     def get_score(self, queries):
@@ -87,7 +93,8 @@ class OracleBase:
         - Transforms the queries to a good format with base2oracle
         - Calls the oracle on this data and return it in a good format --> for the proxy to train on.
         '''
-        return
+        pass
+
 
 '''
 Different Oracles Implemented
@@ -103,7 +110,7 @@ class OracleMLP(OracleBase):
         self.device = torch.device(self.config.device)
     
     def initialize_samples_base(self):
-
+    
         self.min_len = self.config.env.min_len
         self.max_len = self.config.env.max_len
         self.init_len = self.config.oracle.init_dataset.init_len

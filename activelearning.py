@@ -27,7 +27,7 @@ class ActiveLearning:
         self.logger = Logger()
 
         #load the main components of the AL pipeline
-        self.oracle_wrapper = Oracle(self.config)
+        self.oracle = Oracle(self.config)
         self.proxy = Proxy(self.config, self.logger)
         self.acq = AcquisitionFunction(self.config, self.proxy)
         self.env = Env(self.config, self.acq)
@@ -35,7 +35,7 @@ class ActiveLearning:
         self.querier = Querier(self.config, self.gflownet)
     
     def run_pipeline(self):
-        #useful variable
+
         self.iter = None
 
         #we initialize the first dataset
@@ -47,7 +47,6 @@ class ActiveLearning:
     
     def iterate(self):
         self.proxy.train()
-        return
         self.gflownet.train()
         return
         queries = self.querier.build_query()
@@ -67,7 +66,7 @@ class Logger():
     Incorporates the previous function "getModelState", ...
     Like FormatHandler, it can be passed on to querier, gfn, proxy, ... to get the statistics of training of the generated data at real time
     '''
-    def __init__(self) -> None:
+    def __init__(self):
         pass
 
     def init_comet(self):

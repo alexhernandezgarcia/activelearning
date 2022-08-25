@@ -37,18 +37,17 @@ proxy:
     seed : 10
 
 gflownet:
-  policy_model : 
+  policy_model : "mlp"
   loss : 
     function: "flowmatch"
     flowmatch_eps: 1.0e-10
   view_progress : True
-  training_data : 
-    online : 
-      seed : 1
-      random_action_prob : 0.1
-    offline :
-      pct_batch_empirical : 0.1
-  training_process:
+  sampling:
+    temperature : 1
+    seed : 1
+    random_action_prob : 0.1   
+  training:
+    pct_batch_empirical : 0.1
     batch_size : 16
     training_steps : 2000
     clip_grad_norm : 10
@@ -60,6 +59,7 @@ gflownet:
     learning_rate : 1.0e-4
     lr_decay_period : 1.0e+6
     lr_decay_gamma : 0.75
+    ttsr : 3
 
 acquisition:
   main: "proxy"

@@ -11,7 +11,7 @@ import os
 from abc import abstractmethod
 
 '''
-GLOBAL CLASS PROXY WRAPPER
+GLOBAL CLASS PROXY WRAPPER, callable with key methods
 '''
 class Proxy:
     def __init__(self, config, logger):
@@ -21,13 +21,13 @@ class Proxy:
 
     def init_proxy(self):
         if self.config.proxy.model == "mlp":
-            self.proxy_model = ProxyMLP(self.config, self.logger)
+            self.proxy = ProxyMLP(self.config, self.logger)
         else:
             raise NotImplementedError
     
     def train(self):
-        self.data_handler = BuildDataset(self.config, self.proxy_model)
-        self.proxy_model.converge(self.data_handler)
+        self.data_handler = BuildDataset(self.config, self.proxy)
+        self.proxy.converge(self.data_handler)
         return
 
 
@@ -43,66 +43,6 @@ class ProxyBase:
         self.path_data = self.config.path.data_oracle
         self.path_model = self.config.path.model_proxy  
 
-    @abstractmethod
-    def init_model(self):
-        '''
-        Initialize the proxy we want (cf config). Each possible proxy is a class (MLP, transformer ...)
-        Ensemble methods will be another separate class
-        '''
-        pass
-
-    @abstractmethod
-    def load_model(self):
-        '''
-        will not have to be used normally because the global object ActiveLearning.proxy will be continuously updated
-        '''
-        pass
-    
-    @abstractmethod
-    def converge(self, data_handler):
-        '''
-        will call getDataLoaders/train_batch/ test / checkConvergencce 
-        '''
-        pass
-    
-    @abstractmethod
-    def train(self):
-        ''' 
-        will call getLoss
-        '''
-        pass
-    
-    @abstractmethod
-    def test(self):
-        pass
-    
-    @abstractmethod
-    def get_loss(self):
-        pass
-    
-    @abstractmethod
-    def check_convergence(self):
-        pass
-    
-    @abstractmethod
-    def get_data_loaders(self):
-        '''
-        will instantiate the training dataset and shuffle/work on it
-        '''
-        pass
-        
-    @abstractmethod
-    def evaluate(self):
-        pass
-
-    @abstractmethod
-    def base2proxy(self, state):
-        pass
-
-class ProxyMLP(ProxyBase):
-    def __init__(self, config, logger, init_model = False):
-        super().__init__(config, logger)
-
         #Training Parameters
         self.training_eps = self.config.proxy.training.eps
         self.max_epochs = self.config.proxy.training.max_epochs
@@ -115,16 +55,23 @@ class ProxyMLP(ProxyBase):
         self.shuffle_data = self.config.proxy.data.shuffle
         self.seed_data = self.config.proxy.data.seed
 
-        #initialize model 
-        if init_model:
-            self.init_model()
-    
+        self.model_class = NotImplemented  #will be precised in child classes
+
+ 
+    @abstractmethod
     def init_model(self):
-        self.model = MLP(self.config).to(self.device)
+        '''
+        Initialize the proxy we want (cf config). Each possible proxy is a class (MLP, transformer ...)
+        Ensemble methods will be another separate class
+        '''
+        self.model = self.model_class(self.config).to(self.device)
         self.optimizer = optim.AdamW(self.model.parameters(), amsgrad = True)
-        return
-    
-    def load(self, dir_name = None):
+
+    @abstractmethod
+    def load_model(self, dir_name = None):
+        '''
+        will not have to be used normally because the global object ActiveLearning.proxy will be continuously updated
+        '''
         if dir_name == None:
             dir_name = self.config.path.model_proxy
         
@@ -145,13 +92,17 @@ class ProxyMLP(ProxyBase):
         else:
             raise NotImplementedError
     
+    @abstractmethod
     def converge(self, data_handler):
+        '''
+        will call getDataLoaders/train_batch/ test / checkConvergencce 
+        '''
         #we reset the model, cf primacy bias, here we train on more and more data
         self.init_model()
 
         #for statistics we save the tr and te errors
         [self.err_tr_hist, self.err_te_hist] = [[], []]
-
+        
         #get training data in torch format
         tr, te = data_handler.get_data_loaders()
 
@@ -168,6 +119,7 @@ class ProxyMLP(ProxyBase):
                 self.err_tr_hist.append(0)
 
             self.test(te)
+
 
             if self.err_te_hist[-1] == np.min(
                 self.err_te_hist
@@ -203,7 +155,12 @@ class ProxyMLP(ProxyBase):
             #         self.err_tr_hist, self.err_te_hist
             #     )
  
+    
+    @abstractmethod
     def train(self, tr):
+        ''' 
+        will call getLoss
+        '''
         err_tr = []
         self.model.train(True)
         for i, trainData in enumerate(tr):
@@ -214,7 +171,8 @@ class ProxyMLP(ProxyBase):
             self.optimizer.step()
         
         self.err_te_hist.append(torch.mean(torch.stack(err_tr)).cpu().detach().numpy())
-
+    
+    @abstractmethod
     def test(self, te):
         err_te = []
         self.model.eval()
@@ -224,19 +182,18 @@ class ProxyMLP(ProxyBase):
                 err_te.append(loss.data)
         
         self.err_te_hist.append(torch.mean(torch.stack(err_te)).cpu().detach().numpy())
-
+    
+    @abstractmethod
     def get_loss(self, data):
         inputs = data[0]
         targets = data[1]
-
         if self.device == "cuda":
             inputs = inputs.cuda()
             targets = targets.cuda()
-        
         output = self.model(inputs.float())
-
         return F.mse_loss(output[:, 0], targets.float())
-    
+        
+    @abstractmethod
     def check_convergence(self):
         eps = self.training_eps
         history = self.history
@@ -271,13 +228,54 @@ class ProxyMLP(ProxyBase):
                     self.epochs + 1, min(self.err_te_hist)
                 )
             )
-
+      
+    @abstractmethod
     def evaluate(self, data):
         self.model.eval()
         with torch.no_grad():
             output = self.model(data).cpu().detach().numpy()
             return output  
+
+    @abstractmethod
+    def base2proxy(self, state):
+        pass
+
+'''
+In the child Classes, the previous abstract methods can be overwritten. In what follows, the minimum is done to precise the proxy, ie
+- the Network is precised
+- The conversion format is given for its input
+'''
+class ProxyMLP(ProxyBase):
+    def __init__(self, config, logger, init_model = False):
+        super().__init__(config, logger)
+        self.model_class = MLP
+        if init_model:
+            self.init_model()
+
+    def init_model(self):
+        super().init_model()
+            
+    def load_model(self, dir_name = None):
+        super().load_model(dir_name)
+   
+    def converge(self, data_handler):
+        super().converge(data_handler)
+
+    def train(self, tr):
+        super().train(tr)
+
+    def test(self, te):
+        super().test(te)
+
+    def get_loss(self, data):
+        return super().get_loss(data)
     
+    def check_convergence(self):
+        super().check_convergence()
+
+    def evaluate(self, data):
+        return super().evaluate(data)
+  
     def base2proxy(self, state):
         #useful format
         self.dict_size = self.config.env.dict_size
@@ -335,6 +333,7 @@ class BuildDataset:
         samples = list(map(self.proxy.base2proxy, dataset["samples"]))
         self.samples = np.array(samples)
 
+
     def reshuffle(self):
         self.samples, self.targets = shuffle(
             self.samples, self.targets, random_state=self.seed_data
@@ -364,7 +363,7 @@ class BuildDataset:
             train_dataset.append(self.__getitem__(i))
         for i in range(test_size):  # test data is drawn from oldest datapoints
             test_dataset.append(self.__getitem__(i))
-        
+
         tr = data.DataLoader(
             train_dataset,
             batch_size = self.proxy.batch_size,

@@ -4,7 +4,7 @@ class Querier:
     '''
     def __init__(self, config, gflownet):
         self.config = config
-        self.gflownet = gflownet.gflownet
+        self.gflownet = gflownet
         self.n_queries = self.config.al.queries_per_it
 
     
@@ -18,7 +18,7 @@ class Querier:
         return queries
     
     def sample4query(self):
-        self.gflownet.sample_sequence(self.n_queries)
+        self.gflownet.sample(self.n_queries)
         return
   
     def enhance_queries(self, queries):

@@ -25,14 +25,10 @@ class Env:
     
     def init_env(self):
         if self.config.env.main == "aptamers":
-            self.env = EnvAptamers(self.config, self.acq)
+            self.env = EnvAptamers
         else:
             raise NotImplementedError
-
     
-
-
-
 '''
 Generic Env Base Class
 '''
@@ -42,10 +38,16 @@ class EnvBase:
         self.config = config
         self.acq = acq
 
+        self.device = self.config.device
+
+
     @abstractmethod
-    def init_env(self, idx = 0):
+    def create_new_env(self, idx):
         pass
 
+    @abstractmethod
+    def init_env(self, idx):
+        pass
 
     @abstractmethod
     def get_action_space(self):
@@ -53,7 +55,7 @@ class EnvBase:
         get all possible actions to get the parents
         '''
         pass
-    
+ 
     @abstractmethod
     def get_mask(self):
         '''
@@ -62,21 +64,21 @@ class EnvBase:
         pass
     
     @abstractmethod
-    def get_parents(self):
+    def get_parents(self, backward = True):
         '''
         to build the training batch (for the inflows)
         '''
         pass
     
     @abstractmethod
-    def step(self):
+    def step(self,, action):
         '''
         for forward sampling
         '''
         pass
     
     @abstractmethod
-    def acq2rewards(self):
+    def acq2rewards(self, acq_values):
         '''
         correction of the value of the AF for positive reward (or to scale it)
         '''
@@ -84,7 +86,7 @@ class EnvBase:
         pass
     
     @abstractmethod
-    def get_reward(self):
+    def get_reward(self, states, done):
         '''
         get the reward values of a batch of candidates
         '''
@@ -107,21 +109,27 @@ class EnvAptamers(EnvBase):
         self.min_word_len = self.config.env.min_word_len
         self.n_alphabet = self.config.env.dict_size
 
-        self.action_space = self.get_actions_space()
+        self.action_space = self.get_action_space()
         self.token_eos = self.get_token_eos(self.action_space)
 
         self.env_class = EnvAptamers
 
         self.init_env()
+   
+    def create_new_env(self, idx):
+        env = EnvAptamers(self.config, self.acq)
+        env.init_env(idx)
+        return env
     
     def init_env(self, idx=0):
         super().init_env(idx)
-        self.seq = np.array([])
+        self.state = np.array([])
         self.n_actions_taken = 0
         self.done = False
         self.id = idx
+        self.last_action = None
 
-    def get_actions_space(self):
+    def get_action_space(self):
         super().get_action_space()
         valid_wordlens = np.arange(self.min_word_len, self.max_word_len +1)
         alphabet = [a for a in range(self.n_alphabet)]
@@ -142,7 +150,7 @@ class EnvAptamers(EnvBase):
         if self.done : 
             return [0 for _ in mask]
         
-        seq_len = len(self.seq)
+        seq_len = len(self.state)
 
         if seq_len < self.min_seq_len:
             mask[self.token_eos] = 0
@@ -155,12 +163,12 @@ class EnvAptamers(EnvBase):
             return mask
     
     def get_parents(self, backward = False):
-        super().get_parents()
+        super().get_parents(backward)
 
         if self.done:
-            if self.seq[-1] == self.token_eos:
+            if self.state[-1] == self.token_eos:
                 parents_a = [self.token_eos]
-                parents = [self.seq[:-1]]
+                parents = [self.state[:-1]]
                 if backward:
                     self.done = False
                 return parents, parents_a 
@@ -171,16 +179,16 @@ class EnvAptamers(EnvBase):
             parents = []
             actions = []
             for idx, a in enumerate(self.action_space):
-                if self.seq[-len(a): ] == list(a):
-                    parents.append((self.seq[:-len(a)]))
+                if self.state[-len(a): ] == list(a):
+                    parents.append((self.state[:-len(a)]))
                     actions.append(idx)
             
             return parents, actions
     
     def step(self, action):
-        super().step()
+        super().step(action)
         valid = False
-        seq = self.seq
+        seq = self.state
         seq_len = len(seq)
 
         if (action == self.token_eos) and (self.done == False):
@@ -189,7 +197,8 @@ class EnvAptamers(EnvBase):
                 next_seq = np.append(seq, action)
                 self.done = True
                 self.n_actions_taken += 1
-                self.seq = next_seq
+                self.state = next_seq
+                self.last_action = self.token_eos
 
                 return next_seq, action, valid
         
@@ -202,13 +211,40 @@ class EnvAptamers(EnvBase):
                 valid = True
                 next_seq = np.append(seq, action)
                 self.n_actions_taken += 1
-                self.seq = next_seq
+                self.state = next_seq
+                self.last_action = action
                 return next_seq, action, valid
         
         else:
             raise TypeError("invalid action to take")
+    
+    def acq2reward(self, acq_values):
+        min_reward = 1e-10
+        return np.clip(acq_values, min_reward, None)
+
+    def get_reward(self, states, done):
+        rewards = np.zeros(len(done), dtype = float)
+        final_states = [s for s, d in zip(states, done) if d]
+        inputs_af_base = [self.manip2base(final_state) for final_state in final_states]
+        
+        final_rewards = self.acq.get_reward(inputs_af_base)
+        final_rewards = self.acq2reward(final_rewards)
+
+        done = [True if d else False for d in done]
+        rewards[done] = final_rewards
+        return rewards
         
     def base2manip(self, state):
-        return
+        seq_base = state
+        seq_manip = np.concatenate((seq_base, [self.token_eos]))
+        return seq_manip
     
+    def manip2base(self, state):
+        seq_manip = state
+        if seq_manip[-1] == self.token_eos:
+            seq_base = seq_manip[:-1]
+            return seq_base
+        else:
+            raise TypeError
+
     
