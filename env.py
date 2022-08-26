@@ -25,7 +25,7 @@ class Env:
     
     def init_env(self):
         if self.config.env.main == "aptamers":
-            self.env = EnvAptamers
+            self.env = EnvAptamers(self.config, self.acq)
         else:
             raise NotImplementedError
     
@@ -64,14 +64,14 @@ class EnvBase:
         pass
     
     @abstractmethod
-    def get_parents(self, backward = True):
+    def get_parents(self, backward = False):
         '''
         to build the training batch (for the inflows)
         '''
         pass
     
     @abstractmethod
-    def step(self,, action):
+    def step(self,action):
         '''
         for forward sampling
         '''
@@ -158,6 +158,7 @@ class EnvAptamers(EnvBase):
         
         elif seq_len == self.max_seq_len:
             mask[:self.token_eos] = [0] * len(self.action_space)
+            return mask
         
         else:
             return mask
@@ -190,8 +191,8 @@ class EnvAptamers(EnvBase):
         valid = False
         seq = self.state
         seq_len = len(seq)
-
-        if (action == self.token_eos) and (self.done == False):
+       
+        if (action == [self.token_eos]) and (self.done == False):
             if seq_len >= self.min_seq_len and seq_len <= self.max_seq_len:
                 valid = True
                 next_seq = np.append(seq, action)
@@ -206,7 +207,7 @@ class EnvAptamers(EnvBase):
             valid = False
             return None, None, valid
         
-        elif self.done == False and not(action == self.token_eos):
+        elif self.done == False and not(action == [self.token_eos]):
             if action in list(map(list, self.action_space)) and seq_len <= self.max_seq_len:
                 valid = True
                 next_seq = np.append(seq, action)
@@ -220,17 +221,21 @@ class EnvAptamers(EnvBase):
     
     def acq2reward(self, acq_values):
         min_reward = 1e-10
-        return np.clip(acq_values, min_reward, None)
+        true_reward = np.clip(acq_values, min_reward, None)
+
+        exponentiate = np.vectorize(lambda x: x**5)
+        return exponentiate(true_reward)
 
     def get_reward(self, states, done):
         rewards = np.zeros(len(done), dtype = float)
         final_states = [s for s, d in zip(states, done) if d]
         inputs_af_base = [self.manip2base(final_state) for final_state in final_states]
         
-        final_rewards = self.acq.get_reward(inputs_af_base)
+        final_rewards = self.acq.get_reward(inputs_af_base).view(len(final_states)).numpy()
         final_rewards = self.acq2reward(final_rewards)
 
-        done = [True if d else False for d in done]
+        done = np.array(done)
+        
         rewards[done] = final_rewards
         return rewards
         

@@ -154,8 +154,8 @@ class ProxyBase:
             #     self.statistics.log_comet_proxy_training(
             #         self.err_tr_hist, self.err_te_hist
             #     )
- 
-    
+
+
     @abstractmethod
     def train(self, tr):
         ''' 

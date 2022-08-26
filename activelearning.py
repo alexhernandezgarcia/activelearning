@@ -40,16 +40,19 @@ class ActiveLearning:
 
         #we initialize the first dataset
         self.oracle.initialize_dataset()
-
+        
         #we run each round of active learning
         for self.iter in range(self.config.al.n_iter):
             self.iterate()
+
     
     def iterate(self):
         self.proxy.train()
+        
         self.gflownet.train()
-        return
+        
         queries = self.querier.build_query()
+        print(queries)
         energies = self.oracle.score(queries)
         self.oracle.update_dataset(queries, energies)
     
@@ -76,4 +79,7 @@ if __name__ == "__main__":
     config_test_name = "config_test.yaml"
     al = ActiveLearning(config = config_test_name)
     al.run_pipeline()
+
+    config = OmegaConf.load("config_test.yaml")
+
 

@@ -42,7 +42,8 @@ class GFlowNet:
         self.gflownet.train()
     
     def sample(self, nb_queries):
-        self.gflownet.sample_queries(nb_queries)
+        queries = self.gflownet.sample_queries(nb_queries)
+        return queries
         
         
 '''
@@ -149,7 +150,7 @@ class GFlowNetBase:
                             state[k] = v.cuda()
             
             self.lr_scheduler = make_lr_scheduler(self.opt, self.config)
-        
+            print("self.model new model created ! ")
         if best_model:
             path_best_model = self.path_model
             if os.path.exists(path_best_model):
@@ -158,7 +159,7 @@ class GFlowNetBase:
                 self.best_model.load_state_dict(checkpoint["model_state_dict"])
                 self.best_opt = make_opt(self.best_model.parameters(), self.config)
                 self.best_opt.load_state_dict(checkpoint["optimizer_state_dict"])
-                print("best gfn loaded") 
+                print("self.best_model best gfn loaded") 
 
                 if self.device == "cuda":
                     self.best_model.cuda()  # move net to GPU
@@ -204,6 +205,7 @@ class GFlowNetBase:
         if self.sampling_model == NotImplemented:
             print("weird, the sampling model should be initialized already")
             self.sampling_model = self.best_model
+            self.sampling_model.eval()
 
         states = [env.state for env in envs]
         states_ohe = torch.stack(list(map(self.manip2policy, states))).view(len(states), -1)
@@ -214,7 +216,7 @@ class GFlowNetBase:
                 action_logits = self.sampling_model(states_ohe)
             action_logits /= temperature
         elif policy == "uniform":
-            action_logits = tf_list(np.ones(len(states), len(self.env.action_space) + 1))
+            action_logits = tf_list(np.ones((len(states), len(self.env.action_space) + 1)))
         elif policy == "mixt":
             random_probas = [self.rng.uniform() for _ in range(len(envs))]
             envs_random = [env for i, env in enumerate(envs) if random_probas[i] <= self.random_action_prob]
@@ -222,44 +224,63 @@ class GFlowNetBase:
 
             if envs_random: 
                 envs_random, actions_random, valids_random = self.forward_sample(envs_random, policy = "uniform", temperature = self.temperature)
+                # print('random', actions_random)
+                # print(type(valids_random))
+
             else:
-                envs_random, actions_random, valids_random = [], [], []
+                envs_random, actions_random, valids_random = [], torch.tensor([]), ()
 
             if envs_no_random:
                 envs_no_random, actions_no_random, valids_no_random = self.forward_sample(envs_no_random, policy = "model", temperature=self.temperature)
+                # print('no random', actions_no_random)
+                # print(valids_no_random)
+                
             else:
-                envs_no_random, actions_no_random, valids_no_random = [], [], []
-
-            return envs_no_random + envs_random, actions_no_random + actions_random, valids_no_random + valids_random
+                envs_no_random, actions_no_random, valids_no_random = [], torch.tensor([]), ()
+            final_envs = envs_random + envs_no_random
+            final_actions = torch.cat((actions_random, actions_no_random), dim = 0)
+            final_valids = valids_random + valids_no_random
+            
+            return final_envs, final_actions, final_valids
         
         else:
             raise NotImplemented
         
-
+        
         action_logits = torch.where(masks == 1, action_logits, - self.loginf)
         if all(torch.isfinite(action_logits).flatten()):
             actions = Categorical(logits=action_logits).sample()
         else:
             raise ValueError("Action could not be sampled from model!")
-
+        
         assert len(envs) == actions.shape[0]
+  
         # Execute actions
-        _, _, valids = zip(*[env.step(action) for env, action in zip(envs, actions)])
+        _, _, valids = zip(*[env.step([action.tolist()]) for env, action in zip(envs, actions)])
+        
         return envs, actions, valids
 
 
     @abstractmethod
-    def backward_sample(self, env, policy, temperature):
-        parents, parents_a = self.env.get_parents(backward = True) #remplacer state par seq
+    def backward_sample(self, env, policy, temperature = 0):
+        if temperature == 0:
+            temperature = self.config.gflownet.sampling.temperature
+
+        parents, parents_a = env.get_parents(backward = True) #remplacer state par seq
+
         parents_ohe = torch.stack(list(map(self.manip2policy, parents))).view(len(parents), -1)
+
         if policy == "model":
+            self.best_model.eval()
             with torch.no_grad():
                 action_logits = self.best_model(parents_ohe)[
                     torch.arange(len(parents)), parents_a
                 ]
             action_logits /= temperature
+        
             if all(torch.isfinite(action_logits).flatten()):
                 action_idx = Categorical(logits=action_logits).sample().item()
+         
             else:
                 raise ValueError("Action could not be sampled from model!")
         
@@ -268,7 +289,8 @@ class GFlowNetBase:
         else:
             raise NotImplemented
         env.state = parents[action_idx] #state ou fonction set state
-        env.last_action = action_idx
+        env.last_action = parents_a[action_idx]
+  
         return env, parents, parents_a
 
     @abstractmethod
@@ -331,6 +353,7 @@ class GFlowNetBase:
         '''
         Just performs forward sampling with the trained GFlownet
         '''
+        print("we sample for query !")
         self.make_model(best_model=True)
         self.sampling_model = self.best_model
 
@@ -338,21 +361,20 @@ class GFlowNetBase:
         envs = [self.env.create_new_env(idx = idx) for idx in range(nb_queries)]
 
         while envs:
-                envs, actions, valids = self.forward_sample(
-                    envs, policy="model", temperature= self.temperature)
+            envs, actions, valids = self.forward_sample(
+                envs, policy="model", temperature= self.temperature)
                 
                 
-                remaining_envs = []
-                for env in envs:
-                    if env.done:
-                        batch.append(
+            remaining_envs = []
+            for env in envs:
+                if env.done:
+                    batch.append(
                             self.env.manip2base(env.state)
                         )
-                    else:
-                        remaining_envs.append(env)
-                envs = remaining_envs
-
-        print(batch)
+                else:
+                    remaining_envs.append(env)
+            envs = remaining_envs
+        
         return batch
 
     @abstractmethod
@@ -379,17 +401,18 @@ class GFlowNet_A(GFlowNetBase):
         
 
     def forward_sample(self, envs, policy="model", temperature=0):
-        super().forward_sample(envs, policy, temperature)
+        return super().forward_sample(envs, policy, temperature)
 
 
-    def backward_sample(self, env, policy = "model", temperature = 1):
-        super().backward_sample(env, policy, temperature)
+    def backward_sample(self, env, policy = "model", temperature = 0):
+        return super().backward_sample(env, policy, temperature)
 
     
     def get_training_data(self, batch_size):
         super().get_training_data(batch_size)
 
         batch = []
+
         envs = [
             self.env.create_new_env(idx)
             for idx in range(batch_size)
@@ -405,20 +428,21 @@ class GFlowNet_A(GFlowNetBase):
             env.state = state_manip
             env.last_action = self.env.token_eos
 
+
             while len(env.state) > 0:
+                previous_state = env.state
                 previous_done = env.done
                 previous_mask = env.get_mask()
-                previous_seq = env.state
-                previous_action = env.last_action
-
+   
+                
                 env, parents, parents_a = self.backward_sample(
                         env,
                         policy="model",
                         temperature=self.temperature
                     )
-
-                
-                seq_ohe = self.manip2policy(previous_seq)
+                #for backward sampling, the last action is updated after
+                previous_action = env.last_action 
+                seq_ohe = self.manip2policy(previous_state)
                 parents_ohe = torch.stack(
                     list(map(self.manip2policy, parents))
                     )
@@ -428,32 +452,33 @@ class GFlowNet_A(GFlowNetBase):
                         seq_ohe.unsqueeze(0),
                         tl_list([previous_action]),
                         tf_list([previous_mask]),
-                        previous_seq,
+                        previous_state,
                         parents_ohe.view(len(parents), -1),
                         tl_list(parents_a),
                         previous_done,
                         tl_list([env.id]*len(parents)),
                         tl_list(
                             [
-                                len(previous_seq) - 1 if not previous_done
-                                else len(previous_seq)
+                                len(previous_state) - 1 if not previous_done
+                                else len(previous_state)
                             ]
                         )
                     ]
                 )
 
-            
             env.done = True
+
+
         
         envs = [env for env in envs if not env.done]
         self.sampling_model = self.best_model
         self.sampling_model.eval()
-
+        
         while envs:
 
             envs, actions, valids = self.forward_sample(
                     envs,
-                    policy="model",
+                    policy="mixt",
                     temperature=self.temperature
                 )
 
@@ -464,24 +489,37 @@ class GFlowNet_A(GFlowNetBase):
                     state_ohe = self.manip2policy(env.state)
                     parents_ohe = torch.stack(list(map(self.manip2policy, parents)))
                     mask = env.get_mask()
-                    
                     batch.append(
                             [
                                 state_ohe.unsqueeze(0),
-                                tl_list(action),
-                                tf_list(mask),
+                                tl_list([int(action)]), #don't know why it is a scalar sometime ...
+                                tf_list([mask]),
                                 env.state,
                                 parents_ohe.view(len(parents), -1),
                                 tl_list(parents_a),
                                 env.done,
                                 tl_list([env.id] * len(parents)),
-                                tl_list([env.n_actions_taken]),
+                                tl_list([env.n_actions_taken - 1]), #convention, we start at 0
                             ]
                         )
             
+
+                    # print(
+                    #         [
+                    #             state_ohe.unsqueeze(0),
+                    #             tl_list([action]),
+                    #             tf_list([mask]),
+                    #             env.state,
+                    #             parents_ohe.view(len(parents), -1),
+                    #             tl_list(parents_a),
+                    #             env.done,
+                    #             tl_list([env.id] * len(parents)),
+                    #             tl_list([env.n_actions_taken - 1]),
+                    #         ]
+                    # )
             envs = [env for env in envs if not env.done]
 
-
+        
         (
             states,
             actions,
@@ -529,27 +567,25 @@ class GFlowNet_A(GFlowNetBase):
             )
         )
 
-        seqs, _, masks, rewards, parents, actions, done, _, _ = map(
-            torch.cat, zip(*data)
-        )
-    
+        seqs, _, masks, rewards, parents, actions, done, _, _ = map(torch.cat, zip(*data))
 
         #IN FLOW
         q_in = self.model(parents)[torch.arange(parents.shape[0]), actions]
-        parents_Qsa = q_in
+        parents_Qsa = q_in   
         in_flow = torch.log(self.flowmatch_eps + to(torch.zeros((seqs.shape[0],)).index_add_(0, parents_incoming_flow_idxs, torch.exp(parents_Qsa))))
 
         #OUTFLOW
         q_out = self.model(seqs)
         q_out = torch.where(masks ==1, q_out, -self.loginf)
         q_out = torch.logsumexp(q_out, 1)
-
+    
         child_Qsa = q_out * (1 - done) - self.loginf*done
-        out_flow = torch.log(self.flowmatch_eps + rewards + torch.exp(child_Qsa))
 
+        out_flow = torch.log(self.flowmatch_eps + rewards + torch.exp(child_Qsa))
+        
         #LOSS
         loss = (in_flow - out_flow).pow(2).mean()
-
+        print("loss gfn", loss.item())
         return loss
     
     def train(self):
@@ -557,7 +593,7 @@ class GFlowNet_A(GFlowNetBase):
 
     
     def sample_queries(self, nb_queries):
-        super().sample_queries(nb_queries)
+        return super().sample_queries(nb_queries)
                 
 
 
@@ -566,7 +602,7 @@ class GFlowNet_A(GFlowNetBase):
         initial_len = len(seq_manip)
 
         seq_tensor = torch.from_numpy(seq_manip)
-        seq_ohe =  F.one_hot(seq_tensor.long(), num_classes=self.env.n_alphabet)
+        seq_ohe =  F.one_hot(seq_tensor.long(), num_classes=self.env.n_alphabet+1)
         input_policy = seq_ohe.reshape(1, -1).float()
 
         number_pads = (self.env.max_seq_len + 1 - initial_len)

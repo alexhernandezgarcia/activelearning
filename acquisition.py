@@ -44,7 +44,7 @@ class AcquisitionFunctionBase:
         In case, loads the latest version of the proxy (no need normally)
         '''
         if os.path.exists(self.config.path.model_proxy):
-            self.proxy.load_model(self.config.path.model.proxy)
+            self.proxy.load_model(self.config.path.model_proxy)
         
         else:
             raise FileNotFoundError
@@ -78,7 +78,7 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
         self.proxy.model.eval()
         with torch.no_grad():
             outputs = self.proxy.model(inputs)
-        return outputs
+        return outputs.cpu().detach()
 
 
     
