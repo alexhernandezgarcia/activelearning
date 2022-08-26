@@ -160,20 +160,21 @@ class GFlowNetBase:
                 self.best_opt = make_opt(self.best_model.parameters(), self.config)
                 self.best_opt.load_state_dict(checkpoint["optimizer_state_dict"])
                 print("self.best_model best gfn loaded") 
-
-                if self.device == "cuda":
-                    self.best_model.cuda()  # move net to GPU
-                    for state in self.best_opt.state.values():  # move optimizer to GPU
-                        for k, v in state.items():
-                            if isinstance(v, torch.Tensor):
-                                state[k] = v.cuda()   
-
-                self.best_lr_scheduler = make_lr_scheduler(self.best_opt, self.config)    
+  
             else:
                 print("the best previous model could not be loaded, random gfn for best model")
                 self.best_model = self.model_class(self.config)
                 self.best_opt = make_opt(self.best_model.parameters(), self.config)
                 self.best_lr_scheduler = make_lr_scheduler(self.best_opt, self.config)
+            
+            if self.device == "cuda":
+                self.best_model.cuda()  # move net to GPU
+                for state in self.best_opt.state.values():  # move optimizer to GPU
+                    for k, v in state.items():
+                        if isinstance(v, torch.Tensor):
+                            state[k] = v.cuda()   
+
+            self.best_lr_scheduler = make_lr_scheduler(self.best_opt, self.config)  
 
 
     @abstractmethod
@@ -228,7 +229,7 @@ class GFlowNetBase:
                 # print(type(valids_random))
 
             else:
-                envs_random, actions_random, valids_random = [], torch.tensor([]), ()
+                envs_random, actions_random, valids_random = [], to(torch.tensor([])), ()
 
             if envs_no_random:
                 envs_no_random, actions_no_random, valids_no_random = self.forward_sample(envs_no_random, policy = "model", temperature=self.temperature)
@@ -236,7 +237,7 @@ class GFlowNetBase:
                 # print(valids_no_random)
                 
             else:
-                envs_no_random, actions_no_random, valids_no_random = [], torch.tensor([]), ()
+                envs_no_random, actions_no_random, valids_no_random = [], to(torch.tensor([])), ()
             final_envs = envs_random + envs_no_random
             final_actions = torch.cat((actions_random, actions_no_random), dim = 0)
             final_valids = valids_random + valids_no_random
@@ -572,7 +573,8 @@ class GFlowNet_A(GFlowNetBase):
         #IN FLOW
         q_in = self.model(parents)[torch.arange(parents.shape[0]), actions]
         parents_Qsa = q_in   
-        in_flow = torch.log(self.flowmatch_eps + to(torch.zeros((seqs.shape[0],)).index_add_(0, parents_incoming_flow_idxs, torch.exp(parents_Qsa))))
+        
+        in_flow = torch.log(self.flowmatch_eps + to(torch.zeros((seqs.shape[0],))).index_add_(0, parents_incoming_flow_idxs, torch.exp(parents_Qsa)))
 
         #OUTFLOW
         q_out = self.model(seqs)

@@ -80,6 +80,6 @@ if __name__ == "__main__":
     al = ActiveLearning(config = config_test_name)
     al.run_pipeline()
 
-    config = OmegaConf.load("config_test.yaml")
+
 
 

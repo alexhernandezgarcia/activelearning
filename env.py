@@ -222,8 +222,8 @@ class EnvAptamers(EnvBase):
     def acq2reward(self, acq_values):
         min_reward = 1e-10
         true_reward = np.clip(acq_values, min_reward, None)
-
-        exponentiate = np.vectorize(lambda x: x**5)
+        customed_af = lambda x: x**3 #to favor the higher rewards in a more spiky way, can be customed
+        exponentiate = np.vectorize(customed_af)
         return exponentiate(true_reward)
 
     def get_reward(self, states, done):

@@ -302,7 +302,7 @@ class ProxyMLP(ProxyBase):
             ).view(1, -1)
             input_proxy = torch.cat((input_proxy, padding), dim = 1)
         
-        return input_proxy.to(self.device)[0]
+        return input_proxy.to("cpu")[0] #weird, it always has to be cpu ...
 
 
 '''
