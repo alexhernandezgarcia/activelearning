@@ -13,13 +13,13 @@ path :
 env:
   main : "aptamers"
   dict_size : 4
-  min_len : 4
-  max_len : 4
+  min_len : 20
+  max_len : 30
   min_word_len : 1
   max_word_len : 1
 
 oracle:
-  main : "toy"
+  main : "nupack"
   init_dataset:
     seed : 0
     init_len : 100
@@ -56,7 +56,7 @@ gflownet:
     adam_beta1 : 0.9
     adam_beta2 : 0.99
     momentum : 0.8
-    learning_rate : 1.0e-3
+    learning_rate : 1.0e-4
     lr_decay_period : 1.0e+6
     lr_decay_gamma : 0.75
     ttsr : 3

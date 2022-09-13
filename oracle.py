@@ -8,7 +8,12 @@ import torch.nn.functional as F
 import os
 #for mother class of Oracle
 from abc import abstractmethod
-
+#NUPACK ORACLE
+try: # we don't always install these on every platform
+    from nupack import *
+except:
+    print("COULD NOT IMPORT NUPACK ON THIS DEVICE - proceeding, but will crash with nupack oracle selected")
+    pass
 '''
 Oracle Wrapper, callable in the AL pipeline, with key methods
 '''
@@ -30,6 +35,8 @@ class Oracle:
             self.oracle = OracleMLP(self.config)
         elif self.config.oracle.main == "toy":
             self.oracle = OracleToy(self.config)
+        elif self.config.oracle.main == "nupack":
+            self.oracle = OracleNupack(self.config)
         else:
             raise NotImplementedError
 
@@ -42,7 +49,7 @@ class Oracle:
         data = {}
         data["samples"] = samples
         data["energies"] = self.score(samples)
-
+        #print(data)
 
         if save:
             np.save(self.path_data, data)
@@ -213,6 +220,141 @@ class OracleToy(OracleBase):
         outputs = list(map(count_zero, queries))
         return outputs
 
+
+class OracleNupack(OracleBase):
+    def __init__(self, config):
+        super().__init__(config)
+    
+    def initialize_samples_base(self):
+        self.dict_size = self.config.env.dict_size
+        self.min_len = self.config.env.min_len
+        self.max_len = self.config.env.max_len
+
+        self.init_len = self.config.oracle.init_dataset.init_len
+        self.random_seed = self.config.oracle.init_dataset.seed
+        np.random.seed(self.random_seed)
+        
+        #random samples in base format
+        samples = []
+        for i in range(self.min_len, self.max_len + 1):
+            #in order to have more long samples, we generate more random samples of longer sequences : it is arbitrary so far
+            samples.extend(np.random.randint(0, self.dict_size, size = (int(self.init_len * i), i))) 
+        
+        np.random.shuffle(samples)
+        samples = samples[:self.init_len]
+
+        return samples
+
+    def base2oracle(self, state):
+        '''
+        Input : array = seq
+        Output : array = seq
+        '''
+        sequence = state
+        if type(state) != np.ndarray:
+            sequence = np.asarray(state)
+
+        letters = ""
+
+        for j in range(len(sequence)):
+            na = sequence[j]
+            if na == 0:
+                letters += 'A'
+            elif na == 1:
+                letters += 'T'
+            elif na == 2:
+                letters += 'C'
+            elif na == 3:
+                letters += 'G'
+    
+        return letters
+
+    def get_score(self, queries, returnFunc = "energy"):
+        
+        temperature = 310.0  # Kelvin
+        ionicStrength = 1.0 # molar
+        
+        sequences = list(map(self.base2oracle, queries))
+       
+        energies = np.zeros(len(sequences))
+        #nPins = np.zeros(len(sequences)).astype(int)
+        #nPairs = 0
+        #ssStrings = np.zeros(len(sequences), dtype=object)
+
+        # parallel evaluation - fast
+        strandList = []
+        comps = []
+        i = -1
+        for sequence in sequences:
+            i += 1
+            strandList.append(Strand(sequence, name='strand{}'.format(i)))
+            comps.append(Complex([strandList[-1]], name='comp{}'.format(i)))
+
+        set = ComplexSet(strands=strandList, complexes=SetSpec(max_size=1, include=comps))
+        model1 = Model(material='dna', celsius=temperature - 273, sodium=ionicStrength)
+        results = complex_analysis(set, model=model1, compute=['mfe'])
+        
+        for i in range(len(energies)):
+            energies[i] = - results[comps[i]].mfe[0].energy
+            #ssStrings[i] = str(results[comps[i]].mfe[0].structure)
+
+        dict_return = {}
+        # if 'pins' in returnFunc:
+        #     for i in range(len(ssStrings)):
+        #         indA = 0  # hairpin completion index
+        #         for j in range(len(sequences[i])):
+        #             if ssStrings[i][j] == '(':
+        #                 indA += 1
+        #             elif ssStrings[i][j] == ')':
+        #                 indA -= 1
+        #                 if indA == 0:  # if we come to the end of a distinct hairpin
+        #                     nPins[i] += 1
+        #     dict_return.update({"pins": -nPins})
+        # if 'pairs' in returnFunc:
+        #     nPairs = np.asarray([ssString.count('(') for ssString in ssStrings]).astype(int)
+        #     dict_return.update({"pairs": -nPairs})
+        if 'energy' in returnFunc:
+            dict_return.update({"energy": energies}) # this is already negative by construction in nupack
+
+        # if 'open loop' in returnFunc:
+        #     biggest_loop = np.zeros(len(ssStrings))
+        #     for i in range(len(ssStrings)):  # measure all the open loops and return the largest
+        #         loops = [0] # size of loops
+        #         counting = 0
+        #         indA = 0
+        #         # loop completion index
+        #         for j in range(len(sequences[i])):
+        #             if ssStrings[i][j] == '(':
+        #                 counting = 1
+        #                 indA = 0
+        #             if (ssStrings[i][j] == '.') and (counting == 1):
+        #                 indA += 1
+        #             if (ssStrings[i][j] == ')') and (counting == 1):
+        #                 loops.append(indA)
+        #                 counting = 0
+        #         biggest_loop[i] = max(loops)
+        #     dict_return.update({"open loop": -biggest_loop})
+
+        # if 'motif' in returnFunc: # searches for a particular fold NOTE searches for this exact aptamer, not subsections or longer sequences with this as just one portion
+        #     #'((((....))))((((....))))....(((....)))'
+        #     # pad strings up to max length for binary distance calculation
+        #     padded_strings = bracket_dot_to_num(ssStrings, maxlen=self.max_len)
+        #     padded_motif = np.expand_dims(bracket_dot_to_num([motif,motif], maxlen=self.max_len)[0],0)
+        #     motif_distance = binaryDistance(np.concatenate((padded_motif,padded_strings),axis=0), pairwise=True)[0,1:] # the first element is the motif we are looking for - take everything after this
+        #     dict_return.update({"motif": motif_distance - 1}) # result is normed on 0-1, so dist-1 gives scaling from 0(bad) to -1(good)
+
+        # if energy_weighting:
+        #     for key in dict_return.keys():
+        #         if key != 'energy':
+        #             dict_return[key] = dict_return[key] * np.tanh(np.abs(energies)/2) # positive tahn of the energies, scaled
+
+        if isinstance(returnFunc, list):
+            if len(returnFunc) > 1:
+                return dict_return
+            else:
+                return dict_return[returnFunc[0]]
+        else:
+            return dict_return[returnFunc].tolist()
 
 
 ### Diverse Models of Oracle for now

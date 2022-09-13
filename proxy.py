@@ -325,16 +325,18 @@ class BuildDataset:
     def load_dataset(self):
         dataset = np.load(self.path_data, allow_pickle = True)
         dataset = dataset.item()
-
+        
         #Targets of training
         self.targets = np.array(dataset["energies"])
-
         #Samples of training
         samples = list(map(self.proxy.base2proxy, dataset["samples"]))
         self.samples = np.array(samples)
 
 
     def reshuffle(self):
+        # print(self.samples)
+        # print(self.targets)
+        # print(len(self.samples), len(self.targets))
         self.samples, self.targets = shuffle(
             self.samples, self.targets, random_state=self.seed_data
         )
