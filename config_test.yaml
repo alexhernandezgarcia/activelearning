@@ -1,5 +1,6 @@
 device : "cpu"
 debug : True
+
 al:
   n_iter: 10
   queries_per_it: 100

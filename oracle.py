@@ -1,12 +1,8 @@
 import numpy as np
-
-#for transition functions base2oracle, specific to each oracle
 import torch
 from torch import nn
 import torch.nn.functional as F
-#to check path
 import os
-#for mother class of Oracle
 from abc import abstractmethod
 #NUPACK ORACLE
 try: # we don't always install these on every platform
@@ -14,13 +10,15 @@ try: # we don't always install these on every platform
 except:
     print("COULD NOT IMPORT NUPACK ON THIS DEVICE - proceeding, but will crash with nupack oracle selected")
     pass
+
 '''
 Oracle Wrapper, callable in the AL pipeline, with key methods
 '''
+
 class Oracle:
     '''
     Generic Class for the oracle. 
-    The different oracles (can be classes (MLP-toy oracle eg) or just a single function calling another annex program)
+    The different oracles (classes inheriting from OracleBase)
     can be called according to a config param in the method score
     '''
     def __init__(self, config):
@@ -49,7 +47,6 @@ class Oracle:
         data = {}
         data["samples"] = samples
         data["energies"] = self.score(samples)
-        #print(data)
 
         if save:
             np.save(self.path_data, data)
@@ -73,9 +70,6 @@ class Oracle:
         return
 
 
-
-#For generalization purposes, the oracles are outside the main class of oracle
-#First, general a general wrapper for oracles. All the other files.py follow the same formalism for modularity 
 '''
 BaseClass model for all other oracles
 '''
@@ -270,6 +264,10 @@ class OracleNupack(OracleBase):
         return letters
 
     def get_score(self, queries, returnFunc = "energy"):
+        '''
+        IMPORTANT : current implementation below with the commentaries correspond to the raw code in the oracle.py of the previous code.
+        So far we commented the rest because we only focus on "energy" nupack reward function. 
+        '''
         
         temperature = 310.0  # Kelvin
         ionicStrength = 1.0 # molar

@@ -1,6 +1,6 @@
 #To load the config
 from omegaconf import DictConfig, OmegaConf
-import hydra
+import hydra #not currently used, to be implemented
 
 #Import main components of the pipeline
 from oracle import Oracle
@@ -12,7 +12,7 @@ from querier import Querier
 
 #--------------------------------
 '''
-AL Global pipeline
+AL Global pipeline : so far it is a class (the config is easily passed on to all methods), very simple, but it can be a single simple function
 '''
 
 #TODO : instantiate the config with hydra . Once we have the config object we can pass it to other functions
@@ -49,9 +49,7 @@ class ActiveLearning:
     
     def iterate(self):
         self.proxy.train()
-        
         self.gflownet.train()
-        
         queries = self.querier.build_query()
         energies = self.oracle.score(queries)
         self.oracle.update_dataset(queries, energies)
@@ -60,9 +58,9 @@ class ActiveLearning:
     def setup(self):
         '''
         Creates the working directories to store the data.
-        It can call a class DataHandler which methods create the directories (if it is too long to put in this class)
         '''
         return
+
 
 class Logger():
     '''
@@ -76,7 +74,9 @@ class Logger():
     def init_comet(self):
         return
 
+
 if __name__ == "__main__":
+    #TODO : activelearning pipeline as a simple function, without the class ? 
     config_test_name = "config_test.yaml"
     al = ActiveLearning(config = config_test_name)
     al.run_pipeline()

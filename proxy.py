@@ -5,9 +5,7 @@ from torch import nn, optim, cuda, backends
 from sklearn.utils import shuffle
 from tqdm import tqdm
 import numpy as np
-#to check path
 import os
-#for mother class of Oracle
 from abc import abstractmethod
 
 '''
@@ -20,6 +18,7 @@ class Proxy:
         self.init_proxy()
 
     def init_proxy(self):
+        #for now only the MLP proxy is implemented, but another class inheriting from ProxyBase has to be created for another proxy (transformer, ...)
         if self.config.proxy.model == "mlp":
             self.proxy = ProxyMLP(self.config, self.logger)
         else:
@@ -150,6 +149,7 @@ class ProxyBase:
 
             self.epochs += 1
 
+            #TODO : implement comet logger (with logger object in activelearning.py)
             # if self.converged == 1:
             #     self.statistics.log_comet_proxy_training(
             #         self.err_tr_hist, self.err_te_hist
@@ -334,9 +334,7 @@ class BuildDataset:
 
 
     def reshuffle(self):
-        # print(self.samples)
-        # print(self.targets)
-        # print(len(self.samples), len(self.targets))
+
         self.samples, self.targets = shuffle(
             self.samples, self.targets, random_state=self.seed_data
         )

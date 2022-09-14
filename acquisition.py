@@ -2,10 +2,10 @@ import os
 import torch
 import torch.nn.functional as F
 from abc import abstractmethod
+
 '''
 ACQUISITION WRAPPER
 '''
-
 class AcquisitionFunction:
     def __init__(self, config, proxy):
         self.config = config
@@ -14,6 +14,7 @@ class AcquisitionFunction:
         self.init_acquisition()
     
     def init_acquisition(self):
+        #so far, only proxy acquisition function has been implemented, only add new acquisition class inheriting from AcquisitionFunctionBase to innovate
         if self.config.acquisition.main == "proxy":
             self.acq = AcquisitionFunctionProxy(self.config, self.proxy)
         else:
@@ -78,7 +79,7 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
         self.proxy.model.eval()
         with torch.no_grad():
             outputs = self.proxy.model(inputs)
-        return outputs.cpu().detach()
+        return outputs
 
 
     

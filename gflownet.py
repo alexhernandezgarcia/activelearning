@@ -7,9 +7,7 @@ from sklearn.utils import shuffle
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-#to check path
 import os
-#for mother class of Oracle
 from abc import abstractmethod
 
 #Utils function for the whole file, fixed once and for all
@@ -22,38 +20,14 @@ to = lambda x : x.to(_dev[0])
 def set_device(dev):
     _dev[0] = dev
 
-'''
-GFlownet Wrapper, callable with key methods
-'''
-class GFlowNet:
-    def __init__(self, config, logger, env):
-        self.config = config
-        self.logger = logger
-        self.env = env.env
 
-        self.init_gflownet()
-    
-    def init_gflownet(self):
-        #for now there is only one GFlowNet - configuration called A, but there will be several with multifidelity (several possibilities of sampling m)
-        self.gflownet = GFlowNet_A(self.config, self.logger, self.env)
-        
-    
-    def train(self):
-        self.gflownet.train()
-    
-    def sample(self, nb_queries):
-        queries = self.gflownet.sample_queries(nb_queries)
-        return queries
-        
-        
-'''
-GFlowNet Objects
-'''
-class GFlowNetBase:
+#single GFlownet class
+
+class GFlowNet:
     def __init__(self, config, logger, env, load_best_model = False):
         self.config = config
         self.logger = logger
-        self.env = env
+        self.env = env.env
 
         self.device = self.config.device
         set_device(self.device)
@@ -82,7 +56,6 @@ class GFlowNetBase:
         self.loginf = tf_list([1e6])
         self.buffer = Buffer(self.config)
             
-    @abstractmethod
     def load_hyperparameters(self):
         self.flowmatch_eps = tf_list([self.config.gflownet.loss.flowmatch_eps])
         self.rng = np.random.default_rng(self.config.gflownet.sampling.seed)
@@ -96,11 +69,13 @@ class GFlowNetBase:
         self.clip_grad_norm = self.config.gflownet.training.clip_grad_norm
 
 
-    @abstractmethod
     def get_model_class(self):
-        pass
+        if self.config.gflownet.policy_model == "mlp":
+            self.model_class = MLP
+        else:
+            raise NotImplementedError
 
-    @abstractmethod
+
     def make_model(self, new_model = False, best_model = False):
         '''
         Initializes the GFN policy network (separate class for MLP for now), and load the best one (random if not best GFN yet)
@@ -177,7 +152,7 @@ class GFlowNetBase:
             self.best_lr_scheduler = make_lr_scheduler(self.best_opt, self.config)  
 
 
-    @abstractmethod
+
     def forward_sample(self, envs, policy, temperature = 0):
         """
         Performs a forward action on each environment of a list.
@@ -225,16 +200,12 @@ class GFlowNetBase:
 
             if envs_random: 
                 envs_random, actions_random, valids_random = self.forward_sample(envs_random, policy = "uniform", temperature = self.temperature)
-                # print('random', actions_random)
-                # print(type(valids_random))
 
             else:
                 envs_random, actions_random, valids_random = [], to(torch.tensor([])), ()
 
             if envs_no_random:
                 envs_no_random, actions_no_random, valids_no_random = self.forward_sample(envs_no_random, policy = "model", temperature=self.temperature)
-                # print('no random', actions_no_random)
-                # print(valids_no_random)
                 
             else:
                 envs_no_random, actions_no_random, valids_no_random = [], to(torch.tensor([])), ()
@@ -262,7 +233,7 @@ class GFlowNetBase:
         return envs, actions, valids
 
 
-    @abstractmethod
+
     def backward_sample(self, env, policy, temperature = 0):
         if temperature == 0:
             temperature = self.config.gflownet.sampling.temperature
@@ -294,123 +265,13 @@ class GFlowNetBase:
   
         return env, parents, parents_a
 
-    @abstractmethod
+
     def get_training_data(self, batch_size):
         '''
         Calls the buffer to get some interesting training data
         Performs backward sampling for off policy data and forward sampling
         Calls the utils method forward sampling and backward sampling
         '''
-        pass
-    
-
-    @abstractmethod
-    def flowmatch_loss(self, data):
-        pass
-    
-
-    @abstractmethod
-    def trajectory_balance(self, data):
-        pass
-    
-
-    @abstractmethod
-    def train(self):
-        all_losses = []
-
-        self.make_model(new_model=True, best_model=True)
-        self.model.train()
-
-        for it in tqdm(range(self.training_steps), disable = not self.view_progress):
-
-            data = self.get_training_data(self.batch_size)
-
-            for sub_it in range(self.ttsr):
-                self.model.train()
-                loss = self.loss_function(data)
-                
-                if not torch.isfinite(loss):
-                    print("loss is not finite - skipping iteration")
-
-                else:
-                    loss.backward()
-                    if self.clip_grad_norm > 0:
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad_norm)     
-                    self.opt.step()
-                    self.lr_scheduler.step()
-                    self.opt.zero_grad()
-                
-                if sub_it == 0:
-                    all_losses.append(loss.item())
-                 
-        #save model
-        path = self.path_model
-        torch.save({'model_state_dict': self.model.state_dict(), 'optimizer_state_dict': self.opt.state_dict()}, path)
-        print("new gfn model saved ! ")
-        return
-    
-    @abstractmethod
-    def sample_queries(self, nb_queries):
-        '''
-        Just performs forward sampling with the trained GFlownet
-        '''
-        print("we sample for query !")
-        self.make_model(best_model=True)
-        self.sampling_model = self.best_model
-
-        batch = []
-        envs = [self.env.create_new_env(idx = idx) for idx in range(nb_queries)]
-
-        while envs:
-            envs, actions, valids = self.forward_sample(
-                envs, policy="model", temperature= self.temperature)
-                
-                
-            remaining_envs = []
-            for env in envs:
-                if env.done:
-                    batch.append(
-                            self.env.manip2base(env.state)
-                        )
-                else:
-                    remaining_envs.append(env)
-            envs = remaining_envs
-        
-        return batch
-
-    @abstractmethod
-    def manip2policy(self, state):
-        pass
-
-
-###-----------SUBCLASS OF SPECIFIC GFLOWNET-----------------------
-class GFlowNet_A(GFlowNetBase):
-    def __init__(self, config, logger, env):
-        super().__init__(config, logger, env)
-
-    def load_hyperparameters(self):
-        super().load_hyperparameters()
-    
-    def get_model_class(self):
-        if self.config.gflownet.policy_model == "mlp":
-            self.model_class = MLP
-        else:
-            raise NotImplementedError
-        
-    def make_model(self, new_model=False, best_model=False):
-        super().make_model(new_model, best_model)
-        
-
-    def forward_sample(self, envs, policy="model", temperature=0):
-        return super().forward_sample(envs, policy, temperature)
-
-
-    def backward_sample(self, env, policy = "model", temperature = 0):
-        return super().backward_sample(env, policy, temperature)
-
-    
-    def get_training_data(self, batch_size):
-        super().get_training_data(batch_size)
 
         batch = []
 
@@ -505,19 +366,6 @@ class GFlowNet_A(GFlowNetBase):
                         )
             
 
-                    # print(
-                    #         [
-                    #             state_ohe.unsqueeze(0),
-                    #             tl_list([action]),
-                    #             tf_list([mask]),
-                    #             env.state,
-                    #             parents_ohe.view(len(parents), -1),
-                    #             tl_list(parents_a),
-                    #             env.done,
-                    #             tl_list([env.id] * len(parents)),
-                    #             tl_list([env.n_actions_taken - 1]),
-                    #         ]
-                    # )
             envs = [env for env in envs if not env.done]
 
         
@@ -552,9 +400,10 @@ class GFlowNet_A(GFlowNetBase):
         )
 
         return batch
+    
+
 
     def flowmatch_loss(self, data):
-        super().flowmatch_loss(data)
         self.model.train()
 
         #for inputflow, id of parents
@@ -590,14 +439,74 @@ class GFlowNet_A(GFlowNetBase):
         print("loss gfn", loss.item())
         return loss
     
-    def train(self):
-        super().train()
 
+
+    def trajectory_balance(self, data):
+        pass
     
-    def sample_queries(self, nb_queries):
-        return super().sample_queries(nb_queries)
-                
 
+
+    def train(self):
+        all_losses = []
+
+        self.make_model(new_model=True, best_model=True)
+        self.model.train()
+
+        for it in tqdm(range(self.training_steps), disable = not self.view_progress):
+
+            data = self.get_training_data(self.batch_size)
+
+            for sub_it in range(self.ttsr):
+                self.model.train()
+                loss = self.loss_function(data)
+                
+                if not torch.isfinite(loss):
+                    print("loss is not finite - skipping iteration")
+
+                else:
+                    loss.backward()
+                    if self.clip_grad_norm > 0:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad_norm)     
+                    self.opt.step()
+                    self.lr_scheduler.step()
+                    self.opt.zero_grad()
+                
+                if sub_it == 0:
+                    all_losses.append(loss.item())
+                 
+        #save model
+        path = self.path_model
+        torch.save({'model_state_dict': self.model.state_dict(), 'optimizer_state_dict': self.opt.state_dict()}, path)
+        print("new gfn model saved ! ")
+        return
+
+    def sample_queries(self, nb_queries):
+        '''
+        Just performs forward sampling with the trained GFlownet
+        '''
+        print("we sample for query !")
+        self.make_model(best_model=True)
+        self.sampling_model = self.best_model
+
+        batch = []
+        envs = [self.env.create_new_env(idx = idx) for idx in range(nb_queries)]
+
+        while envs:
+            envs, actions, valids = self.forward_sample(
+                envs, policy="model", temperature= self.temperature)
+                
+                
+            remaining_envs = []
+            for env in envs:
+                if env.done:
+                    batch.append(
+                            self.env.manip2base(env.state)
+                        )
+                else:
+                    remaining_envs.append(env)
+            envs = remaining_envs
+        
+        return batch
 
     def manip2policy(self, state):
         seq_manip = state
@@ -618,11 +527,6 @@ class GFlowNet_A(GFlowNetBase):
 
 
 
-
-
-
-        
-        
 
 
 

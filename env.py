@@ -6,9 +6,7 @@ from sklearn.utils import shuffle
 from tqdm import tqdm
 import numpy as np
 import itertools
-#to check path
 import os
-#for mother class of Oracle
 from abc import abstractmethod
 
 
@@ -24,6 +22,7 @@ class Env:
         self.init_env()
     
     def init_env(self):
+        #so far only aptamers has been implemented
         if self.config.env.main == "aptamers":
             self.env = EnvAptamers(self.config, self.acq)
         else:
@@ -39,7 +38,6 @@ class EnvBase:
         self.acq = acq
 
         self.device = self.config.device
-
 
     @abstractmethod
     def create_new_env(self, idx):
@@ -222,16 +220,16 @@ class EnvAptamers(EnvBase):
     def acq2reward(self, acq_values):
         min_reward = 1e-10
         true_reward = np.clip(acq_values, min_reward, None)
-        customed_af = lambda x: x**3 #to favor the higher rewards in a more spiky way, can be customed
-        exponentiate = np.vectorize(customed_af)
-        return exponentiate(true_reward)
+        customed_af = lambda x: x #to favor the higher rewards in a more spiky way, can be customed : eg : x : x**3
+        distort = np.vectorize(customed_af)
+        return distort(true_reward)
 
     def get_reward(self, states, done):
         rewards = np.zeros(len(done), dtype = float)
         final_states = [s for s, d in zip(states, done) if d]
         inputs_af_base = [self.manip2base(final_state) for final_state in final_states]
         
-        final_rewards = self.acq.get_reward(inputs_af_base).view(len(final_states)).numpy()
+        final_rewards = self.acq.get_reward(inputs_af_base).view(len(final_states)).cpu().detach().numpy()
         final_rewards = self.acq2reward(final_rewards)
 
         done = np.array(done)

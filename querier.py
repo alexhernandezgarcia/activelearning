@@ -18,7 +18,7 @@ class Querier:
         return queries
     
     def sample4query(self):
-        queries = self.gflownet.sample(self.n_queries)
+        queries = self.gflownet.sample_queries(self.n_queries)
         return queries
   
     def enhance_queries(self, queries):
