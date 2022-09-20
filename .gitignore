@@ -9,3 +9,5 @@ RLAptamer/
 sequenceModel2
 distanceTests.py
 sh/
+*.txt
+!requirements.txt
