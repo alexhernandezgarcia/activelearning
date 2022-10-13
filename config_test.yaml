@@ -15,12 +15,12 @@ env:
   main : "aptamers"
   dict_size : 4
   min_len : 10
-  max_len : 10
+  max_len : 20
   min_word_len : 1
   max_word_len : 1
 
 oracle:
-  main : "toy"
+  main : "mlp"
   init_dataset:
     seed : 0
     init_len : 100

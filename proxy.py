@@ -79,7 +79,6 @@ class ProxyBase:
         if os.path.exists(dir_name):
             checkpoint = torch.load(dir_name)
             self.model.load_state_dict(checkpoint["model_state_dict"])
-            print("proxy loaded !")
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
             if self.device == "cuda":
