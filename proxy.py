@@ -8,10 +8,10 @@ import numpy as np
 import os
 from abc import abstractmethod
 
-'''
-GLOBAL CLASS PROXY WRAPPER, callable with key methods
-'''
 class Proxy:
+    '''
+    GLOBAL CLASS PROXY WRAPPER, callable with key methods
+    '''
     def __init__(self, config, logger):
         self.config = config
         self.logger = logger
@@ -79,6 +79,7 @@ class ProxyBase:
         if os.path.exists(dir_name):
             checkpoint = torch.load(dir_name)
             self.model.load_state_dict(checkpoint["model_state_dict"])
+            print("proxy loaded !")
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
             if self.device == "cuda":
@@ -92,7 +93,7 @@ class ProxyBase:
             raise NotImplementedError
     
     @abstractmethod
-    def converge(self, data_handler):
+    def converge(self, data_handler): #if we chose a different algo of convergence, eg per proxy, we might make this method move to ProxyMLP
         '''
         will call getDataLoaders/train_batch/ test / checkConvergencce 
         '''
@@ -154,6 +155,7 @@ class ProxyBase:
             #     self.statistics.log_comet_proxy_training(
             #         self.err_tr_hist, self.err_te_hist
             #     )
+
 
 
     @abstractmethod
@@ -302,7 +304,7 @@ class ProxyMLP(ProxyBase):
             ).view(1, -1)
             input_proxy = torch.cat((input_proxy, padding), dim = 1)
         
-        return input_proxy.to("cpu")[0] #weird, it always has to be cpu ...
+        return input_proxy.to("cpu")[0] #inputs and targets are converted in get loss if necessary to cuda
 
 
 '''
@@ -411,7 +413,7 @@ class MLP(nn.Module):
         # Architecture
         self.input_max_length = self.config.env.max_len
         self.input_classes = self.config.env.dict_size + 1  # +1 for eos
-        self.filters = 256
+        self.filters = 156
         self.layers = 8
 
         self.init_layer_depth = int(
@@ -428,7 +430,7 @@ class MLP(nn.Module):
         # build hidden layers
         self.lin_layers = []
         self.activations= []
-        self.norms = []  
+        #self.norms = []  
         self.dropouts= []
 
         for i in range(self.layers):
@@ -438,13 +440,13 @@ class MLP(nn.Module):
             self.activations.append(
                 Activation(act_func)
             )
-            self.norms.append(nn.BatchNorm1d(self.filters))
+            #self.norms.append(nn.BatchNorm1d(self.filters))
             self.dropouts.append(nn.Dropout(p = self.config.proxy.training.dropout))
 
         # initialize module lists
         self.lin_layers = nn.ModuleList(self.lin_layers)
         self.activations = nn.ModuleList(self.activations)
-        self.norms = nn.ModuleList(self.norms)
+        #self.norms = nn.ModuleList(self.norms)
         self.dropouts = nn.ModuleList(self.dropouts)
 
      
@@ -455,7 +457,7 @@ class MLP(nn.Module):
             x = self.lin_layers[i](x)
             x = self.activations[i](x)
             x = self.dropouts[i](x)
-            x = self.norms[i](x)
+            #x = self.norms[i](x)
 
         y = self.output_layer(x)
 

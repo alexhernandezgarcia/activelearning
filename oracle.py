@@ -11,9 +11,6 @@ except:
     print("COULD NOT IMPORT NUPACK ON THIS DEVICE - proceeding, but will crash with nupack oracle selected")
     pass
 
-'''
-Oracle Wrapper, callable in the AL pipeline, with key methods
-'''
 
 class Oracle:
     '''
@@ -47,7 +44,7 @@ class Oracle:
         data = {}
         data["samples"] = samples
         data["energies"] = self.score(samples)
-
+        #print("initial data", data)
         if save:
             np.save(self.path_data, data)
         if return_data:
@@ -70,23 +67,23 @@ class Oracle:
         return
 
 
-'''
-BaseClass model for all other oracles
-'''
 class OracleBase:
+    '''
+    BaseClass model for all other oracles
+    '''
     def __init__(self, config):
         self.config = config
 
     @abstractmethod
     def initialize_samples_base(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def base2oracle(self, state):
         '''
         Transition from base format (format of the queries and stored data) to a format callable by the oracle
         '''
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def get_score(self, queries):
@@ -94,7 +91,7 @@ class OracleBase:
         - Transforms the queries to a good format with base2oracle
         - Calls the oracle on this data and return it in a good format --> for the proxy to train on.
         '''
-        pass
+        raise NotImplementedError
 
 
 '''
@@ -210,7 +207,7 @@ class OracleToy(OracleBase):
         return seq
 
     def get_score(self, queries):
-        count_zero = lambda x : float(np.count_nonzero(x == 0))
+        count_zero = lambda x : float(np.count_nonzero(x == 1))
         outputs = list(map(count_zero, queries))
         return outputs
 
@@ -263,7 +260,7 @@ class OracleNupack(OracleBase):
     
         return letters
 
-    def get_score(self, queries, returnFunc = "energy"):
+    def get_score(self, queries, returnFunc = "energy"): #We kept all Nupack features and only decommented the energy one
         '''
         IMPORTANT : current implementation below with the commentaries correspond to the raw code in the oracle.py of the previous code.
         So far we commented the rest because we only focus on "energy" nupack reward function. 

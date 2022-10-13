@@ -9,16 +9,13 @@ import itertools
 import os
 from abc import abstractmethod
 
-
-'''
-ENV WRAPPER
-'''
-
-class Env:
+class Env:  
+    '''
+    ENV WRAPPER
+    '''
     def __init__(self, config, acq):
         self.config = config
         self.acq = acq
-
         self.init_env()
     
     def init_env(self):
@@ -36,59 +33,58 @@ class EnvBase:
     def __init__(self, config, acq):
         self.config = config
         self.acq = acq
-
         self.device = self.config.device
 
     @abstractmethod
     def create_new_env(self, idx):
-        pass
+        raise NotImplementedError
+        
 
     @abstractmethod
     def init_env(self, idx):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_action_space(self):
         '''
         get all possible actions to get the parents
         '''
-        pass
+        raise NotImplementedError
  
     @abstractmethod
     def get_mask(self):
         '''
         for sampling in GFlownet and masking in the loss function
         '''
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def get_parents(self, backward = False):
         '''
         to build the training batch (for the inflows)
         '''
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def step(self,action):
         '''
         for forward sampling
         '''
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def acq2rewards(self, acq_values):
         '''
         correction of the value of the AF for positive reward (or to scale it)
         '''
-
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def get_reward(self, states, done):
         '''
         get the reward values of a batch of candidates
         '''
-        pass
+        raise NotImplementedError
 
 
 '''
@@ -98,7 +94,6 @@ Specific Envs
 class EnvAptamers(EnvBase):
     def __init__(self, config, acq) -> None:
         super().__init__(config, acq)
-
         self.device = self.config.device
 
         self.max_seq_len = self.config.env.max_len
@@ -106,10 +101,8 @@ class EnvAptamers(EnvBase):
         self.max_word_len = self.config.env.max_word_len
         self.min_word_len = self.config.env.min_word_len
         self.n_alphabet = self.config.env.dict_size
-
         self.action_space = self.get_action_space()
         self.token_eos = self.get_token_eos(self.action_space)
-
         self.env_class = EnvAptamers
 
         self.init_env()
@@ -120,7 +113,6 @@ class EnvAptamers(EnvBase):
         return env
     
     def init_env(self, idx=0):
-        super().init_env(idx)
         self.state = np.array([])
         self.n_actions_taken = 0
         self.done = False
@@ -128,7 +120,6 @@ class EnvAptamers(EnvBase):
         self.last_action = None
 
     def get_action_space(self):
-        super().get_action_space()
         valid_wordlens = np.arange(self.min_word_len, self.max_word_len +1)
         alphabet = [a for a in range(self.n_alphabet)]
         actions = []
@@ -141,7 +132,6 @@ class EnvAptamers(EnvBase):
         return len(action_space)
     
     def get_mask(self):
-        super().get_mask()
 
         mask = [1] * (len(self.action_space) + 1)
 
@@ -162,8 +152,6 @@ class EnvAptamers(EnvBase):
             return mask
     
     def get_parents(self, backward = False):
-        super().get_parents(backward)
-
         if self.done:
             if self.state[-1] == self.token_eos:
                 parents_a = [self.token_eos]
@@ -185,7 +173,6 @@ class EnvAptamers(EnvBase):
             return parents, actions
     
     def step(self, action):
-        super().step(action)
         valid = False
         seq = self.state
         seq_len = len(seq)
@@ -220,7 +207,7 @@ class EnvAptamers(EnvBase):
     def acq2reward(self, acq_values):
         min_reward = 1e-10
         true_reward = np.clip(acq_values, min_reward, None)
-        customed_af = lambda x: x #to favor the higher rewards in a more spiky way, can be customed : eg : x : x**3
+        customed_af = lambda x: x**2 #to favor the higher rewards in a more spiky way, can be customed : eg : x : x**3
         distort = np.vectorize(customed_af)
         return distort(true_reward)
 
@@ -228,12 +215,11 @@ class EnvAptamers(EnvBase):
         rewards = np.zeros(len(done), dtype = float)
         final_states = [s for s, d in zip(states, done) if d]
         inputs_af_base = [self.manip2base(final_state) for final_state in final_states]
-        
+
         final_rewards = self.acq.get_reward(inputs_af_base).view(len(final_states)).cpu().detach().numpy()
         final_rewards = self.acq2reward(final_rewards)
-
-        done = np.array(done)
         
+        done = np.array(done)
         rewards[done] = final_rewards
         return rewards
         

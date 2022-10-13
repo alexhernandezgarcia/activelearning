@@ -21,7 +21,7 @@ def set_device(dev):
     _dev[0] = dev
 
 
-#single GFlownet class
+#single GFlownet class ! 
 
 class GFlowNet:
     def __init__(self, config, logger, env, load_best_model = False):
@@ -153,7 +153,7 @@ class GFlowNet:
 
 
 
-    def forward_sample(self, envs, policy, temperature = 0):
+    def forward_sample(self, envs, policy, temperature = 0): 
         """
         Performs a forward action on each environment of a list.
 
@@ -382,7 +382,7 @@ class GFlowNet:
         ) = zip(*batch)
         
         rewards = self.env.get_reward(input_reward, done)
-        rewards = [tl_list([r]) for r in rewards]
+        rewards = [tf_list([r]) for r in rewards]
         done = [tl_list([d]) for d in done]
 
         batch = list(
