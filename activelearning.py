@@ -11,7 +11,8 @@ from gflownet import GFlowNet
 from querier import Querier
 
 
-# TODO : instantiate the config with hydra . Once we have the config object we can pass it to other functions
+# TODO : instantiate the config with hydra . Once we have the config object we can pass
+# it to other functions
 class ActiveLearning:
     """
     AL Global pipeline : so far it is a class (the config is easily passed on to all
@@ -19,7 +20,8 @@ class ActiveLearning:
     """
 
     def __init__(self, config):
-        # assume we have a config object that we can pass to all the components of the pipeline like in the previous code, eg "config_test.yaml"
+        # assume we have a config object that we can pass to all the components of the
+        # pipeline like in the previous code, eg "config_test.yaml"
         self.config = OmegaConf.load(config)
         # setup function that creates the directories to save data, ...
         self.setup()
