@@ -11,31 +11,32 @@ from gflownet import GFlowNet
 from querier import Querier
 
 
-#TODO : instantiate the config with hydra . Once we have the config object we can pass it to other functions
+# TODO : instantiate the config with hydra . Once we have the config object we can pass it to other functions
 class ActiveLearning:
-    '''
+    """
     AL Global pipeline : so far it is a class (the config is easily passed on to all methods), very simple, but it can be a single simple function
-    '''
+    """
+
     def __init__(self, config):
-        #assume we have a config object that we can pass to all the components of the pipeline like in the previous code, eg "config_test.yaml"
+        # assume we have a config object that we can pass to all the components of the pipeline like in the previous code, eg "config_test.yaml"
         self.config = OmegaConf.load(config)
-        #setup function that creates the directories to save data, ...
+        # setup function that creates the directories to save data, ...
         self.setup()
-        #util class to handle the statistics during training
+        # util class to handle the statistics during training
         self.logger = Logger()
-        #load the main components of the AL pipeline
+        # load the main components of the AL pipeline
         self.oracle = Oracle(self.config)
         self.proxy = Proxy(self.config, self.logger)
         self.acq = AcquisitionFunction(self.config, self.proxy)
         self.env = Env(self.config, self.acq)
         self.gflownet = GFlowNet(self.config, self.logger, self.env)
         self.querier = Querier(self.config, self.gflownet)
-    
+
     def run_pipeline(self):
         self.iter = None
-        #we initialize the first dataset
-        self.oracle.initialize_dataset() 
-        #we run each round of active learning
+        # we initialize the first dataset
+        self.oracle.initialize_dataset()
+        # we run each round of active learning
         for self.iter in range(self.config.al.n_iter):
             self.iterate()
 
@@ -46,19 +47,21 @@ class ActiveLearning:
         print(queries)
         energies = self.oracle.score(queries)
         self.oracle.update_dataset(queries, energies)
-    
+
     def setup(self):
-        '''
+        """
         Creates the working directories to store the data.
-        '''
+        """
         return
 
-class Logger():
-    '''
+
+class Logger:
+    """
     Utils functions to compute and handle the statistics (saving them or send to comet).
     Incorporates the previous function "getModelState", ...
     Like FormatHandler, it can be passed on to querier, gfn, proxy, ... to get the statistics of training of the generated data at real time
-    '''
+    """
+
     def __init__(self):
         pass
 
@@ -67,11 +70,7 @@ class Logger():
 
 
 if __name__ == "__main__":
-    #TODO : activelearning pipeline as a simple function, without the class ? 
+    # TODO : activelearning pipeline as a simple function, without the class ?
     config_test_name = "config_test.yaml"
-    al = ActiveLearning(config = config_test_name)
+    al = ActiveLearning(config=config_test_name)
     al.run_pipeline()
-
-
-
-
