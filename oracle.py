@@ -1,439 +1,280 @@
-'''import statements'''
-from seqfold import dg, fold
-from utils import *
-from potts_utils import load_potts_model
-from potts_utils import potts_energy
-import sys
+import numpy as np
+import torch
+from torch import nn
+import torch.nn.functional as F
+import os
+from abc import abstractmethod
+#NUPACK ORACLE
 try: # we don't always install these on every platform
     from nupack import *
 except:
     print("COULD NOT IMPORT NUPACK ON THIS DEVICE - proceeding, but will crash with nupack oracle selected")
     pass
-try:
-    from bbdob.utils import idx2one_hot
-    from bbdob import OneMax, TwoMin, FourPeaks, DeceptiveTrap, NKLandscape, WModel
-except:
-    print("COULD NOT IMPORT BB-DOB ON THIS DEVICE - proceeding, but will crash with BB-DOB oracle selected")
-    pass
 
 
-'''
-This script computes a binding score for a given sequence or set of sequences
-
-> Inputs: numpy integer arrays - different oracles with different requirements
-> Outputs: oracle outputs - usually numbers
-
-config
-'dataset seed' - self explanatory
-'dict size' - number of possible states per sequence element - e.g., for ATGC 'dict size' = 4
-'variable sample length', 'min sample length', 'max sample length' - for determining the length and variability of sample sequences
-'init dataset length' - number of samples for initial (random) dataset
-'dataset' - name of dataset to be saved
-'''
-
-
-class Oracle():
-    def __init__(self, seed, seq_len, dict_size, min_len, max_len, oracle,
-            variable_len=True, init_len=0, energy_weight=False, nupack_target_motif="",
-            seed_toy=0):
-        '''
-        initialize the oracle
-        :param config:
-        '''
-        self.seed = seed
-        self.seq_len = seq_len
-        self.dict_size = dict_size
-        self.min_len = min_len
-        self.max_len = max_len
-        self.init_len = init_len
-        self.variable_len = variable_len
-        self.oracle = oracle
-        self.energy_weight = energy_weight
-        self.nupack_target_motif = nupack_target_motif
-        self.seed_toy = seed_toy
-
-        np.random.seed(self.seed_toy)
-        if not 'nupack' in self.oracle:
-            self.initRands() # initialize random numbers for hand-made oracles
-
-
-    def initRands(self):
-        '''
-        initialize random numbers for custom-made toy functions
-        :return:
-        '''
-
-        # set these to be always positive to play nice with gFlowNet sampling
-        if True:#self.config.test_mode:
-            self.linFactors = -np.ones(self.seq_len) # Uber-simple function, for testing purposes - actually nearly functionally identical to one-max, I believe
+class Oracle:
+    '''
+    Generic Class for the oracle. 
+    The different oracles (classes inheriting from OracleBase)
+    can be called according to a config param in the method score
+    '''
+    def __init__(self, config):
+        self.config = config
+        #path to load and save the scored data
+        self.path_data = config.path.data_oracle
+        self.init_oracle()
+    
+    def init_oracle(self):
+        #calling the relevant oracle. All oracles should follow the model of OracleBase
+        if self.config.oracle.main == "mlp":
+            self.oracle = OracleMLP(self.config)
+        elif self.config.oracle.main == "toy":
+            self.oracle = OracleToy(self.config)
+        elif self.config.oracle.main == "nupack":
+            self.oracle = OracleNupack(self.config)
         else:
-            self.linFactors = np.abs(np.random.randn(self.seq_len))  # coefficients for linear toy energy
+            raise NotImplementedError
 
-        hamiltonian = np.random.randn(self.seq_len,self.seq_len) # energy function
-        self.hamiltonian = np.tril(hamiltonian) + np.tril(hamiltonian, -1).T # random symmetric matrix
+    def initialize_dataset(self, save = True, return_data = False):
+        #the method to initialize samples in the BASE format is specific to each oracle for now. It can be changed.
+        #the first samples are in the "base format", so as to be directly saved as such and sent for query (base2oracle transition) 
 
-        pham = np.zeros((self.seq_len,self.seq_len,self.dict_size,self.dict_size))
-        for i in range(pham.shape[0]):
-            for j in range(i, pham.shape[1]):
-                for k in range(pham.shape[2]):
-                    for l in range(k, pham.shape[3]):
-                        num =  - np.random.uniform(0,1)
-                        pham[i, j, k, l] = num
-                        pham[i, j, l, k] = num
-                        pham[j, i, k, l] = num
-                        pham[j, i, l, k] = num
-        self.pottsJ = pham # multilevel spin Hamiltonian (Potts Hamiltonian) - coupling term
-        self.pottsH = np.random.randn(self.seq_len,self.dict_size) # Potts Hamiltonian - onsite term
+        samples = self.oracle.initialize_samples_base()
 
-        # W-model parameters
-        # first get the binary dimension size
-        aa = np.arange(self.dict_size)
-        if self.variable_len:
-            aa = np.clip(aa, 1, self.dict_size) #  merge padding with class 1
-        x0 = np.binary_repr(aa[-1])
-        dimension = int(len(x0) * self.max_len)
-
-        mu = np.random.randint(1, dimension + 1)
-        v = np.random.randint(1, dimension + 1)
-        m = np.random.randint(1, dimension)
-        n = np.random.randint(1, dimension)
-        gamma = np.random.randint(0, int(n * (n - 1 ) / 2))
-        self.mu, self.v, self.m, self.n, self.gamma = [mu, v, m, n, gamma]
-
-
-    def initializeDataset(self,save = True, returnData = False, customSize=None,
-            custom_seed=None):
-        '''
-        generate an initial toy dataset with a given number of samples
-        need an extra factor to speed it up (duplicate filtering is very slow)
-        :param numSamples:
-        :return:
-        '''
         data = {}
-        if custom_seed:
-            np.random.seed(custom_seed)
-        else:
-            np.random.seed(self.seed)
-        if customSize is None:
-            datasetLength = self.init_len
-        else:
-            datasetLength = customSize
-
-        if self.variable_len:
-            samples = []
-            while len(samples) < datasetLength:
-                for i in range(self.min_len, self.max_len + 1):
-                    samples.extend(np.random.randint(0 + 1, self.dict_size + 1, size=(int(10 * self.dict_size * i), i)))
-
-                samples = self.numpy_fillna(np.asarray(samples, dtype = object)) # pad sequences up to maximum length
-                samples = filterDuplicateSamples(samples) # this will naturally proportionally punish shorter sequences
-                if len(samples) < datasetLength:
-                    samples = samples.tolist()
-            np.random.shuffle(samples) # shuffle so that sequences with different lengths are randomly distributed
-            samples = samples[:datasetLength] # after shuffle, reduce dataset to desired size, with properly weighted samples
-        else: # fixed sample size
-            samples = np.random.randint(1, self.dict_size + 1,size=(datasetLength, self.max_len))
-            samples = filterDuplicateSamples(samples)
-            while len(samples) < datasetLength:
-                samples = np.concatenate((samples,np.random.randint(1, self.dict_size + 1, size=(datasetLength, self.max_len))),0)
-                samples = filterDuplicateSamples(samples)
-
-        data['samples'] = samples
-        data['energies'] = self.score(data['samples'])
-
+        data["samples"] = samples
+        data["energies"] = self.score(samples)
+        #print("initial data", data)
         if save:
-            np.save('datasets/' + self.oracle, data)
-        if returnData:
+            np.save(self.path_data, data)
+        if return_data:
             return data
-
-
+       
+    
     def score(self, queries):
         '''
-        assign correct scores to selected sequences
-        :param queries: sequences to be scored
-        :return: computed scores
+        Calls the specific oracle (class/function) and apply its "get_score" method on the dataset
         '''
-        if isinstance(queries, list):
-            queries = np.asarray(queries) # convert queries to array
-        block_size = int(1e4) # score in blocks of maximum 10000
-        scores_list = []
-        scores_dict = {}
-        for idx in range(len(queries) // block_size + bool(len(queries) % block_size)):
-            queryBlock = queries[idx * block_size:(idx + 1) * block_size]
-            scores_block = self.getScore(queryBlock)
-            if isinstance(scores_block, dict):
-                for k, v in scores_block.items():
-                    if k in scores_dict:
-                        scores_dict[k].extend(list(v))
-                    else:
-                        scores_dict.update({k: list(v)})
-            else:
-                scores_list.extend(self.getScore(queryBlock))
-        if len(scores_list) > 0:
-            return np.asarray(scores_list)
+        scores = self.oracle.get_score(queries)
+        return scores
+
+    def update_dataset(self, queries, energies):
+        dataset = np.load(self.path_data, allow_pickle = True)
+        dataset = dataset.item()
+        dataset["samples"] += queries
+        dataset["energies"] += energies
+        np.save(self.path_data, dataset)
+        return
+
+
+class OracleBase:
+    '''
+    BaseClass model for all other oracles
+    '''
+    def __init__(self, config):
+        self.config = config
+
+    @abstractmethod
+    def initialize_samples_base(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def base2oracle(self, state):
+        '''
+        Transition from base format (format of the queries and stored data) to a format callable by the oracle
+        '''
+        raise NotImplementedError
+    
+    @abstractmethod
+    def get_score(self, queries):
+        '''
+        - Transforms the queries to a good format with base2oracle
+        - Calls the oracle on this data and return it in a good format --> for the proxy to train on.
+        '''
+        raise NotImplementedError
+
+
+'''
+Different Oracles Implemented
+'''
+
+class OracleMLP(OracleBase):
+    def __init__(self, config):
+        super().__init__(config)
+        #parameters useful for the format of this custom trained MLP
+        self.dict_size = self.config.env.dict_size 
+        self.max_len_mlp = 40 #this MLP was trained with seqs of len max 40
+        self.path_oracle_mlp = self.config.path.model_oracle_MLP
+        self.device = torch.device(self.config.device)
+    
+    def initialize_samples_base(self):
+    
+        self.min_len = self.config.env.min_len
+        self.max_len = self.config.env.max_len
+        self.init_len = self.config.oracle.init_dataset.init_len
+        self.random_seed = self.config.oracle.init_dataset.seed
+        np.random.seed(self.random_seed)
+        
+        #random samples in base format
+        samples = []
+        for i in range(self.min_len, self.max_len + 1):
+            #in order to have more long samples, we generate more random samples of longer sequences : it is arbitrary so far
+            samples.extend(np.random.randint(0, self.dict_size, size = (int(self.init_len * i), i))) 
+        
+        np.random.shuffle(samples)
+        samples = samples[:self.init_len]
+
+        return samples
+
+    def base2oracle(self, state):
+        seq_array = state
+        initial_len = len(seq_array)
+        #transform the array as a tensor
+        seq_tensor = torch.from_numpy(seq_array)
+        #perform one hot encoding on it
+        seq_ohe = F.one_hot(seq_tensor.long(), num_classes = self.dict_size + 1) #+1 for eos token
+        seq_ohe = seq_ohe.reshape(1, -1).float()
+        #adding the end of sequence token
+        eos_tensor = torch.tensor([self.dict_size])
+        eos_ohe = F.one_hot(eos_tensor.long(), num_classes=self.dict_size + 1)
+        eos_ohe = eos_ohe.reshape(1, -1).float()
+
+        oracle_input = torch.cat((seq_ohe, eos_ohe), dim = 1)
+        #adding 0-padding until max_len
+        number_pads = self.max_len_mlp - initial_len
+        if number_pads:
+            padding = torch.cat([torch.tensor([0] * (self.dict_size + 1))] * number_pads).view(1, -1)
+            oracle_input = torch.cat((oracle_input, padding), dim = 1)
+        
+        return oracle_input.to(self.device)[0]
+
+    def get_score(self, queries):
+        '''
+        Input : list of arrays=seqs
+        Outputs : list of floats=energies
+        '''
+        #list of tensors in ohe format
+        list4oracle =  list(map(self.base2oracle, queries))
+        #turn this into a single big tensor to call the MLP once
+        tensor4oracle = torch.stack(list4oracle).view(len(queries), -1)
+
+        #load the MLP oracle
+        self.model = MLP()
+        if os.path.exists(self.path_oracle_mlp):
+            checkpoint = torch.load(self.path_oracle_mlp)
+            self.model.load_state_dict(checkpoint["model_state_dict"])
+            self.model.to(self.device)
         else:
-            return {k: np.asarray(v) for k, v in scores_dict.items()}
+            print("The MLP oracle could not be loaded")
+            raise NotImplementedError
+            
+        self.model.eval()
+        outputs = self.model(tensor4oracle)
+    
+        return outputs.squeeze(1).tolist()
 
 
-    def getScore(self,queries):
-        if self.oracle == 'linear':
-            return self.linearToy(queries)
-        elif self.oracle == 'potts':
-            return self.PottsEnergy(queries)
-        elif self.oracle == 'potts new':
-            return self.PottsEnergyNew(queries)
-        elif self.oracle == 'inner product':
-            return self.toyHamiltonian(queries)
-        elif self.oracle == 'seqfold':
-            return self.seqfoldScore(queries)
-        elif self.oracle == 'nupack energy':
-            return self.nupackScore(queries, returnFunc = 'energy')
-        elif self.oracle == 'nupack pins':
-            return self.nupackScore(queries, returnFunc = 'pins', energy_weighting = self.energy_weight)
-        elif self.oracle == 'nupack pairs':
-            return self.nupackScore(queries, returnFunc = 'pairs', energy_weighting = self.energy_weight)
-        elif self.oracle == 'nupack open loop':
-            return self.nupackScore(queries, returnFunc = 'open loop', energy_weighting = self.energy_weight)
-        elif self.oracle == 'nupack motif':
-            return self.nupackScore(queries, returnFunc = 'motif', motif = nupack_target_motif, energy_weighting = self.energy_weight)
+class OracleToy(OracleBase):
+    def __init__(self, config):
+        super().__init__(config)
+    
+    def initialize_samples_base(self):
+        self.dict_size = self.config.env.dict_size
+        self.min_len = self.config.env.min_len
+        self.max_len = self.config.env.max_len
 
+        self.init_len = self.config.oracle.init_dataset.init_len
+        self.random_seed = self.config.oracle.init_dataset.seed
+        np.random.seed(self.random_seed)
+        
+        #random samples in base format
+        samples = []
+        for i in range(self.min_len, self.max_len + 1):
+            #in order to have more long samples, we generate more random samples of longer sequences : it is arbitrary so far
+            samples.extend(np.random.randint(0, self.dict_size, size = (int(self.init_len * i), i))) 
+        
+        np.random.shuffle(samples)
+        samples = samples[:self.init_len]
 
-        elif (self.oracle == 'onemax') or (self.oracle == 'twomin') or (self.oracle == 'fourpeaks')\
-                or (self.oracle == 'deceptivetrap') or (self.oracle == 'nklandscape') or (self.oracle == 'wmodel'):
-            return self.BB_DOB_functions(queries)
-        elif isinstance(self.oracle, list) and all(["nupack " in el for el in self.oracle]):
-            return self.nupackScore(queries, returnFunc=[el.replace("nupack ", "") for el in self.oracle])
-        elif isinstance(self.oracle, list) and self.oracle[0] == "potts new":
-            return self.PottsEnergyNew(queries)
-        else:
-            raise NotImplementedError("Unknown oracle type")
+        return samples
 
-
-    def BB_DOB_functions(self, queries):
+    def base2oracle(self, state):
         '''
-        BB-DOB OneMax benchmark
-        :param queries:
-        :return:
+        Input : array = seq
+        Output : array = seq
         '''
-        if self.variable_len:
-            queries = np.clip(queries, 1, self.dict_size) #  merge padding with class 1
+        seq = state
+        return seq
 
-        x0 = [np.binary_repr((queries[i][j] - 1).astype('uint8'),width=2) for i in range(len(queries)) for j in range(self.max_len)] # convert to binary
-        x0 = np.asarray(x0).astype(str).reshape(len(queries), self.max_len) # reshape to proper size
-        x0= [''.join(x0[i]) for i in range(len(x0))] # concatenate to binary strings
-        x1 = np.zeros((len(queries),len(x0[0])),int) # initialize array
-        for i in range(len(x0)): # finally, as an array (took me long enough)
-            x1[i] = np.asarray(list(x0[i])).astype(int)
-
-        dimension = x1.shape[1]
-
-        x1 = idx2one_hot(x1, 2) # convert to BB_DOB one_hot format
-
-        objective = self.getObjective(dimension)
-
-        evals, info = objective(x1)
-
-        return evals
+    def get_score(self, queries):
+        count_zero = lambda x : float(np.count_nonzero(x == 1))
+        outputs = list(map(count_zero, queries))
+        return outputs
 
 
-    def getObjective(self, dimension):
-        if self.oracle == 'onemax': # very limited in our DNA one-hot encoding
-            objective = OneMax(dimension)
-        elif self.oracle == 'twomin':
-            objective = TwoMin(dimension)
-        elif self.oracle == 'fourpeaks': # very limited in our DNA one-hot encoding
-            objective = FourPeaks(dimension, t=3)
-        elif self.oracle == 'deceptivetrap':
-            objective = DeceptiveTrap(dimension, minimize=True)
-        elif self.oracle == 'nklandscape':
-            objective = NKLandscape(dimension, minimize=True)
-        elif self.oracle == 'wmodel':
-            objective = WModel(dimension, mu=self.mu, v=self.v, m = self.m, n = self.n, gamma = self.gamma, minimize=True)
-        else:
-            printRecord(self.oracle + ' is not a valid dataset!')
-            sys.exit()
+class OracleNupack(OracleBase):
+    def __init__(self, config):
+        super().__init__(config)
+    
+    def initialize_samples_base(self):
+        self.dict_size = self.config.env.dict_size
+        self.min_len = self.config.env.min_len
+        self.max_len = self.config.env.max_len
 
-        return objective
+        self.init_len = self.config.oracle.init_dataset.init_len
+        self.random_seed = self.config.oracle.init_dataset.seed
+        np.random.seed(self.random_seed)
+        
+        #random samples in base format
+        samples = []
+        for i in range(self.min_len, self.max_len + 1):
+            #in order to have more long samples, we generate more random samples of longer sequences : it is arbitrary so far
+            samples.extend(np.random.randint(0, self.dict_size, size = (int(self.init_len * i), i))) 
+        
+        np.random.shuffle(samples)
+        samples = samples[:self.init_len]
 
-    def linearToy(self,queries):
+        return samples
+
+    def base2oracle(self, state):
         '''
-        return the energy of a toy model for the given set of queries
-        sites are completely uncorrelated
-        :param queries:
-        :return:
+        Input : array = seq
+        Output : array = seq
         '''
-        energies = queries @ self.linFactors # simple matmul - padding entries (zeros) have zero contribution
+        sequence = state
+        if type(state) != np.ndarray:
+            sequence = np.asarray(state)
 
-        return energies
+        letters = ""
 
+        for j in range(len(sequence)):
+            na = sequence[j]
+            if na == 0:
+                letters += 'A'
+            elif na == 1:
+                letters += 'T'
+            elif na == 2:
+                letters += 'C'
+            elif na == 3:
+                letters += 'G'
+    
+        return letters
 
-    def toyHamiltonian(self,queries):
+    def get_score(self, queries, returnFunc = "energy"): #We kept all Nupack features and only decommented the energy one
         '''
-        return the energy of a toy model for the given set of queries
-        sites may be correlated if they have a strong coupling (off diagonal term in the Hamiltonian)
-        :param queries:
-        :return:
+        IMPORTANT : current implementation below with the commentaries correspond to the raw code in the oracle.py of the previous code.
+        So far we commented the rest because we only focus on "energy" nupack reward function. 
         '''
-
-        energies = np.zeros(len(queries))
-        for i in range(len(queries)):
-            energies[i] = queries[i] @ self.hamiltonian @ queries[i].transpose() # compute energy for each sample via inner product with the Hamiltonian
-
-        return energies
-
-
-    def PottsEnergy(self, queries):
-        '''
-        test oracle - randomly generated Potts Multilevel Spin Hamiltonian
-        each pair of sites is correlated depending on the occupation of each site
-        :param queries: sequences to be scored
-        :return:
-        '''
-
-        # DNA Potts model - OLD
-        #coupling_dict = scipy.io.loadmat('40_level_scored.mat')
-        #N = coupling_dict['h'].shape[1] # length of DNA chain
-        #assert N == len(queries[0]), "Hamiltonian and proposed sequences are different sizes!"
-        #h = coupling_dict['h']
-        #J = coupling_dict['J']
-
-        energies = np.zeros(len(queries))
-        for k in range(len(queries)):
-            nnz = np.count_nonzero(queries[k])
-            # potts hamiltonian
-            for ii in range(nnz): # ignore padding terms
-                energies[k] += self.pottsH[ii, queries[k,ii] - 1] # add onsite term and account for indexing (e.g. 1-4 -> 0-3)
-
-                for jj in range(ii,nnz): # this is duplicated on lower triangle so we only need to do it from i-L
-                    energies[k] += 2 * self.pottsJ[ii, jj, queries[k,ii] - 1, queries[k,jj] - 1]  # site-specific couplings
-
-        return energies
-
-
-    def PottsEnergyNew(self, sequences):
-
-        # Load the potts model
-        J, h = load_potts_model(435);
-
-        # Compute energies
-        energies = np.zeros(len(sequences))
-        for idx, seq in enumerate(sequences):
-            energies[idx] = potts_energy(J, h, seq)
-
-        return energies
-
-
-    def seqfoldScore(self,queries, returnSS = False):
-        '''
-        get the secondary structure for a given sequence
-        using seqfold here - identical features are available using nupack, though results are sometimes different
-        :param sequence:
-        :return:
-        '''
-        temperature = 37.0  # celcius
-        sequences = self.numbers2letters(queries)
-
-        energies = np.zeros(len(sequences))
-        strings = []
-        pairLists = []
-        i = -1
-        for sequence in sequences:
-            i += 1
-            en = dg(sequence, temp = temperature) # get predicted minimum energy of folded structure
-            if np.isfinite(en):
-                if en > 1500: # no idea why it does this but sometimes it adds 1600 - we will upgrade this to nupack in the future
-                    energies[i] = en - 1600
-                else:
-                    energies[i] = en
-            else:
-                energies[i] = 5 # np.nan # set infinities as being very unlikely
-
-            if returnSS:
-                structs = fold(sequence)  # identify structural features
-                # print(round(sum(s.e for s in structs), 2)) # predicted energy of the final structure
-
-                desc = ["."] * len(sequence)
-                pairList = []
-                for s in structs:
-                    pairList.append(s.ij[0])
-                    if len(s.ij) == 1:
-                        i, j = s.ij[0]
-                        desc[i] = "("
-                        desc[j] = ")"
-
-                ssString = "".join(desc) # secondary structure string
-                strings.append(ssString)
-                pairList = np.asarray(pairList) + 1 # list of paired bases
-                pairLists.append(pairList)
-
-        if returnSS:
-            return energies, strings, pairLists
-        else:
-            return energies
-
-
-    def numbers2letters(self, sequences):  # Tranforming letters to numbers (1234 --> ATGC)
-        '''
-        Converts numerical values to ATGC-format
-        :param sequences: numerical DNA sequences to be converted
-        :return: DNA sequences in ATGC format
-        '''
-        if type(sequences) != np.ndarray:
-            sequences = np.asarray(sequences)
-
-        my_seq = ["" for x in range(len(sequences))]
-        row = 0
-        for j in range(len(sequences)):
-            seq = sequences[j, :]
-            assert type(seq) != str, 'Function inputs must be a list of equal length strings'
-            for i in range(len(sequences[0])):
-                na = seq[i]
-                if na == 1:
-                    my_seq[row] += 'A'
-                elif na == 2:
-                    my_seq[row] += 'T'
-                elif na == 3:
-                    my_seq[row] += 'C'
-                elif na == 4:
-                    my_seq[row] += 'G'
-            row += 1
-        return my_seq
-
-
-    def numpy_fillna(self, data):
-        '''
-        function to pad uneven-length vectors up to the max with zeros
-        :param data:
-        :return:
-        '''
-        # Get lengths of each row of data
-        lens = np.array([len(i) for i in data])
-
-        # Mask of valid places in each row
-        mask = np.arange(lens.max()) < lens[:, None]
-
-        # Setup output array and put elements from data into masked positions
-        out = np.zeros(mask.shape, dtype=object)
-        out[mask] = np.concatenate(data)
-        return out
-
-
-    def nupackScore(self, queries, returnFunc='energy', energy_weighting = False, motif = None):
-        # Nupack requires Linux OS.
-        #use nupack instead of seqfold - more stable and higher quality predictions in general
-        #returns the energy of the most probable structure only
-        #:param queries:
-        #:param returnFunct 'energy' 'pins' 'pairs'
-        #:return:
-
+        
         temperature = 310.0  # Kelvin
         ionicStrength = 1.0 # molar
-        sequences = self.numbers2letters(queries)
-
+        
+        sequences = list(map(self.base2oracle, queries))
+       
         energies = np.zeros(len(sequences))
-        nPins = np.zeros(len(sequences)).astype(int)
-        nPairs = 0
-        ssStrings = np.zeros(len(sequences), dtype=object)
+        #nPins = np.zeros(len(sequences)).astype(int)
+        #nPairs = 0
+        #ssStrings = np.zeros(len(sequences), dtype=object)
 
         # parallel evaluation - fast
         strandList = []
@@ -447,59 +288,60 @@ class Oracle():
         set = ComplexSet(strands=strandList, complexes=SetSpec(max_size=1, include=comps))
         model1 = Model(material='dna', celsius=temperature - 273, sodium=ionicStrength)
         results = complex_analysis(set, model=model1, compute=['mfe'])
+        
         for i in range(len(energies)):
-            energies[i] = results[comps[i]].mfe[0].energy
-            ssStrings[i] = str(results[comps[i]].mfe[0].structure)
+            energies[i] = - results[comps[i]].mfe[0].energy
+            #ssStrings[i] = str(results[comps[i]].mfe[0].structure)
 
         dict_return = {}
-        if 'pins' in returnFunc:
-            for i in range(len(ssStrings)):
-                indA = 0  # hairpin completion index
-                for j in range(len(sequences[i])):
-                    if ssStrings[i][j] == '(':
-                        indA += 1
-                    elif ssStrings[i][j] == ')':
-                        indA -= 1
-                        if indA == 0:  # if we come to the end of a distinct hairpin
-                            nPins[i] += 1
-            dict_return.update({"pins": -nPins})
-        if 'pairs' in returnFunc:
-            nPairs = np.asarray([ssString.count('(') for ssString in ssStrings]).astype(int)
-            dict_return.update({"pairs": -nPairs})
+        # if 'pins' in returnFunc:
+        #     for i in range(len(ssStrings)):
+        #         indA = 0  # hairpin completion index
+        #         for j in range(len(sequences[i])):
+        #             if ssStrings[i][j] == '(':
+        #                 indA += 1
+        #             elif ssStrings[i][j] == ')':
+        #                 indA -= 1
+        #                 if indA == 0:  # if we come to the end of a distinct hairpin
+        #                     nPins[i] += 1
+        #     dict_return.update({"pins": -nPins})
+        # if 'pairs' in returnFunc:
+        #     nPairs = np.asarray([ssString.count('(') for ssString in ssStrings]).astype(int)
+        #     dict_return.update({"pairs": -nPairs})
         if 'energy' in returnFunc:
             dict_return.update({"energy": energies}) # this is already negative by construction in nupack
 
-        if 'open loop' in returnFunc:
-            biggest_loop = np.zeros(len(ssStrings))
-            for i in range(len(ssStrings)):  # measure all the open loops and return the largest
-                loops = [0] # size of loops
-                counting = 0
-                indA = 0
-                # loop completion index
-                for j in range(len(sequences[i])):
-                    if ssStrings[i][j] == '(':
-                        counting = 1
-                        indA = 0
-                    if (ssStrings[i][j] == '.') and (counting == 1):
-                        indA += 1
-                    if (ssStrings[i][j] == ')') and (counting == 1):
-                        loops.append(indA)
-                        counting = 0
-                biggest_loop[i] = max(loops)
-            dict_return.update({"open loop": -biggest_loop})
+        # if 'open loop' in returnFunc:
+        #     biggest_loop = np.zeros(len(ssStrings))
+        #     for i in range(len(ssStrings)):  # measure all the open loops and return the largest
+        #         loops = [0] # size of loops
+        #         counting = 0
+        #         indA = 0
+        #         # loop completion index
+        #         for j in range(len(sequences[i])):
+        #             if ssStrings[i][j] == '(':
+        #                 counting = 1
+        #                 indA = 0
+        #             if (ssStrings[i][j] == '.') and (counting == 1):
+        #                 indA += 1
+        #             if (ssStrings[i][j] == ')') and (counting == 1):
+        #                 loops.append(indA)
+        #                 counting = 0
+        #         biggest_loop[i] = max(loops)
+        #     dict_return.update({"open loop": -biggest_loop})
 
-        if 'motif' in returnFunc: # searches for a particular fold NOTE searches for this exact aptamer, not subsections or longer sequences with this as just one portion
-            #'((((....))))((((....))))....(((....)))'
-            # pad strings up to max length for binary distance calculation
-            padded_strings = bracket_dot_to_num(ssStrings, maxlen=self.max_len)
-            padded_motif = np.expand_dims(bracket_dot_to_num([motif,motif], maxlen=self.max_len)[0],0)
-            motif_distance = binaryDistance(np.concatenate((padded_motif,padded_strings),axis=0), pairwise=True)[0,1:] # the first element is the motif we are looking for - take everything after this
-            dict_return.update({"motif": motif_distance - 1}) # result is normed on 0-1, so dist-1 gives scaling from 0(bad) to -1(good)
+        # if 'motif' in returnFunc: # searches for a particular fold NOTE searches for this exact aptamer, not subsections or longer sequences with this as just one portion
+        #     #'((((....))))((((....))))....(((....)))'
+        #     # pad strings up to max length for binary distance calculation
+        #     padded_strings = bracket_dot_to_num(ssStrings, maxlen=self.max_len)
+        #     padded_motif = np.expand_dims(bracket_dot_to_num([motif,motif], maxlen=self.max_len)[0],0)
+        #     motif_distance = binaryDistance(np.concatenate((padded_motif,padded_strings),axis=0), pairwise=True)[0,1:] # the first element is the motif we are looking for - take everything after this
+        #     dict_return.update({"motif": motif_distance - 1}) # result is normed on 0-1, so dist-1 gives scaling from 0(bad) to -1(good)
 
-        if energy_weighting:
-            for key in dict_return.keys():
-                if key != 'energy':
-                    dict_return[key] = dict_return[key] * np.tanh(np.abs(energies)/2) # positive tahn of the energies, scaled
+        # if energy_weighting:
+        #     for key in dict_return.keys():
+        #         if key != 'energy':
+        #             dict_return[key] = dict_return[key] * np.tanh(np.abs(energies)/2) # positive tahn of the energies, scaled
 
         if isinstance(returnFunc, list):
             if len(returnFunc) > 1:
@@ -507,5 +349,71 @@ class Oracle():
             else:
                 return dict_return[returnFunc[0]]
         else:
-            return dict_return[returnFunc]
+            return dict_return[returnFunc].tolist()
+
+
+### Diverse Models of Oracle for now
+'''
+ORACLE MODELS ZOO
+'''
+###
+
+class Activation(nn.Module):
+    def __init__(self, activation_func = "relu"):
+        super().__init__()
+        if activation_func == "relu":
+            self.activation = F.relu
+        elif activation_func == "gelu":
+            self.activation = F.gelu
+
+    def forward(self, input):
+        return self.activation(input)
+
+
+#This MLP was specifically trained on a special dataset
+class MLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.layers = 2
+        self.filters = 128
+        self.init_layer_depth = int(
+            (40 + 1) * (4 + 1)
+        )  
+
+        # build input and output layers
+        self.initial_layer = nn.Linear(
+            int(self.init_layer_depth), self.filters
+        )
+        self.activation1 = Activation("gelu")
+        self.output_layer = nn.Linear(self.filters, 1, bias=False)
+
+        # build hidden layers
+        self.lin_layers = []
+        self.activations = []
+        self.dropouts = []
+
+        for i in range(self.layers):
+            self.lin_layers.append(nn.Linear(self.filters, self.filters))
+            self.activations.append(Activation("gelu"))
+            self.dropouts.append(nn.Dropout(p=0.1))
+
+        # initialize module lists
+        self.lin_layers = nn.ModuleList(self.lin_layers)
+        self.activations = nn.ModuleList(self.activations)
+        self.dropouts = nn.ModuleList(self.dropouts)
+
+    def forward(self, x):
+
+        x = self.activation1(
+            self.initial_layer(x)
+        )  # apply linear transformation and nonlinear activation
+        for i in range(self.layers):
+            x = self.lin_layers[i](x)
+            x = self.activations[i](x)
+            x = self.dropouts[i](x)
+
+        y = self.output_layer(x)
+
+        return y
 
