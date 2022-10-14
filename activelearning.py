@@ -1,8 +1,9 @@
-#To load the config
+"""
+Active learning with GFlowNets
+"""
+
 from omegaconf import DictConfig, OmegaConf
 import hydra #not currently used, to be implemented
-
-#Import main components of the pipeline
 from oracle import Oracle
 from proxy import Proxy
 from acquisition import AcquisitionFunction
