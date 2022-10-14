@@ -14,7 +14,8 @@ from querier import Querier
 # TODO : instantiate the config with hydra . Once we have the config object we can pass it to other functions
 class ActiveLearning:
     """
-    AL Global pipeline : so far it is a class (the config is easily passed on to all methods), very simple, but it can be a single simple function
+    AL Global pipeline : so far it is a class (the config is easily passed on to all
+    methods), very simple, but it can be a single simple function
     """
 
     def __init__(self, config):
@@ -52,20 +53,6 @@ class ActiveLearning:
         """
         Creates the working directories to store the data.
         """
-        return
-
-
-class Logger:
-    """
-    Utils functions to compute and handle the statistics (saving them or send to comet).
-    Incorporates the previous function "getModelState", ...
-    Like FormatHandler, it can be passed on to querier, gfn, proxy, ... to get the statistics of training of the generated data at real time
-    """
-
-    def __init__(self):
-        pass
-
-    def init_comet(self):
         return
 
 
