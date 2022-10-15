@@ -2,6 +2,8 @@ import os
 import torch
 import torch.nn.functional as F
 from abc import abstractmethod
+from torch.nn.utils.rnn import pad_sequence
+
 
 '''
 ACQUISITION WRAPPER
@@ -38,6 +40,7 @@ class AcquisitionFunctionBase:
         self.proxy = proxy
         self.device = self.config.device
         
+        #the specific class of the exact AF is instantiated here
     @abstractmethod
     def load_best_proxy(self):
         '''
@@ -54,12 +57,7 @@ class AcquisitionFunctionBase:
         '''
         calls the get_reward method of the appropriate Acquisition Class (MUtual Information, Expected Improvement, ...)
         '''
-        raise NotImplementedError
-    
-    @abstractmethod
-    def base2af(self, inputs_af_base):
-        raise NotImplementedError
-
+        pass
 
 '''
 SUBCLASS SPECIFIC ACQUISITION
@@ -74,14 +72,29 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
 
     
     def get_reward_batch(self, inputs_af_base): #inputs_af = list of ...
-        inputs_af = list(map(self.base2af, inputs_af_base))
-        inputs = torch.stack(inputs_af).view(len(inputs_af_base), -1)
+        super().get_reward_batch(inputs_af_base)
+
+        inputs_af = list(map(torch.tensor, inputs_af_base))
+        input_afs_lens = list(map(len, inputs_af_base))
+        inputs = pad_sequence(inputs_af, batch_first=True, padding_value=0.0)
+        # inputs = self.proxy.base2proxy(inputs_af)
+
+        # inputs = torch.stack(inputs_af).view(len(inputs_af_base), -1)
+    
         self.load_best_proxy()
         self.proxy.model.eval()
         with torch.no_grad():
-            outputs = self.proxy.model(inputs)
+            if self.config.proxy.model.lower() == "mlp":
+                outputs = self.proxy.model(inputs)
+            elif self.config.proxy.model.lower() == "lstm":
+                outputs = self.proxy.model(inputs, input_afs_lens)
+            elif self.config.proxy.model.lower() == "transformer":
+                outputs = self.proxy.model(inputs, None)
+
         return outputs
 
+
+    
     def base2af(self, state):
         #useful format
         self.dict_size = self.config.env.dict_size
@@ -109,6 +122,3 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
             input_proxy = torch.cat((input_proxy, padding), dim = 1)
         
         return input_proxy.to(self.device)[0]
-    
-
-
