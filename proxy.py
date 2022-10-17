@@ -247,11 +247,6 @@ class ProxyBase:
             output = self.model(data).cpu().detach().numpy()
             return output
 
-    @abstractmethod
-    def base2proxy(self, state):
-        return state
-        # pass
-
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
@@ -389,9 +384,6 @@ class ProxyTransformer(ProxyBase):
     def evaluate(self, data):
         return super().evaluate(data)
 
-    def base2proxy(self, state):
-        return super().base2proxy(state)
-
 
 """
 BuildDataset utils
@@ -400,7 +392,7 @@ BuildDataset utils
 
 class BuildDataset:
     """
-    Will load the dataset scored by the oracle and convert it in the right format for the proxy with transition.base2proxy
+    Will load the dataset scored by the oracle
     """
 
     def __init__(self, config, proxy):
@@ -559,6 +551,7 @@ class MLP(nn.Module):
         return self.model(x)
 
     def preprocess(self, inputs):
+        inputs = inputs.to(torch.int64)
         inp_x = F.one_hot(inputs, num_classes=self.input_classes + 1)[:, :, :-1].to(
             torch.float32
         )
@@ -626,9 +619,9 @@ class LSTM(nn.Module):
         return out
 
     def preprocess(self, inputs):
-        inp_x = F.one_hot(inputs, num_classes=self.input_classes + 1)[:, :, 1:].to(
-            torch.float32
-        )
+        inp_x = F.one_hot(inputs.to(torch.int64), num_classes=self.input_classes + 1)[
+            :, :, 1:
+        ].to(torch.float32)
         inp = torch.zeros(inputs.shape[0], self.max_seq_length, self.input_classes)
         inp[:, : inp_x.shape[1], :] = inp_x
         inputs = inp

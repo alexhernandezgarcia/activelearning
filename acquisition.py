@@ -84,9 +84,6 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
         inputs_af = list(map(torch.tensor, inputs_af_base))
         input_afs_lens = list(map(len, inputs_af_base))
         inputs = pad_sequence(inputs_af, batch_first=True, padding_value=0.0)
-        # inputs = self.proxy.base2proxy(inputs_af)
-
-        # inputs = torch.stack(inputs_af).view(len(inputs_af_base), -1)
 
         self.load_best_proxy()
         self.proxy.model.eval()
@@ -99,31 +96,3 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
                 outputs = self.proxy.model(inputs, None)
 
         return outputs
-
-    def base2af(self, state):
-        # useful format
-        self.dict_size = self.config.env.dict_size
-        self.min_len = self.config.env.min_len
-        self.max_len = self.config.env.max_len
-
-        seq = state
-        initial_len = len(seq)
-        # into a tensor and then ohe
-        seq_tensor = torch.from_numpy(seq)
-        seq_ohe = F.one_hot(seq_tensor.long(), num_classes=self.dict_size + 1)
-        seq_ohe = seq_ohe.reshape(1, -1).float()
-        # addind eos token
-        eos_tensor = torch.tensor([self.dict_size])
-        eos_ohe = F.one_hot(eos_tensor.long(), num_classes=self.dict_size + 1)
-        eos_ohe = eos_ohe.reshape(1, -1).float()
-
-        input_proxy = torch.cat((seq_ohe, eos_ohe), dim=1)
-        # adding 0-padding
-        number_pads = self.max_len - initial_len
-        if number_pads:
-            padding = torch.cat(
-                [torch.tensor([0] * (self.dict_size + 1))] * number_pads
-            ).view(1, -1)
-            input_proxy = torch.cat((input_proxy, padding), dim=1)
-
-        return input_proxy.to(self.device)[0]
