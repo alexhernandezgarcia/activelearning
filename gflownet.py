@@ -270,7 +270,6 @@ class GFlowNet:
         parents_ohe = torch.stack(list(map(self.manip2policy, parents))).view(
             len(parents), -1
         )
-        # parents_ohe = (1, 105)
         if policy == "model":
             self.best_model.eval()
             with torch.no_grad():
@@ -291,8 +290,6 @@ class GFlowNet:
             raise NotImplemented
         env.state = parents[action_idx]  # state ou fonction set state
         env.last_action = parents_a[action_idx]
-        # parents_a is that specific action like if nucleotide 2 was added then 2 will be parent_a
-        # parent is the entire sequence before
         return env, parents, parents_a
 
     def get_training_data(self, batch_size):
@@ -309,16 +306,12 @@ class GFlowNet:
         # OFFLINE DATA
         self.buffer.make_train_test_set()
         offline_samples = int(self.pct_batch_empirical * len(envs))
-        # 1 offline sample in the first batch
         for env in envs[:offline_samples]:
-            # randomly permutes the sequences in the entire dataset and chooses the first one
             state = self.rng.permutation(self.buffer.train.samples.values)[0]
             state_manip = self.env.base2manip(state)
             env.done = True
             env.state = state_manip
             env.last_action = self.env.token_eos  # 4
-            # create the env by putting the state_manip (sequence + eos) in env.state
-            # then for that sequence, we will now do backward sampling
             while len(env.state) > 0:
                 previous_state = env.state
                 previous_done = env.done
@@ -330,8 +323,6 @@ class GFlowNet:
                 # for backward sampling, the last action is updated after
                 previous_action = env.last_action
                 seq_ohe = self.manip2policy(previous_state)
-                # previous state = array([1, 2, 1, 0, 3, 0, 0, 3, 0, 1, 0, 3, 4])
-                # parents = [array([1, 2, 1, 0, 3, 0, 0, 3, 0, 1, 0, 3])]
                 parents_ohe = torch.stack(list(map(self.manip2policy, parents)))
 
                 batch.append(
@@ -355,18 +346,16 @@ class GFlowNet:
                 )
 
             env.done = True
-        # the following line takes just those envs for which env.done=False, all offline sampled envs are removed
+
         envs = [env for env in envs if not env.done]
         self.sampling_model = self.best_model
         self.sampling_model.eval()
 
         while envs:
-            # predicts one action for each sequence in the batch
             envs, actions, valids = self.forward_sample(
                 envs, policy="mixt", temperature=self.temperature
             )
 
-            # Add to batch
             for env, action, valid in zip(envs, actions, valids):
                 if valid:
                     parents, parents_a = env.get_parents()
@@ -390,10 +379,6 @@ class GFlowNet:
                             ),  # convention, we start at 0
                         ]
                     )
-            # path_id is corresponds to tidx in moksh's code. Used to identify which path number (in the entire dataset it is)
-            # state_id is to identify which index it lies on in the entire process of conducting that sequence
-            # with each step, the subsequences are added to the batch. Once you are done constructing that entire sequence,
-            # you remove it from the envs list.
             envs = [env for env in envs if not env.done]
 
         (
