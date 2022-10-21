@@ -9,6 +9,8 @@ from acquisition import AcquisitionFunction
 from env import Env
 from gflownet import GFlowNet
 from querier import Querier
+from utils.logger import Logger
+import wandb
 
 
 # TODO : instantiate the config with hydra . Once we have the config object we can pass
@@ -26,9 +28,9 @@ class ActiveLearning:
         # setup function that creates the directories to save data, ...
         self.setup()
         # util class to handle the statistics during training
-        self.logger = Logger()
+        self.logger = Logger(self.config)
         # load the main components of the AL pipeline
-        self.oracle = Oracle(self.config)
+        self.oracle = Oracle(self.config, self.logger)
         self.proxy = Proxy(self.config, self.logger)
         self.acq = AcquisitionFunction(self.config, self.proxy)
         self.env = Env(self.config, self.acq)
@@ -41,7 +43,9 @@ class ActiveLearning:
         self.oracle.initialize_dataset()
         # we run each round of active learning
         for self.iter in range(self.config.al.n_iter):
+            self.logger.set_context("iter{}".format(self.iter+1))
             self.iterate()
+        self.logger.finish()
 
     def iterate(self):
         self.proxy.train()
@@ -60,6 +64,9 @@ class ActiveLearning:
 
 if __name__ == "__main__":
     # TODO : activelearning pipeline as a simple function, without the class ?
-    config_test_name = "config_test.yaml"
+    config_test_name = (
+        "/home/mila/n/nikita.saxena/ActiveLearningPipeline/config_test.yaml"
+    )
+
     al = ActiveLearning(config=config_test_name)
     al.run_pipeline()
