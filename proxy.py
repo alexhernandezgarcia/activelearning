@@ -621,9 +621,9 @@ class LSTM(nn.Module):
 
     def preprocess(self, inputs):
         inputs = inputs.to(torch.int64)
-        inp_x = F.one_hot(inputs, num_classes=self.input_classes + 1)[
-            :, :, 1:
-        ].to(torch.float32)
+        inp_x = F.one_hot(inputs, num_classes=self.input_classes + 1)[:, :, 1:].to(
+            torch.float32
+        )
         inp = torch.zeros(inputs.shape[0], self.max_seq_length, self.input_classes)
         inp[:, : inp_x.shape[1], :] = inp_x
         inputs = inp

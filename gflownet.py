@@ -264,9 +264,9 @@ class GFlowNet:
     def backward_sample(self, env, policy, temperature=0):
         if temperature == 0:
             temperature = self.config.gflownet.sampling.temperature
-        
-        parents, parents_a = env.get_parents(backward=True)  
-        
+
+        parents, parents_a = env.get_parents(backward=True)
+
         parents_ohe = torch.stack(list(map(self.manip2policy, parents))).view(
             len(parents), -1
         )
@@ -343,7 +343,7 @@ class GFlowNet:
                         parents_ohe.view(len(parents), -1),
                         tl_list(parents_a),
                         previous_done,
-                        tl_list([env.id] * len(parents)), # what is this?
+                        tl_list([env.id] * len(parents)),  # what is this?
                         tl_list(
                             [
                                 len(previous_state) - 1
@@ -392,7 +392,7 @@ class GFlowNet:
                     )
             # path_id is corresponds to tidx in moksh's code. Used to identify which path number (in the entire dataset it is)
             # state_id is to identify which index it lies on in the entire process of conducting that sequence
-            # with each step, the subsequences are added to the batch. Once you are done constructing that entire sequence, 
+            # with each step, the subsequences are added to the batch. Once you are done constructing that entire sequence,
             # you remove it from the envs list.
             envs = [env for env in envs if not env.done]
 
@@ -409,8 +409,8 @@ class GFlowNet:
         ) = zip(*batch)
 
         rewards = self.env.get_reward(input_reward, done)
-        self.logger.log_metric('policy_reward', np.mean(rewards))
-        self.logger.log_histogram('policy_reward_hist', rewards)
+        self.logger.log_metric("policy_reward", np.mean(rewards))
+        self.logger.log_histogram("policy_reward_hist", rewards)
         rewards = [tf_list([r]) for r in rewards]
         done = [tl_list([d]) for d in done]
 

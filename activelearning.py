@@ -43,7 +43,7 @@ class ActiveLearning:
         self.oracle.initialize_dataset()
         # we run each round of active learning
         for self.iter in range(self.config.al.n_iter):
-            self.logger.set_context("iter{}".format(self.iter+1))
+            self.logger.set_context("iter{}".format(self.iter + 1))
             self.iterate()
         self.logger.finish()
 
