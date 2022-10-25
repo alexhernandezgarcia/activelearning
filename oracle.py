@@ -32,11 +32,11 @@ class Oracle:
     def init_oracle(self):
         # calling the relevant oracle. All oracles should follow the model of OracleBase
         if self.config.oracle.main == "mlp":
-            self.oracle = OracleMLP(self.config, self.logger)
+            self.oracle = OracleMLP(self.config)
         elif self.config.oracle.main == "toy":
-            self.oracle = OracleToy(self.config, self.logger)
+            self.oracle = OracleToy(self.config)
         elif self.config.oracle.main == "nupack":
-            self.oracle = OracleNupack(self.config, self.logger)
+            self.oracle = OracleNupack(self.config)
         else:
             raise NotImplementedError
 
@@ -61,7 +61,7 @@ class Oracle:
         """
         scores = self.oracle.get_score(queries)
 
-        self.logger.log_histogram("oracle_energies", scores, False)
+        self.logger.log_histogram('oracle_energies', scores, use_context)
         return scores
 
     def update_dataset(self, queries, energies):
@@ -78,9 +78,9 @@ class OracleBase:
     BaseClass model for all other oracles
     """
 
-    def __init__(self, config, logger):
+    def __init__(self, config):
         self.config = config
-        self.logger = logger
+        # self.logger = logger
 
     @abstractmethod
     def initialize_samples_base(self):
@@ -108,8 +108,9 @@ Different Oracles Implemented
 
 
 class OracleMLP(OracleBase):
-    def __init__(self, config, logger):
-        super().__init__(config, logger)
+    def __init__(self, config):
+        super().__init__(config)
+        # super().__init__(config, logger)
         # parameters useful for the format of this custom trained MLP
         self.dict_size = self.config.env.dict_size
         self.max_len_mlp = 40  # this MLP was trained with seqs of len max 40
@@ -190,8 +191,10 @@ class OracleMLP(OracleBase):
 
 
 class OracleToy(OracleBase):
-    def __init__(self, config, logger):
-        super().__init__(config, logger)
+    def __init__(self, config):
+        super().__init__(config)
+
+        # super().__init__(config, logger)
 
     def initialize_samples_base(self):
         self.dict_size = self.config.env.dict_size
@@ -230,8 +233,10 @@ class OracleToy(OracleBase):
 
 
 class OracleNupack(OracleBase):
-    def __init__(self, config, logger):
-        super().__init__(config, logger)
+    def __init__(self, config):
+        super().__init__(config)
+
+        # super().__init__(config, logger)
 
     def initialize_samples_base(self):
         self.dict_size = self.config.env.dict_size
