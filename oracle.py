@@ -80,7 +80,6 @@ class OracleBase:
 
     def __init__(self, config):
         self.config = config
-        # self.logger = logger
 
     @abstractmethod
     def initialize_samples_base(self):
@@ -110,7 +109,6 @@ Different Oracles Implemented
 class OracleMLP(OracleBase):
     def __init__(self, config):
         super().__init__(config)
-        # super().__init__(config, logger)
         # parameters useful for the format of this custom trained MLP
         self.dict_size = self.config.env.dict_size
         self.max_len_mlp = 40  # this MLP was trained with seqs of len max 40
@@ -194,8 +192,6 @@ class OracleToy(OracleBase):
     def __init__(self, config):
         super().__init__(config)
 
-        # super().__init__(config, logger)
-
     def initialize_samples_base(self):
         self.dict_size = self.config.env.dict_size
         self.min_len = self.config.env.min_len
@@ -235,8 +231,6 @@ class OracleToy(OracleBase):
 class OracleNupack(OracleBase):
     def __init__(self, config):
         super().__init__(config)
-
-        # super().__init__(config, logger)
 
     def initialize_samples_base(self):
         self.dict_size = self.config.env.dict_size
