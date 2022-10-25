@@ -10,7 +10,6 @@ from env import Env
 from gflownet import GFlowNet
 from querier import Querier
 from utils.logger import Logger
-import wandb
 
 
 # TODO : instantiate the config with hydra . Once we have the config object we can pass
