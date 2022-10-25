@@ -5,6 +5,7 @@ import wandb
 import os
 import torch
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 class Logger:
     """
@@ -15,7 +16,8 @@ class Logger:
     """
     def __init__(self, config):
         self.config = config
-        run_name = "proxy{}_oracle{}_gfn{}_minLen{}_maxLen{}".format(config.proxy.model.upper(), config.oracle.main.upper(), config.gflownet.policy_model.upper(), config.env.min_len, config.env.max_len)
+        date_time = datetime.today().strftime('%d/%m-%H:%M:%S')
+        run_name = "proxy{}_oracle{}_gfn{}_minLen{}_maxLen{}_{}".format(config.proxy.model.upper(), config.oracle.main.upper(), config.gflownet.policy_model.upper(), config.env.min_len, config.env.max_len, date_time)
         self.run = wandb.init(config=config, project='ActiveLearningPipeline', name=run_name)
         self.context = ""
 
