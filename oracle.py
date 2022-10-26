@@ -61,7 +61,7 @@ class Oracle:
         """
         scores = self.oracle.get_score(queries)
 
-        self.logger.log_histogram('oracle_energies', scores, use_context)
+        self.logger.log_histogram("oracle_energies", scores, use_context)
         return scores
 
     def update_dataset(self, queries, energies):

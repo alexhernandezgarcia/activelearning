@@ -394,11 +394,11 @@ class GFlowNet:
         ) = zip(*batch)
 
         rewards = self.env.get_reward(input_reward, done)
-        terminalStates = rewards[rewards!=0]
+        terminalStates = rewards[rewards != 0]
         # mean of just the terminal states
-        self.logger.log_metric('rewards', np.mean(terminalStates))
+        self.logger.log_metric("rewards", np.mean(terminalStates))
         proxy_vals = self.env.reward2acq(terminalStates)
-        self.logger.log_metric('proxy_vals', np.mean(proxy_vals))
+        self.logger.log_metric("proxy_vals", np.mean(proxy_vals))
         rewards = [tf_list([r]) for r in rewards]
         done = [tl_list([d]) for d in done]
 
