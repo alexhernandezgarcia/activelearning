@@ -201,6 +201,7 @@ class ProxyBase:
         targets = data[1]
         inputs = inputs.to(self.device)
         targets = targets.to(self.device)
+        # output = self.model(inputs.float())
         output = self.model(inputs)
         loss = F.mse_loss(output[:, 0], targets.float())
         return loss
@@ -620,10 +621,9 @@ class LSTM(nn.Module):
         return out
 
     def preprocess(self, inputs):
-        inputs = inputs.to(torch.int64)
-        inp_x = F.one_hot(inputs, num_classes=self.input_classes + 1)[:, :, 1:].to(
-            torch.float32
-        )
+        inp_x = F.one_hot(inputs.to(torch.int64), num_classes=self.input_classes + 1)[
+            :, :, 1:
+        ].to(torch.float32)
         inp = torch.zeros(inputs.shape[0], self.max_seq_length, self.input_classes)
         inp[:, : inp_x.shape[1], :] = inp_x
         inputs = inp
@@ -685,6 +685,5 @@ class Transformer(nn.Module):
         return y
 
     def preprocess(self, inputs):
-        inputs = inputs.to(torch.int64)
         inputs = torch.transpose(inputs, 1, 0)
         return inputs
