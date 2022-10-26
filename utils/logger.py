@@ -2,6 +2,7 @@
 Logger utils, to be developed.
 """
 
+
 class Logger:
     """
     Utils functions to compute and handle the statistics (saving them or send to
@@ -15,5 +16,3 @@ class Logger:
 
     def init_comet(self):
         return
-
-
