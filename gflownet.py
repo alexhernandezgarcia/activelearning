@@ -311,12 +311,12 @@ class GFlowNet:
             state_manip = self.env.base2manip(state)
             env.done = True
             env.state = state_manip
-            env.last_action = self.env.token_eos  # 4
+            env.last_action = self.env.token_eos
+
             while len(env.state) > 0:
                 previous_state = env.state
                 previous_done = env.done
                 previous_mask = env.get_mask()
-                # WHAT IS MASKING FOR?
                 env, parents, parents_a = self.backward_sample(
                     env, policy="model", temperature=self.temperature
                 )
@@ -557,7 +557,11 @@ Utils Buffer
 
 class Buffer:
     """
+<<<<<<< HEAD
     BUffer of data :
+=======
+    BUffer of data : 
+>>>>>>> main-new-al
     - loads the data from oracle and put the best ones as offline training data
     - maintains a replay buffer composed of the best trajectories sampled for training
     """

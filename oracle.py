@@ -17,7 +17,7 @@ except:
 
 class Oracle:
     """
-    Generic Class for the oracle.
+    Generic Class for the oracle. 
     The different oracles (classes inheriting from OracleBase)
     can be called according to a config param in the method score
     """
