@@ -22,8 +22,9 @@ class Oracle:
     can be called according to a config param in the method score
     """
 
-    def __init__(self, config):
+    def __init__(self, config, logger):
         self.config = config
+        self.logger = logger
         # path to load and save the scored data
         self.path_data = config.path.data_oracle
         self.init_oracle()
@@ -39,7 +40,7 @@ class Oracle:
         else:
             raise NotImplementedError
 
-    def initialize_dataset(self, save=True, return_data=False):
+    def initialize_dataset(self, save=True, return_data=False, use_context=False):
         # the method to initialize samples in the BASE format is specific to each oracle for now. It can be changed.
         # the first samples are in the "base format", so as to be directly saved as such and sent for query (base2oracle transition)
 
@@ -47,18 +48,20 @@ class Oracle:
 
         data = {}
         data["samples"] = samples
-        data["energies"] = self.score(samples)
+        data["energies"] = self.score(samples, use_context)
         # print("initial data", data)
         if save:
             np.save(self.path_data, data)
         if return_data:
             return data
 
-    def score(self, queries):
+    def score(self, queries, use_context=True):
         """
         Calls the specific oracle (class/function) and apply its "get_score" method on the dataset
         """
         scores = self.oracle.get_score(queries)
+
+        self.logger.log_histogram("oracle_energies", scores, use_context)
         return scores
 
     def update_dataset(self, queries, energies):
@@ -280,7 +283,7 @@ class OracleNupack(OracleBase):
     ):  # We kept all Nupack features and only decommented the energy one
         """
         IMPORTANT : current implementation below with the commentaries correspond to the raw code in the oracle.py of the previous code.
-        So far we commented the rest because we only focus on "energy" nupack reward function. 
+        So far we commented the rest because we only focus on "energy" nupack reward function.
         """
 
         temperature = 310.0  # Kelvin
