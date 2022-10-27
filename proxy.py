@@ -199,8 +199,11 @@ class ProxyBase:
         targets = data[1]
         inputs = inputs.to(self.device)
         targets = targets.to(self.device)
-        # output = self.model(inputs.float())
-        output = self.model(inputs)
+        inputLens = data[2]
+        inputs = inputs.to(self.device)
+        inputLens = inputLens.to(self.device)
+        targets = targets.to(self.device)
+        output = self.model(inputs, inputLens, targets)
         loss = F.mse_loss(output[:, 0], targets.float())
         return loss
 
@@ -331,15 +334,7 @@ class ProxyLSTM(ProxyBase):
         super().test(te)
 
     def get_loss(self, data):
-        inputs = data[0]
-        targets = data[1]
-        inputLens = data[2]
-        inputs = inputs.to(self.device)
-        inputLens = inputLens.to(self.device)
-        targets = targets.to(self.device)
-        output = self.model(inputs, inputLens)
-        loss = F.mse_loss(output[:, 0], targets.float())
-        return loss
+        return super().get_loss(data)
 
     def check_convergence(self):
         super().check_convergence()
@@ -371,12 +366,7 @@ class ProxyTransformer(ProxyBase):
         super().test(te)
 
     def get_loss(self, data):
-        inputs = data[0]
-        targets = data[1]
-        inputs = inputs.to(self.device)
-        targets = targets.to(self.device)
-        output = self.model(inputs, None)
-        return F.mse_loss(output[:, 0], targets.float())
+        return super().get_loss(data)
 
     def check_convergence(self):
         super().check_convergence()
@@ -545,7 +535,7 @@ class MLP(nn.Module):
         layers.append(nn.Linear(self.hidden_layers[-1], self.out_dim))
         self.model = nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, input_len, mask):
         if self.transformerCall == False:
             x = self.preprocess(x)
         return self.model(x)
@@ -592,10 +582,10 @@ class LSTM(nn.Module):
 
         self.activation = Activation(act_func)
 
-    def forward(self, inputs, inputLens):
+    def forward(self, inputs, input_len, mask):
         x = self.preprocess(inputs)
         xPack = pack_padded_sequence(
-            x, inputLens, batch_first=True, enforce_sorted=False
+            x, input_len, batch_first=True, enforce_sorted=False
         )
         h_0 = Variable(
             torch.zeros(self.num_layer, inputs.size(0), self.hidden_size_lstm)
@@ -673,7 +663,7 @@ class Transformer(nn.Module):
             + list(self.output.parameters())
         )
 
-    def forward(self, x, mask):
+    def forward(self, x, input_len, mask):
         x = self.preprocess(x)
         x = self.embedding(x)
         x = self.pos(x)
