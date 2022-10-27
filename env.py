@@ -107,8 +107,12 @@ class EnvAptamers(EnvBase):
         self.n_alphabet = self.config.env.dict_size
         self.action_space = self.get_action_space()
         self.token_eos = self.get_token_eos(self.action_space)
+        self.min_reward = 1e-8
+        self.reward_beta = 4
+        self.reward_norm = 1.0
+        self.reward_func = "boltzmann"
+        self.denorm_proxy = False
         self.env_class = EnvAptamers
-
         self.init_env()
 
     def create_new_env(self, idx):
@@ -169,6 +173,7 @@ class EnvAptamers(EnvBase):
         else:
             parents = []
             actions = []
+            # is this code written to handle cases when the action is not just adding one nucleotide but perhaps adding a subsequence of nucleotides??
             for idx, a in enumerate(self.action_space):
                 if self.state[-len(a) :] == list(a):
                     parents.append((self.state[: -len(a)]))
@@ -212,13 +217,43 @@ class EnvAptamers(EnvBase):
             raise TypeError("invalid action to take")
 
     def acq2reward(self, acq_values):
-        min_reward = 1e-10
-        true_reward = np.clip(acq_values, min_reward, None)
-        customed_af = (
-            lambda x: x ** 2
-        )  # to favor the higher rewards in a more spiky way, can be customed : eg : x : x**3
-        distort = np.vectorize(customed_af)
-        return distort(true_reward)
+        """
+        Prepares the output of an oracle for GFlowNet: the inputs proxy_vals is
+        expected to be a negative value (energy), unless self.denorm_proxy is True. If
+        the latter, the proxy values are first de-normalized according to the mean and
+        standard deviation in self.energies_stats. The output of the function is a
+        strictly positive reward - provided self.reward_norm and self.reward_beta are
+        positive - and larger than self.min_reward.
+        """
+        if self.reward_func == "power":
+            return np.clip(
+                (-1.0 * acq_values / self.reward_norm) ** self.reward_beta,
+                self.min_reward,
+                None,
+            )
+        elif self.reward_func == "boltzmann":
+            return np.clip(
+                np.exp(-1.0 * self.reward_beta * acq_values),
+                self.min_reward,
+                None,
+            )
+        else:
+            raise NotImplemented
+
+    def reward2acq(self, reward):
+        """
+        Converts a "GFlowNet reward" into a (negative) energy or values as returned by
+        an oracle.
+        """
+        if self.reward_func == "power":
+            return -np.exp(
+                (np.log(reward) + self.reward_beta * np.log(self.reward_norm))
+                / self.reward_beta
+            )
+        elif self.reward_func == "boltzmann":
+            return -1.0 * np.log(reward) / self.reward_beta
+        else:
+            raise NotImplemented
 
     def get_reward(self, states, done):
         rewards = np.zeros(len(done), dtype=float)
