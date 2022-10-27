@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 
-
 class Logger:
     """
     Utils functions to compute and handle the statistics (saving them or send to
@@ -33,7 +32,6 @@ class Logger:
         )
         self.context = ""
 
-<<<<<<< HEAD
     def set_context(self, context):
         self.context = context
 
@@ -56,7 +54,3 @@ class Logger:
 
     def finish(self):
         wandb.finish()
-=======
-    def init_comet(self):
-        return
->>>>>>> main-new-al
