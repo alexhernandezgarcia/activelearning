@@ -9,25 +9,29 @@ import itertools
 import os
 from abc import abstractmethod
 
-class Env:  
-    '''
+
+class Env:
+    """
     ENV WRAPPER
-    '''
+    """
+
     def __init__(self, config, acq):
         self.config = config
         self.acq = acq
         self.init_env()
-    
+
     def init_env(self):
-        #so far only aptamers has been implemented
+        # so far only aptamers has been implemented
         if self.config.env.main == "aptamers":
             self.env = EnvAptamers(self.config, self.acq)
         else:
             raise NotImplementedError
-    
-'''
+
+
+"""
 Generic Env Base Class
-'''
+"""
+
 
 class EnvBase:
     def __init__(self, config, acq):
@@ -38,7 +42,6 @@ class EnvBase:
     @abstractmethod
     def create_new_env(self, idx):
         raise NotImplementedError
-        
 
     @abstractmethod
     def init_env(self, idx):
@@ -46,50 +49,51 @@ class EnvBase:
 
     @abstractmethod
     def get_action_space(self):
-        '''
+        """
         get all possible actions to get the parents
-        '''
+        """
         raise NotImplementedError
- 
+
     @abstractmethod
     def get_mask(self):
-        '''
+        """
         for sampling in GFlownet and masking in the loss function
-        '''
+        """
         raise NotImplementedError
-    
+
     @abstractmethod
-    def get_parents(self, backward = False):
-        '''
+    def get_parents(self, backward=False):
+        """
         to build the training batch (for the inflows)
-        '''
+        """
         raise NotImplementedError
-    
+
     @abstractmethod
-    def step(self,action):
-        '''
+    def step(self, action):
+        """
         for forward sampling
-        '''
+        """
         raise NotImplementedError
-    
+
     @abstractmethod
     def acq2rewards(self, acq_values):
-        '''
+        """
         correction of the value of the AF for positive reward (or to scale it)
-        '''
+        """
         raise NotImplementedError
-    
+
     @abstractmethod
     def get_reward(self, states, done):
-        '''
+        """
         get the reward values of a batch of candidates
-        '''
+        """
         raise NotImplementedError
 
 
-'''
+"""
 Specific Envs
-'''
+"""
+
 
 class EnvAptamers(EnvBase):
     def __init__(self, config, acq) -> None:
@@ -106,12 +110,12 @@ class EnvAptamers(EnvBase):
         self.env_class = EnvAptamers
 
         self.init_env()
-   
+
     def create_new_env(self, idx):
         env = EnvAptamers(self.config, self.acq)
         env.init_env(idx)
         return env
-    
+
     def init_env(self, idx=0):
         self.state = np.array([])
         self.n_actions_taken = 0
@@ -120,63 +124,63 @@ class EnvAptamers(EnvBase):
         self.last_action = None
 
     def get_action_space(self):
-        valid_wordlens = np.arange(self.min_word_len, self.max_word_len +1)
+        valid_wordlens = np.arange(self.min_word_len, self.max_word_len + 1)
         alphabet = [a for a in range(self.n_alphabet)]
         actions = []
         for r in valid_wordlens:
-            actions_r = [el for el in itertools.product(alphabet, repeat = r)]
+            actions_r = [el for el in itertools.product(alphabet, repeat=r)]
             actions += actions_r
         return actions
 
     def get_token_eos(self, action_space):
         return len(action_space)
-    
+
     def get_mask(self):
 
         mask = [1] * (len(self.action_space) + 1)
 
-        if self.done : 
+        if self.done:
             return [0 for _ in mask]
-        
+
         seq_len = len(self.state)
 
         if seq_len < self.min_seq_len:
             mask[self.token_eos] = 0
             return mask
-        
+
         elif seq_len == self.max_seq_len:
-            mask[:self.token_eos] = [0] * len(self.action_space)
+            mask[: self.token_eos] = [0] * len(self.action_space)
             return mask
-        
+
         else:
             return mask
-    
-    def get_parents(self, backward = False):
+
+    def get_parents(self, backward=False):
         if self.done:
             if self.state[-1] == self.token_eos:
                 parents_a = [self.token_eos]
                 parents = [self.state[:-1]]
                 if backward:
                     self.done = False
-                return parents, parents_a 
+                return parents, parents_a
             else:
                 raise NameError
-        
+
         else:
             parents = []
             actions = []
             for idx, a in enumerate(self.action_space):
-                if self.state[-len(a): ] == list(a):
-                    parents.append((self.state[:-len(a)]))
+                if self.state[-len(a) :] == list(a):
+                    parents.append((self.state[: -len(a)]))
                     actions.append(idx)
-            
+
             return parents, actions
-    
+
     def step(self, action):
         valid = False
         seq = self.state
         seq_len = len(seq)
-       
+
         if (action == [self.token_eos]) and (self.done == False):
             if seq_len >= self.min_seq_len and seq_len <= self.max_seq_len:
                 valid = True
@@ -187,47 +191,58 @@ class EnvAptamers(EnvBase):
                 self.last_action = self.token_eos
 
                 return next_seq, action, valid
-        
+
         if self.done == True:
             valid = False
             return None, None, valid
-        
-        elif self.done == False and not(action == [self.token_eos]):
-            if action in list(map(list, self.action_space)) and seq_len <= self.max_seq_len:
+
+        elif self.done == False and not (action == [self.token_eos]):
+            if (
+                action in list(map(list, self.action_space))
+                and seq_len <= self.max_seq_len
+            ):
                 valid = True
                 next_seq = np.append(seq, action)
                 self.n_actions_taken += 1
                 self.state = next_seq
                 self.last_action = action
                 return next_seq, action, valid
-        
+
         else:
             raise TypeError("invalid action to take")
-    
+
     def acq2reward(self, acq_values):
         min_reward = 1e-10
         true_reward = np.clip(acq_values, min_reward, None)
-        customed_af = lambda x: x**2 #to favor the higher rewards in a more spiky way, can be customed : eg : x : x**3
+        customed_af = (
+            lambda x: x ** 2
+        )  # to favor the higher rewards in a more spiky way, can be customed : eg : x : x**3
         distort = np.vectorize(customed_af)
         return distort(true_reward)
 
     def get_reward(self, states, done):
-        rewards = np.zeros(len(done), dtype = float)
+        rewards = np.zeros(len(done), dtype=float)
         final_states = [s for s, d in zip(states, done) if d]
         inputs_af_base = [self.manip2base(final_state) for final_state in final_states]
 
-        final_rewards = self.acq.get_reward(inputs_af_base).view(len(final_states)).cpu().detach().numpy()
+        final_rewards = (
+            self.acq.get_reward(inputs_af_base)
+            .view(len(final_states))
+            .cpu()
+            .detach()
+            .numpy()
+        )
         final_rewards = self.acq2reward(final_rewards)
-        
+
         done = np.array(done)
         rewards[done] = final_rewards
         return rewards
-        
+
     def base2manip(self, state):
         seq_base = state
         seq_manip = np.concatenate((seq_base, [self.token_eos]))
         return seq_manip
-    
+
     def manip2base(self, state):
         seq_manip = state
         if seq_manip[-1] == self.token_eos:
@@ -235,5 +250,3 @@ class EnvAptamers(EnvBase):
             return seq_base
         else:
             raise TypeError
-
-    
