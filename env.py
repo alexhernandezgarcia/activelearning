@@ -167,7 +167,6 @@ class EnvAptamers(EnvBase):
                 if backward:
                     self.done = False
                 return parents, parents_a
-            # if the sequence was marked as done but if the last token is not eos, then it means there is some issue hence raise NameError
             else:
                 raise NameError
 
