@@ -1,6 +1,11 @@
 """
 Logger utils, to be developed.
 """
+import wandb
+import os
+import torch
+import matplotlib.pyplot as plt
+from datetime import datetime
 
 
 class Logger:
@@ -11,8 +16,41 @@ class Logger:
     statistics of training of the generated data at real time
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, config):
+        self.config = config
+        date_time = datetime.today().strftime("%d/%m-%H:%M:%S")
+        run_name = "proxy{}_oracle{}_gfn{}_minLen{}_maxLen{}_{}".format(
+            config.proxy.model.upper(),
+            config.oracle.main.upper(),
+            config.gflownet.policy_model.upper(),
+            config.env.min_len,
+            config.env.max_len,
+            date_time,
+        )
+        self.run = wandb.init(
+            config=config, project="ActiveLearningPipeline", name=run_name
+        )
+        self.context = ""
 
-    def init_comet(self):
-        return
+    def set_context(self, context):
+        self.context = context
+
+    def log_metric(self, key, value, use_context=True):
+        if use_context:
+            key = self.context + "/" + key
+        wandb.log({key: value})
+
+    def log_histogram(self, key, value, use_context=True):
+        if use_context:
+            key = self.context + "/" + key
+        fig = plt.figure()
+        plt.hist(value)
+        plt.title(key)
+        plt.ylabel("Frequency")
+        plt.xlabel(key)
+        fig = wandb.Image(fig)
+        wandb.log({key: fig})
+        # wandb.log({key: wandb.Histogram(value)})
+
+    def finish(self):
+        wandb.finish()

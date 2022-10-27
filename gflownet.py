@@ -265,12 +265,11 @@ class GFlowNet:
         if temperature == 0:
             temperature = self.config.gflownet.sampling.temperature
 
-        parents, parents_a = env.get_parents(backward=True)  # remplacer state par seq
+        parents, parents_a = env.get_parents(backward=True)
 
         parents_ohe = torch.stack(list(map(self.manip2policy, parents))).view(
             len(parents), -1
         )
-
         if policy == "model":
             self.best_model.eval()
             with torch.no_grad():
@@ -291,7 +290,6 @@ class GFlowNet:
             raise NotImplemented
         env.state = parents[action_idx]  # state ou fonction set state
         env.last_action = parents_a[action_idx]
-
         return env, parents, parents_a
 
     def get_training_data(self, batch_size):
@@ -302,7 +300,7 @@ class GFlowNet:
         """
 
         batch = []
-
+        # create a list of empty environments
         envs = [self.env.create_new_env(idx) for idx in range(batch_size)]
 
         # OFFLINE DATA
@@ -319,7 +317,6 @@ class GFlowNet:
                 previous_state = env.state
                 previous_done = env.done
                 previous_mask = env.get_mask()
-
                 env, parents, parents_a = self.backward_sample(
                     env, policy="model", temperature=self.temperature
                 )
@@ -355,12 +352,10 @@ class GFlowNet:
         self.sampling_model.eval()
 
         while envs:
-
             envs, actions, valids = self.forward_sample(
                 envs, policy="mixt", temperature=self.temperature
             )
 
-            # Add to batch
             for env, action, valid in zip(envs, actions, valids):
                 if valid:
                     parents, parents_a = env.get_parents()
@@ -384,7 +379,6 @@ class GFlowNet:
                             ),  # convention, we start at 0
                         ]
                     )
-
             envs = [env for env in envs if not env.done]
 
         (
@@ -400,6 +394,11 @@ class GFlowNet:
         ) = zip(*batch)
 
         rewards = self.env.get_reward(input_reward, done)
+        terminal_states = rewards[rewards != 0]
+        # mean of just the terminal states
+        self.logger.log_metric("rewards", np.mean(terminal_states))
+        proxy_vals = self.env.reward2acq(terminal_states)
+        self.logger.log_metric("proxy_vals", np.mean(proxy_vals))
         rewards = [tf_list([r]) for r in rewards]
         done = [tl_list([d]) for d in done]
 
@@ -478,7 +477,7 @@ class GFlowNet:
             for sub_it in range(self.ttsr):
                 self.model.train()
                 loss = self.loss_function(data)
-
+                self.logger.log_metric("policy_train_loss", loss.item())
                 if not torch.isfinite(loss):
                     print("loss is not finite - skipping iteration")
 
@@ -558,7 +557,7 @@ Utils Buffer
 
 class Buffer:
     """
-    BUffer of data : 
+    Buffer of data : 
     - loads the data from oracle and put the best ones as offline training data
     - maintains a replay buffer composed of the best trajectories sampled for training
     """
