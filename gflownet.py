@@ -334,7 +334,7 @@ class GFlowNet:
                         parents_ohe.view(len(parents), -1),
                         tl_list(parents_a),
                         previous_done,
-                        tl_list([env.id] * len(parents)),  # what is this?
+                        tl_list([env.id] * len(parents)),
                         tl_list(
                             [
                                 len(previous_state) - 1
@@ -394,10 +394,10 @@ class GFlowNet:
         ) = zip(*batch)
 
         rewards = self.env.get_reward(input_reward, done)
-        terminalStates = rewards[rewards != 0]
+        terminal_states = rewards[rewards != 0]
         # mean of just the terminal states
-        self.logger.log_metric("rewards", np.mean(terminalStates))
-        proxy_vals = self.env.reward2acq(terminalStates)
+        self.logger.log_metric("rewards", np.mean(terminal_states))
+        proxy_vals = self.env.reward2acq(terminal_states)
         self.logger.log_metric("proxy_vals", np.mean(proxy_vals))
         rewards = [tf_list([r]) for r in rewards]
         done = [tl_list([d]) for d in done]
@@ -557,11 +557,7 @@ Utils Buffer
 
 class Buffer:
     """
-<<<<<<< HEAD
-    BUffer of data :
-=======
-    BUffer of data : 
->>>>>>> main-new-al
+    Buffer of data : 
     - loads the data from oracle and put the best ones as offline training data
     - maintains a replay buffer composed of the best trajectories sampled for training
     """
