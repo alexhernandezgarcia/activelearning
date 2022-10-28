@@ -175,6 +175,7 @@ class ProxyBase:
         self.model.train(True)
         for i, trainData in enumerate(tr):
             loss = self.get_loss(trainData)
+            self.logger.log_metric("proxy_train_mse", loss.item())
             err_tr.append(loss.data)
             self.optimizer.zero_grad()
             loss.backward()
@@ -189,6 +190,7 @@ class ProxyBase:
         with torch.no_grad():
             for i, testData in enumerate(te):
                 loss = self.get_loss(testData)
+                self.logger.log_metric("proxy_val_mse", loss.item())
                 err_te.append(loss.data)
 
         self.err_te_hist.append(torch.mean(torch.stack(err_te)).cpu().detach().numpy())
