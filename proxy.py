@@ -201,11 +201,11 @@ class ProxyBase:
         targets = data[1]
         inputs = inputs.to(self.device)
         targets = targets.to(self.device)
-        inputLens = data[2]
+        input_lens = data[2]
         inputs = inputs.to(self.device)
-        inputLens = inputLens.to(self.device)
+        input_lens = input_lens.to(self.device)
         targets = targets.to(self.device)
-        output = self.model(inputs, inputLens, targets)
+        output = self.model(inputs, input_lens, targets)
         loss = F.mse_loss(output[:, 0], targets.float())
         return loss
 
