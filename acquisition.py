@@ -98,7 +98,7 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
         inputs = pad_sequence(inputs_af, batch_first=True, padding_value=0.0)
 
         self.load_best_proxy()
-        self.proxy.model.eval()
+        self.proxy.model.train()
         with torch.no_grad():
             if self.config.proxy.model.lower() == "mlp":
                 outputs = self.proxy.model(inputs)
@@ -125,7 +125,7 @@ class AcquisitionFunctionUCB(AcquisitionFunctionBase):
         inputs = pad_sequence(inputs_af, batch_first=True, padding_value=0.0)
 
         self.load_best_proxy()
-        self.proxy.model.eval()
+        self.proxy.model.train()
         with torch.no_grad():
             if self.config.proxy.model.lower() == "mlp":
                 outputs = (
@@ -200,7 +200,7 @@ class AcquisitionFunctionEI(AcquisitionFunctionBase):
         self.getMinF(inputs, input_afs_lens, None)
 
         self.load_best_proxy()
-        self.proxy.model.eval()
+        self.proxy.model.train()
         with torch.no_grad():
             if self.config.proxy.model.lower() == "mlp":
                 outputs = (
