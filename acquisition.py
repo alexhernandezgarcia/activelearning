@@ -6,13 +6,6 @@ from torch.nn.utils.rnn import pad_sequence
 import numpy as np
 
 
-def l2r(x):
-    r_max = 0
-    r_norm = 1
-    score = torch.clip(x, min=-np.inf, max=r_max).sigmoid() / r_norm
-    return score.cpu().detach()
-
-
 """
 ACQUISITION WRAPPER
 """
@@ -100,13 +93,7 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
         self.load_best_proxy()
         self.proxy.model.train()
         with torch.no_grad():
-            if self.config.proxy.model.lower() == "mlp":
-                outputs = self.proxy.model(inputs)
-            elif self.config.proxy.model.lower() == "lstm":
-                outputs = self.proxy.model(inputs, input_afs_lens)
-            elif self.config.proxy.model.lower() == "transformer":
-                outputs = self.proxy.model(inputs, None)
-
+            outputs = self.proxy.model(inputs, input_afs_lens, None)
         return outputs
 
 
@@ -127,46 +114,17 @@ class AcquisitionFunctionUCB(AcquisitionFunctionBase):
         self.load_best_proxy()
         self.proxy.model.train()
         with torch.no_grad():
-            if self.config.proxy.model.lower() == "mlp":
-                outputs = (
-                    torch.hstack(
-                        [
-                            self.proxy.model(inputs)
-                            for _ in range(self.config.proxy.dropout_samples)
-                        ]
-                    )
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
-            elif self.config.proxy.model.lower() == "lstm":
-                outputs = (
-                    torch.hstack(
-                        [
-                            self.proxy.model(inputs, input_afs_lens)
-                            for _ in range(self.config.proxy.dropout_samples)
-                        ]
-                    )
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
-            elif self.config.proxy.model.lower() == "transformer":
-                outputs = (
-                    torch.hstack(
-                        [
-                            self.proxy.model(inputs, None)
-                            for _ in range(self.config.proxy.dropout_samples)
-                        ]
-                    )
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
+            outputs = (
+                torch.hstack([self.proxy.model(inputs, input_afs_lens, None)])
+                .cpu()
+                .detach()
+                .numpy()
+            )
+
         mean = np.mean(outputs, axis=1)
         std = np.std(outputs, axis=1)
         score = mean + self.config.acquisition.ucb.kappa * std
-        score = l2r(torch.Tensor(score))
+        score = torch.Tensor(score)
         score = score.unsqueeze(1)
         return score
 
@@ -182,13 +140,12 @@ class AcquisitionFunctionEI(AcquisitionFunctionBase):
         # inputs = torch.Tensor(inputs).to(self.config.device)
 
         if self.config.proxy.model.lower() == "mlp":
-            outputs = self.proxy.model(inputs)
+            outputs = self.proxy.model(inputs).cpu().detach().numpy()
         elif self.config.proxy.model.lower() == "lstm":
-            outputs = self.proxy.model(inputs, input_len)
+            outputs = self.proxy.model(inputs, input_len).cpu().detach().numpy()
         elif self.config.proxy.model.lower() == "transformer":
-            outputs = self.proxy.model(inputs, None)
+            outputs = self.proxy.model(inputs, None).cpu().detach().numpy()
 
-        outputs = l2r(outputs)
         self.best_f = np.percentile(outputs, self.config.acquisition.ei.max_percentile)
 
     def get_reward_batch(self, inputs_af_base):  # inputs_af = list of ...
@@ -202,46 +159,15 @@ class AcquisitionFunctionEI(AcquisitionFunctionBase):
         self.load_best_proxy()
         self.proxy.model.train()
         with torch.no_grad():
-            if self.config.proxy.model.lower() == "mlp":
-                outputs = (
-                    torch.hstack(
-                        [
-                            self.proxy.model(inputs)
-                            for _ in range(self.config.proxy.dropout_samples)
-                        ]
-                    )
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
-            elif self.config.proxy.model.lower() == "lstm":
-                outputs = (
-                    torch.hstack(
-                        [
-                            self.proxy.model(inputs, input_afs_lens)
-                            for _ in range(self.config.proxy.dropout_samples)
-                        ]
-                    )
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
-            elif self.config.proxy.model.lower() == "transformer":
-                outputs = (
-                    torch.hstack(
-                        [
-                            self.proxy.model(inputs, None)
-                            for _ in range(self.config.proxy.dropout_samples)
-                        ]
-                    )
-                    .cpu()
-                    .detach()
-                    .numpy()
-                )
-        outputs = l2r(
-            torch.Tensor(outputs)
-        )  # convert to tensor to use torch operations
-        mean, std = torch.mean(outputs, dim=1), torch.std(outputs, dim=1)
+            outputs = (
+                torch.hstack([self.proxy.model(inputs, input_afs_lens, None)])
+                .cpu()
+                .detach()
+                .numpy()
+            )
+        mean = np.mean(outputs, axis=1)
+        std = np.std(outputs, axis=1)
+        mean, std = torch.from_numpy(mean), torch.from_numpy(std)
         u = (mean - self.best_f) / (std + 1e-4)
         normal = torch.distributions.Normal(torch.zeros_like(u), torch.ones_like(u))
         ucdf = normal.cdf(u)
