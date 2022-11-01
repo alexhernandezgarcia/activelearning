@@ -88,11 +88,5 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
         self.load_best_proxy()
         self.proxy.model.eval()
         with torch.no_grad():
-            if self.config.proxy.model.lower() == "mlp":
-                outputs = self.proxy.model(inputs)
-            elif self.config.proxy.model.lower() == "lstm":
-                outputs = self.proxy.model(inputs, input_afs_lens)
-            elif self.config.proxy.model.lower() == "transformer":
-                outputs = self.proxy.model(inputs, None)
-
+            outputs = self.proxy.model(inputs, input_afs_lens, None)
         return outputs
