@@ -557,7 +557,7 @@ Utils Buffer
 
 class Buffer:
     """
-    Buffer of data : 
+    Buffer of data :
     - loads the data from oracle and put the best ones as offline training data
     - maintains a replay buffer composed of the best trajectories sampled for training
     """
