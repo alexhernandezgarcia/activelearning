@@ -462,7 +462,34 @@ class GFlowNet:
         return loss
 
     def trajectory_balance(self, data):
-        pass
+        (
+            seqs,
+            actions,
+            masks,
+            rewards,
+            parents,
+            parents_a,
+            done,
+            path_id_parents,
+            state_id,
+        ) = zip(*data)
+        path_id = torch.cat([el[:1] for el in path_id_parents])
+        rewards, parents, actions, done, path_id_parents = map(
+            torch.cat, [rewards, parents, actions, done, path_id_parents]
+        )
+        # Log probs of each (s, a)
+        logprobs = self.logsoftmax(self.model(parents))[
+            torch.arange(parents.shape[0]), actions
+        ]
+        # Sum of log probs
+        # currently it's to as in Bao's implementation.
+        # can change to tf as in Alex
+        sumlogprobs = to(
+            torch.zeros(len(torch.unique(path_id, sorted=True)))
+        ).index_add_(0, path_id_parents, logprobs)
+        rewards = rewards[done.eq(1)][torch.argsort(path_id[done.eq(1)])]
+        loss = (self.Z.sum() + sumlogprobs - torch.log((rewards))).pow(2).mean()
+        return loss
 
     def train(self):
         all_losses = []
