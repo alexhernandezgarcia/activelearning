@@ -39,8 +39,10 @@ class GFlowNet:
 
         if self.config.gflownet.loss.function == "flowmatch":
             self.loss_function = self.flowmatch_loss
+            self.Z = None
         elif self.config.gflownet.loss.function == "trajectory_balance":
             self.loss_function = self.trajectory_balance
+            self.Z = nn.Parameter(torch.ones(64) * 150.0 / 64)
         else:
             raise NotImplementedError
 
@@ -51,6 +53,7 @@ class GFlowNet:
         self.get_model_class()
         if load_best_model:
             self.make_model(best_model=True)
+        self.logsoftmax = torch.nn.LogSoftmax(dim=1)
 
         self.load_hyperparameters()
 
@@ -463,28 +466,26 @@ class GFlowNet:
 
     def trajectory_balance(self, data):
         (
-            seqs,
-            actions,
+            _,
+            _,
             masks,
             rewards,
             parents,
             parents_a,
             done,
             path_id_parents,
-            state_id,
+            _,
         ) = zip(*data)
         path_id = torch.cat([el[:1] for el in path_id_parents])
-        rewards, parents, actions, done, path_id_parents = map(
-            torch.cat, [rewards, parents, actions, done, path_id_parents]
+        rewards, parents, parents_a, done, path_id_parents = map(
+            torch.cat, [rewards, parents, parents_a, done, path_id_parents]
         )
         # Log probs of each (s, a)
         logprobs = self.logsoftmax(self.model(parents))[
-            torch.arange(parents.shape[0]), actions
+            torch.arange(parents.shape[0]), parents_a
         ]
         # Sum of log probs
-        # currently it's to as in Bao's implementation.
-        # can change to tf as in Alex
-        sumlogprobs = to(
+        sumlogprobs = tf_list(
             torch.zeros(len(torch.unique(path_id, sorted=True)))
         ).index_add_(0, path_id_parents, logprobs)
         rewards = rewards[done.eq(1)][torch.argsort(path_id[done.eq(1)])]
