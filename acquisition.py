@@ -22,7 +22,7 @@ class AcquisitionFunction:
         # so far, only proxy acquisition function has been implemented, only add new acquisition class inheriting from AcquisitionFunctionBase to innovate
         if self.config.acquisition.main.lower() == "proxy":
             self.acq = AcquisitionFunctionProxy(self.config, self.proxy)
-        elif self.config.acquisition.main == "oracle":
+        elif self.config.acquisition.main.lower() == "oracle":
             self.acq = AcquisitionFunctionOracle(self.config, self.proxy)
         elif self.config.acquisition.main.lower() == "ucb":
             self.acq = AcquisitionFunctionUCB(self.config, self.proxy)
