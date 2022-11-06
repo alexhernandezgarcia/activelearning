@@ -22,6 +22,8 @@ class AcquisitionFunction:
         # so far, only proxy acquisition function has been implemented, only add new acquisition class inheriting from AcquisitionFunctionBase to innovate
         if self.config.acquisition.main.lower() == "proxy":
             self.acq = AcquisitionFunctionProxy(self.config, self.proxy)
+        elif self.config.acquisition.main == "oracle":
+            self.acq = AcquisitionFunctionOracle(self.config, self.proxy)
         elif self.config.acquisition.main.lower() == "ucb":
             self.acq = AcquisitionFunctionUCB(self.config, self.proxy)
         elif self.config.acquisition.main.lower() == "ei":
@@ -66,7 +68,12 @@ class AcquisitionFunctionBase:
     @abstractmethod
     def get_reward_batch(self, inputs_af_base):
         """
-        calls the get_reward method of the appropriate Acquisition Class (MUtual Information, Expected Improvement, ...)
+        Args:
+            inputs_af_base: list of arrays
+        Returns:
+            tensor of outputs
+        Function:
+            calls the get_reward method of the appropriate Acquisition Class (MI, EI, UCB, Proxy, Oracle etc)
         """
         pass
 
@@ -95,6 +102,16 @@ class AcquisitionFunctionProxy(AcquisitionFunctionBase):
         with torch.no_grad():
             outputs = self.proxy.model(inputs, input_afs_lens, None)
         return outputs
+
+
+class AcquisitionFunctionOracle(AcquisitionFunctionBase):
+    def __init__(self, config, proxy):
+        super().__init__(config, proxy)
+
+    def get_reward_batch(self, inputs_af_base):
+        super().get_reward_batch(inputs_af_base)
+        outputs = self.proxy.get_score(inputs_af_base)
+        return torch.FloatTensor(outputs)
 
 
 class AcquisitionFunctionUCB(AcquisitionFunctionBase):
@@ -138,14 +155,7 @@ class AcquisitionFunctionEI(AcquisitionFunctionBase):
 
     def getMinF(self, inputs, input_len, mask):
         # inputs = torch.Tensor(inputs).to(self.config.device)
-
-        if self.config.proxy.model.lower() == "mlp":
-            outputs = self.proxy.model(inputs).cpu().detach().numpy()
-        elif self.config.proxy.model.lower() == "lstm":
-            outputs = self.proxy.model(inputs, input_len).cpu().detach().numpy()
-        elif self.config.proxy.model.lower() == "transformer":
-            outputs = self.proxy.model(inputs, None).cpu().detach().numpy()
-
+        outputs = self.proxy.model(inputs, input_len, mask).cpu().detach().numpy()
         self.best_f = np.percentile(outputs, self.config.acquisition.ei.max_percentile)
 
     def get_reward_batch(self, inputs_af_base):  # inputs_af = list of ...
