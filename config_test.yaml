@@ -1,4 +1,4 @@
-device : "cpu"
+device : "cuda"
 debug : True
 
 al:
@@ -20,7 +20,7 @@ env:
   max_word_len : 1
 
 oracle:
-  main : "mlp"
+  main : "nupack"
   init_dataset:
     seed : 0
     init_len : 100
@@ -36,6 +36,7 @@ proxy:
   data:
     shuffle: True
     seed : 10
+  dropout_samples: 20
 
 gflownet:
   policy_model : "mlp"
@@ -63,7 +64,11 @@ gflownet:
     ttsr : 3
 
 acquisition:
-  main: "proxy"
+  main: "ei"
+  ucb:
+    kappa: 0.1
+  ei:
+    max_percentile: 80
   
 
   

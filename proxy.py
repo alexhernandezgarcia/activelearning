@@ -540,6 +540,7 @@ class MLP(nn.Module):
     def forward(self, x, input_len, mask):
         if self.transformerCall == False:
             x = self.preprocess(x)
+        x = x.to(self.device)
         return self.model(x)
 
     def preprocess(self, inputs):
@@ -586,6 +587,7 @@ class LSTM(nn.Module):
 
     def forward(self, inputs, input_len, mask):
         x = self.preprocess(inputs)
+        x = x.to(self.device)
         xPack = pack_padded_sequence(
             x, input_len, batch_first=True, enforce_sorted=False
         )
@@ -667,6 +669,7 @@ class Transformer(nn.Module):
 
     def forward(self, x, input_len, mask):
         x = self.preprocess(x)
+        x = x.to(self.device)
         x = self.embedding(x)
         x = self.pos(x)
         x = self.encoder(x, src_key_padding_mask=mask)
