@@ -22,15 +22,18 @@ def main(config):
 
     oracle = hydra.utils.instantiate(config.oracle)
     # TODO: Check if initialising env.proxy later breaks anything -- i.e., to check that nothin in the init() depends on the proxy
-    env = hydra.utils.instantiate(config.env, oracle = oracle)
+    env = hydra.utils.instantiate(config.env, oracle=oracle)
     # DataHandler needs env to make the train data
     # DataHandler needs oracle to score the created data
     # But DataHandler is required by regressor that's required by proxy that's required by env
-    data_handler = hydra.utils.instantiate(config.dataset, oracle = oracle, env =env)
+    data_handler = hydra.utils.instantiate(config.dataset, oracle=oracle, env=env)
     # TODO: Initialise database_util and pass it to regressor
     # The regressor initialises a model which requires env-specific params so we pass the env-config
     regressor = hydra.utils.instantiate(
-        config.model, config_network=config.network, config_env=config.env, dataset = data_handler
+        config.model,
+        config_network=config.network,
+        config_env=config.env,
+        dataset=data_handler,
     )
     # TODO: Create a proxy that takes the regressor.
     env.proxy = proxy

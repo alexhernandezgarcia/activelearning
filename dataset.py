@@ -5,8 +5,8 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 from torch.nn.utils.rnn import pad_sequence
 
-class Data(Dataset):
 
+class Data(Dataset):
     def __init__(self, X_data, y_data, fid_data):
         self.X_data = X_data
         self.y_data = y_data
@@ -14,8 +14,9 @@ class Data(Dataset):
     def __getitem__(self, index):
         return self.X_data[index], self.y_data[index]
 
-    def __len__ (self):
+    def __len__(self):
         return len(self.X_data)
+
 
 class DataHandler:
     """
@@ -27,13 +28,13 @@ class DataHandler:
         self.config = config
         self.env = env
         self.oracle = oracle
-    
+
     def initialise_dataset(self):
         """
-         - calls env-specific function to initialise sequence
-         - scores sequence with oracle
-         - normalises/shuffles data (if desired).
-         - splits into train and test data.        
+        - calls env-specific function to initialise sequence
+        - scores sequence with oracle
+        - normalises/shuffles data (if desired).
+        - splits into train and test data.
         """
         x = self.env.make_train_set()
         self.samples = self.env.state2proxy(x)
@@ -44,10 +45,14 @@ class DataHandler:
             self.reshuffle()
 
         train_size = int(self.config.train_fraction * len(self.samples))
-        
+
         # TODO: check if samples and targets are lists or tensors
-        self.train_dataset = Dataset(self.samples[:train_size], self.targets[:train_size])
-        self.test_dataset = Dataset(self.samples[train_size:], self.targets[train_size:])
+        self.train_dataset = Dataset(
+            self.samples[:train_size], self.targets[:train_size]
+        )
+        self.test_dataset = Dataset(
+            self.samples[train_size:], self.targets[train_size:]
+        )
 
     def get_statistics(self):
         self.mean = torch.mean(self.targets)
@@ -59,9 +64,9 @@ class DataHandler:
             y = self.targets
         if mean == None or std == None:
             mean, std = self.get_statistics()
-        y = (y - mean)/std
+        y = (y - mean) / std
         return y
-        
+
     def update_dataset(self, **kwargs):
         """
         Update the dataset with new data after AL iteration
