@@ -1,5 +1,5 @@
 import torch.nn as nn
-from base import ACTIVATION_KEY
+from regressor import ACTIVATION_KEY
 import torch
 
 
