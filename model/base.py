@@ -9,7 +9,7 @@ import hydra
 ACTIVATION_KEY = {'tanh': nn.Tanh(), 'relu': nn.ReLU(), 'sigmoid': nn.Sigmoid(), 'leaky_relu': nn.LeakyReLU()}
 
 class DropoutRegressor(nn.Module):
-    def __init__(self, config, env, dataset, logger):
+    def __init__(self, config, config_network, dataset=None, logger=None):
         """
         Args:
             config specific to the surrogate model
@@ -35,6 +35,8 @@ class DropoutRegressor(nn.Module):
         self.dataset = dataset
         self.shuffle_data = self.config.proxy.data.shuffle
         self.seed_data = self.config.proxy.data.seed
+
+        self.model = hydra.utils.instantiate(config_network)
 
 
     def init_model(self):
