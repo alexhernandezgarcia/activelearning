@@ -6,10 +6,16 @@ import os
 from torch.optim import Adam
 import hydra
 
-ACTIVATION_KEY = {'tanh': nn.Tanh(), 'relu': nn.ReLU(), 'sigmoid': nn.Sigmoid(), 'leaky_relu': nn.LeakyReLU()}
+ACTIVATION_KEY = {
+    "tanh": nn.Tanh(),
+    "relu": nn.ReLU(),
+    "sigmoid": nn.Sigmoid(),
+    "leaky_relu": nn.LeakyReLU(),
+}
+
 
 class DropoutRegressor(nn.Module):
-    def __init__(self, config, config_network, dataset=None, logger=None):
+    def __init__(self, config, config_network, config_env, dataset=None, logger=None):
         """
         Args:
             config specific to the surrogate model
@@ -20,6 +26,8 @@ class DropoutRegressor(nn.Module):
         """
         self.config = config
         self.logger = logger
+        self.config_network = config_network
+        self.config_env = config_env
 
         self.device = self.config.device
         self.path_model = self.config.path_model
@@ -36,14 +44,13 @@ class DropoutRegressor(nn.Module):
         self.shuffle_data = self.config.proxy.data.shuffle
         self.seed_data = self.config.proxy.data.seed
 
-        self.model = hydra.utils.instantiate(config_network)
-
-
     def init_model(self):
         """
         Initialize the network (MLP, Transformer, RNN)
         """
-        self.model = self.model_class = hydra.utils.instantiate(self.config.proxy, env).to(self.device)
+        self.model = hydra.utils.instantiate(
+            self.config_network, config_env=self.config_env
+        ).to(self.device)
         self.optimizer = Adam(
             self.model.parameters(), self.config.learning_rate, self.config.weight_decay
         )
@@ -65,7 +72,7 @@ class DropoutRegressor(nn.Module):
             for state in self.optimizer.state.values():  # move optimizer to GPU
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
-                            state[k] = v.to(self.device)
+                        state[k] = v.to(self.device)
             return self.model
         else:
             raise FileNotFoundError
@@ -140,7 +147,7 @@ class DropoutRegressor(nn.Module):
 
     def train(self, tr):
         """
-        Args: 
+        Args:
             train-loader
         """
         err_tr = []

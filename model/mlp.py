@@ -4,7 +4,7 @@ import torch
 
 
 class MLP(nn.Module):
-    def __init__(self, config, env, transformerCall=False):
+    def __init__(self, config, config_env, transformerCall=False):
         super(MLP, self).__init__()
         """
         Args:
@@ -16,8 +16,8 @@ class MLP(nn.Module):
         self.config = config
         self.activation = ACTIVATION_KEY[config.activation]
 
-        self.input_max_length = env.max_len
-        self.input_classes = env.dict_size
+        self.input_max_length = config_env.max_len
+        self.input_classes = config_env.dict_size
         self.out_dim = self.config.num_output
 
         if transformerCall == False:
@@ -27,7 +27,9 @@ class MLP(nn.Module):
 
         else:
             # this clause is entered only when transformer specific config is passed
-            self.hidden_layers = [self.config.mlp.hidden_dim] * self.config.mlp.num_layer
+            self.hidden_layers = [
+                self.config.mlp.hidden_dim
+            ] * self.config.mlp.num_layer
             self.dropout_prob = self.config.mlp.dropout_prob
             self.init_layer_depth = self.config.embed_dim
 
@@ -46,13 +48,13 @@ class MLP(nn.Module):
             )
         layers.append(nn.Linear(self.hidden_layers[-1], self.out_dim))
         self.model = nn.Sequential(*layers)
-    
+
     def forward(self, x):
         """
         Args:
-            tensor of dimension batch x max_seq_length_in_batch x k, 
+            tensor of dimension batch x max_seq_length_in_batch x k,
             where k is num_tokens if input is required to be one-hot encoded
-        
+
         """
         # Pads the tensor till maximum length of dataset
         input = torch.zeros(x.shape[0], self.input_max_length, self.input_classes)
@@ -61,4 +63,3 @@ class MLP(nn.Module):
         x = input.reshape(x.shape[0], -1)
         # Performs a forward call
         return self.model(x)
-        
