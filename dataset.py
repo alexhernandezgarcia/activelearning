@@ -28,6 +28,7 @@ class DataHandler:
         self.config = config
         self.env = env
         self.oracle = oracle
+        self.initialise_dataset()
 
     def initialise_dataset(self):
         """
