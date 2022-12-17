@@ -21,15 +21,15 @@ class MLP(nn.Module):
         self.out_dim = self.config.num_output
 
         if transformerCall == False:
-            self.hidden_layers = self.config.hidden_layer
+            self.hidden_layers = [self.config.hidden_dim] * self.config.num_layer
             self.dropout_prob = self.config.dropout_prob
             self.init_layer_depth = int((self.input_classes) * (self.input_max_length))
 
         else:
             # this clause is entered only when transformer specific config is passed
-            self.hidden_layers = self.config.mlp.hidden_layers
+            self.hidden_layers = [self.config.mlp.hidden_dim] * self.config.mlp.num_layer
             self.dropout_prob = self.config.mlp.dropout_prob
-            self.init_layer_depth = self.config.mlp.in_dim
+            self.init_layer_depth = self.config.embed_dim
 
         layers = [
             nn.Linear(self.init_layer_depth, self.hidden_layers[0]),
