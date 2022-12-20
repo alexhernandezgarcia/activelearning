@@ -49,7 +49,8 @@ def main(config):
         # proxy = proxy.train(dataset)
         # sampler = sampler.train(proxy)
         # queries = sampler.sample(config.al_batch_size)
-        # dataset = dataset.add(queries)
+        # energies = oracle(queries)
+        # dataset = dataset.add(queries, energies)
 
 
 if __name__ == "__main__":
