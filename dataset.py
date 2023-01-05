@@ -3,6 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
+import pandas as pd
 
 
 class Data(Dataset):
@@ -49,40 +50,41 @@ class DataHandler:
 
     def initialise_dataset(self):
         """
-        - calls env-specific function get a dictionary of samples and energies
-        - saves the un-transformed (no proxy transformation) de-normalised data 
+        - calls env-specific function get a pandas dataframe of samples (list) and energies (list)
+        - saves the un-transformed (no proxy transformation) de-normalised data
         - calls preprocess_for_dataloader
         """
         self.dataset = self.env.make_train_set(ntrain=self.n_samples)
-        self.targets = torch.FloatTensor(self.dataset["energies"])
         if self.save_data:
-            np.save(self.data_path, self.dataset)
+            self.dataset.to_csv(self.data_path)
         self.preprocess_for_dataloader()
-    
+
     def preprocess_for_dataloader(self):
         """
         - converts samples to proxy space
-        - normalises the data
+        - normalises the energies
         - shuffles the data
         - splits the data into train and test
         """
-        # TODO: move around the following line depending on what queroes and energies being fed into the dataloader are
         self.samples = torch.FloatTensor(
             list(map(self.env.state2proxy, self.dataset["samples"]))
         )
+        self.targets = torch.FloatTensor(self.dataset["energies"])
 
         if self.normalise_data:
             self.targets = self.normalise_dataset()
         if self.shuffle_data:
             self.reshuffle()
 
-        train_size = int(self.train_fraction * self.n_samples)
+        # total number of samples is updated with each AL iteration so fraction is multiplied by number of samples at the current iteration
+        train_size = int(self.train_fraction * self.samples.shape[0])
 
         self.train_data = Data(self.samples[:train_size], self.targets[:train_size])
         self.test_data = Data(self.samples[train_size:], self.targets[train_size:])
 
-
     def get_statistics(self):
+        """
+        called each time the dataset is updated so has the most recent metrics"""
         self.mean = torch.mean(self.targets)
         self.std = torch.std(self.targets)
         return self.mean, self.std
@@ -105,17 +107,20 @@ class DataHandler:
 
     def update_dataset(self, queries, energies):
         """
+        Args:
+            queries: list of queries [[0, 0], [1, 1], ...]
+            energies: list of energies [-0.6, -0.1, ...]
         Update the dataset with new data after AL iteration
         Also update the dataset stats
         """
         if self.save_data:
-            self.dataset = np.load(self.path_data, allow_pickle=True)
-            self.dataset = self.dataset.item()
-        self.dataset["samples"] += queries
-        self.dataset["energies"] += energies
+            # load the saved dataset
+            self.dataset = pd.read_csv(self.path_data)
+        query_dataset = pd.DataFrame({"samples": queries, "energies": energies})
+        self.dataset = pd.concat([self.dataset, query_dataset], ignore_index=True)
         self.preprocess_for_dataloader()
         if self.save_data:
-            np.save(self.data_path, self.dataset)
+            self.dataset.to_csv(self.path_data)
 
     def reshuffle(self):
         """

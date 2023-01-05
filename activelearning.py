@@ -8,6 +8,7 @@ from omegaconf import OmegaConf
 
 from gflownet.utils.common import flatten_config
 
+
 @hydra.main(config_path="./config", config_name="main")
 def main(config):
     # Reset seed for job-name generation in multirun jobs
