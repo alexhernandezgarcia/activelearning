@@ -4,7 +4,7 @@ _target_: model.regressor.DropoutRegressor
 device: cuda
 
 # Path
-path_model: "/home/mila/n/nikita.saxena/activelearning/storage/model_proxy/proxy"
+path_model: "./storage/model_proxy/proxy"
 
 # Training
 training:
