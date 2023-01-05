@@ -1,7 +1,7 @@
 defaults:
   - env: grid
   - gflownet: gflownet
-  - proxy: grid_corners
+  - proxy: botorch_ucb
   - oracle: grid_corners
   - dataset: dataset
   - model: dropout_regressor
