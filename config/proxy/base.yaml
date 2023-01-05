@@ -1,0 +1,3 @@
+num_dropout_samples: 20
+model_path: "/home/mila/n/nikita.saxena/activelearning/storage/model_proxy/proxy"
+device: 'cuda'
