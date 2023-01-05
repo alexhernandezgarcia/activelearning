@@ -32,6 +32,8 @@ class DataHandler:
         batch_size,
         n_samples,
         seed_data,
+        save_data,
+        data_path,
     ):
         self.env = env
         self.normalise_data = normalise_data
@@ -40,20 +42,35 @@ class DataHandler:
         self.batch_size = batch_size
         self.n_samples = n_samples
         self.seed_data = seed_data
+        self.save_data = save_data
+        self.data_path = data_path
+
         self.initialise_dataset()
 
     def initialise_dataset(self):
         """
-        - calls env-specific function get samples and energies.
-        - converts samples to proxy representation.
-        - normalises/shuffles data (if desired).
-        - splits into train and test data.
+        - calls env-specific function get a dictionary of samples and energies
+        - saves the un-transformed (no proxy transformation) de-normalised data 
+        - calls preprocess_for_dataloader
         """
-        dataset = self.env.make_train_set(ntrain=self.n_samples)
+        self.dataset = self.env.make_train_set(ntrain=self.n_samples)
+        self.targets = torch.FloatTensor(self.dataset["energies"])
+        if self.save_data:
+            np.save(self.data_path, self.dataset)
+        self.preprocess_for_dataloader()
+    
+    def preprocess_for_dataloader(self):
+        """
+        - converts samples to proxy space
+        - normalises the data
+        - shuffles the data
+        - splits the data into train and test
+        """
+        # TODO: move around the following line depending on what queroes and energies being fed into the dataloader are
         self.samples = torch.FloatTensor(
-            list(map(self.env.state2proxy, dataset["samples"]))
+            list(map(self.env.state2proxy, self.dataset["samples"]))
         )
-        self.targets = torch.FloatTensor(dataset["energies"])
+
         if self.normalise_data:
             self.targets = self.normalise_dataset()
         if self.shuffle_data:
@@ -61,8 +78,9 @@ class DataHandler:
 
         train_size = int(self.train_fraction * self.n_samples)
 
-        self.train_dataset = Data(self.samples[:train_size], self.targets[:train_size])
-        self.test_dataset = Data(self.samples[train_size:], self.targets[train_size:])
+        self.train_data = Data(self.samples[:train_size], self.targets[:train_size])
+        self.test_data = Data(self.samples[train_size:], self.targets[train_size:])
+
 
     def get_statistics(self):
         self.mean = torch.mean(self.targets)
@@ -85,12 +103,19 @@ class DataHandler:
         y = (y - mean) / std
         return y
 
-    def update_dataset(self, **kwargs):
+    def update_dataset(self, queries, energies):
         """
         Update the dataset with new data after AL iteration
         Also update the dataset stats
         """
-        pass
+        if self.save_data:
+            self.dataset = np.load(self.path_data, allow_pickle=True)
+            self.dataset = self.dataset.item()
+        self.dataset["samples"] += queries
+        self.dataset["energies"] += energies
+        self.preprocess_for_dataloader()
+        if self.save_data:
+            np.save(self.data_path, self.dataset)
 
     def reshuffle(self):
         """
@@ -124,7 +149,7 @@ class DataHandler:
         """
         # TODO: Add parameter to config for batch based shuffling (while creating the dataloader) if need be
         tr = DataLoader(
-            self.train_dataset,
+            self.train_data,
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=0,
@@ -133,9 +158,9 @@ class DataHandler:
         )
 
         te = DataLoader(
-            self.test_dataset,
+            self.test_data,
             batch_size=self.batch_size,
-            shuffle=False,
+            shuffle=True,
             num_workers=0,
             pin_memory=False,
             collate_fn=self.collate_batch,
