@@ -25,11 +25,9 @@ class DropoutRegressor(Proxy):
             vanilla rewards (with no power/boltzmann) transformation
 
         """
-        self.model.train()
+        self.regressor.model.train()
         with torch.no_grad():
-            mean, std, var = self.regressor.forward_with_uncertainty(
-                inputs, self.num_dropout_samples
-            )
+            mean, std, var = self.regressor.model(inputs)
         return mean, std, var
 
 
@@ -39,7 +37,11 @@ class UCB(DropoutRegressor):
         self.kappa = kappa
 
     def __call__(self, inputs):
-        mean, std, _ = super().__call__(inputs)
+        self.regressor.model.train()
+        outputs = self.regressor.forward_with_uncertainty(
+            inputs, self.num_dropout_samples
+        )
+        mean, std = torch.mean(outputs, dim=1), torch.std(outputs, dim=1)
         score = mean + self.kappa * std
         score = torch.Tensor(score)
         score = score.unsqueeze(1)

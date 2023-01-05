@@ -222,4 +222,4 @@ class DropoutRegressor:
         self.model.train()
         with torch.no_grad():
             outputs = torch.cat([self.forward(x) for _ in range(num_dropout_samples)])
-        return outputs.mean(dim=1), outputs.std(dim=1), outputs.var(dim=1)
+        return outputs

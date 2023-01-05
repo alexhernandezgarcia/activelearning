@@ -21,11 +21,11 @@ class ProxyBotorchUCB(Model):
             X = X.squeeze(-2)
 
         with torch.no_grad():
-            mean, _, var = self.regressor.forward_with_uncertainty(
+            outputs = self.regressor.forward_with_uncertainty(
                 X, self.num_dropout_samples
             )
-        mean = mean.unsqueeze(-1)
-        var = var.unsqueeze(-1)
+        mean = torch.mean(outputs, axis=1).unsqueeze(-1)
+        var = torch.var(outputs, axis=1).unsqueeze(-1)
         # if var is an array of zeros then we add a small value to it
         var = torch.where(var == 0, torch.ones_like(var) * 1e-4, var)
 
