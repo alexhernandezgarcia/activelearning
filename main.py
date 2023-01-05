@@ -6,10 +6,7 @@ import random
 import hydra
 from omegaconf import OmegaConf
 
-# TODO: fix imports once gflownet package is ready
-from src.gflownet.utils.common import flatten_config
-from gflownet.src.gflownet.gflownet import GFlowNetAgent
-from dataset import DataHandler
+from gflownet.utils.common import flatten_config
 
 
 @hydra.main(config_path="./config", config_name="main")
@@ -26,17 +23,16 @@ def main(config):
     # DataHandler needs env to make the train data
     # DataHandler needs oracle to score the created data
     # But DataHandler is required by regressor that's required by proxy that's required by env
-    data_handler = hydra.utils.instantiate(config.dataset, oracle=oracle, env=env)
-    # TODO: Initialise database_util and pass it to regressor
-    # The regressor initialises a model which requires env-specific params so we pass the env-config
+    data_handler = hydra.utils.instantiate(config.dataset, env=env)
     regressor = hydra.utils.instantiate(
         config.model,
-        config_network=config.network,
         config_env=config.env,
+        config_network=config.network,
         dataset=data_handler,
+        _recursive_=False,
     )
     # TODO: Create a proxy that takes the regressor.
-    env.proxy = proxy
+    # env.proxy = proxy
     # TODO: create logger and pass it to model
     gflownet = hydra.utils.instantiate(
         config.gflownet, env=env, buffer=config.env.buffer

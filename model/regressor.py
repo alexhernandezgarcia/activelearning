@@ -14,8 +14,17 @@ ACTIVATION_KEY = {
 }
 
 
-class DropoutRegressor(nn.Module):
-    def __init__(self, config, config_network, config_env, dataset=None, logger=None):
+class DropoutRegressor:
+    def __init__(
+        self,
+        device,
+        path_model,
+        training,
+        dataset,
+        config_network,
+        config_env,
+        logger=None,
+    ):
         """
         Args:
             config specific to the surrogate model
@@ -24,35 +33,38 @@ class DropoutRegressor(nn.Module):
 
         Inialises model and optimiser. Fits the model and saves it once convergence is reached.
         """
-        self.config = config
         self.logger = logger
         self.config_network = config_network
         self.config_env = config_env
 
-        self.device = self.config.device
-        self.path_model = self.config.path_model
+        self.device = device
+        self.path_model = path_model
 
         # Training Parameters
-        self.training_eps = self.config.training.eps
-        self.max_epochs = self.config.training.max_epochs
-        self.history = self.config.training.history
+        self.training_eps = training.eps
+        self.max_epochs = training.max_epochs
+        self.history = training.history
         assert self.history <= self.max_epochs
-        self.batch_size = self.config.training.training_batch
+        self.batch_size = training.training_batch
+        self.learning_rate = training.learning_rate
+        self.weight_decay = training.weight_decay
 
-        # Dataset management
+        # Dataset
         self.dataset = dataset
-        self.shuffle_data = self.config.proxy.data.shuffle
-        self.seed_data = self.config.proxy.data.seed
+
+        self.init_model()
 
     def init_model(self):
         """
         Initialize the network (MLP, Transformer, RNN)
         """
         self.model = hydra.utils.instantiate(
-            self.config_network, config_env=self.config_env
+            self.config_network, config_env=self.config_env, _recursive_=False
         ).to(self.device)
         self.optimizer = Adam(
-            self.model.parameters(), self.config.learning_rate, self.config.weight_decay
+            self.model.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
         )
 
     def load_model(self, dir_name=None):
@@ -60,7 +72,7 @@ class DropoutRegressor(nn.Module):
         Load and returns the model
         """
         if dir_name == None:
-            dir_name = self.config.path.model_proxy
+            dir_name = self.path_model
 
         self.init_model()
 
@@ -130,7 +142,7 @@ class DropoutRegressor(nn.Module):
             if self.epochs >= self.history + 1:
                 self.check_convergence()
 
-            if (self.epochs % 10 == 0) and self.config.debug:
+            if self.epochs % 10 == 0:
                 print(
                     "Model epoch {} test loss {:.4f}".format(
                         self.epochs, self.err_te_hist[-1]
