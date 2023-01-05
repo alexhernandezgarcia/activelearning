@@ -45,8 +45,8 @@ class DataHandler:
 
     def initialise_dataset(self):
         """
-        - calls env-specific function to initialise sequence
-        - scores sequence with oracle
+        - calls env-specific function get samples and energies.
+        - converts samples to proxy representation.
         - normalises/shuffles data (if desired).
         - splits into train and test data.
         """
@@ -62,18 +62,23 @@ class DataHandler:
 
         train_size = int(self.train_fraction * self.n_samples)
 
-        # TODO: check if samples and targets are lists or tensors
         self.train_dataset = Data(self.samples[:train_size], self.targets[:train_size])
         self.test_dataset = Data(self.samples[train_size:], self.targets[train_size:])
 
     def get_statistics(self):
-        # find mean of elements in list
         self.mean = torch.mean(self.targets)
-        # find standard deviation of elements in list
         self.std = torch.std(self.targets)
         return self.mean, self.std
 
     def normalise_dataset(self, y=None, mean=None, std=None):
+        """
+        Args:
+            y: targets to normalise (tensor)
+            mean: mean of targets (tensor)
+            std: std of targets (tensor)
+        Returns:
+            y: normalised targets (tensor)
+        """
         if y == None:
             y = self.targets
         if mean == None or std == None:
@@ -89,6 +94,9 @@ class DataHandler:
         pass
 
     def reshuffle(self):
+        """
+        Reshuffle the entire dataset before creating train and test subsets
+        """
         self.samples, self.targets = shuffle(
             self.samples.numpy(), self.targets.numpy(), random_state=self.seed_data
         )
@@ -115,7 +123,7 @@ class DataHandler:
             x: self.env.state2proxy(input)
             y: normalised (if need be) energies
         """
-
+        # TODO: Add parameter to config for batch based shuffling (while creating the dataloader) if need be
         tr = DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,

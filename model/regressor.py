@@ -52,8 +52,6 @@ class DropoutRegressor:
         # Dataset
         self.dataset = dataset
 
-        self.init_model()
-
     def init_model(self):
         """
         Initialize the network (MLP, Transformer, RNN)

@@ -24,7 +24,7 @@ class MLP(nn.Module):
         """
         self.activation = ACTIVATION_KEY[activation]
 
-        # TODO: this is grid specific for now, make it general (for apatsamers and torus)
+        # TODO: this is grid specific for now, make it general (for apatamers and torus)
         self.input_max_length = config_env.n_dim
         self.input_classes = config_env.length
         self.out_dim = num_output
