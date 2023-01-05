@@ -8,7 +8,6 @@ from omegaconf import OmegaConf
 
 from gflownet.utils.common import flatten_config
 
-
 @hydra.main(config_path="./config", config_name="main")
 def main(config):
     # Reset seed for job-name generation in multirun jobs
@@ -23,6 +22,7 @@ def main(config):
     env = hydra.utils.instantiate(config.env, oracle=oracle)
     # Note to Self: DataHandler needs env to make the train data. But DataHandler is required by regressor that's required by proxy that's required by env so we have to initalise env.proxy later on
     data_handler = hydra.utils.instantiate(config.dataset, env=env)
+    # Regressor initialises a model which requires env-specific params so we pass the env-config with recursive=False os that the config as it is is passed instead of instantiating an object
     regressor = hydra.utils.instantiate(
         config.model,
         config_env=config.env,
@@ -30,7 +30,6 @@ def main(config):
         dataset=data_handler,
         _recursive_=False,
     )
-    # TODO: Create a proxy that takes the regressor.
     proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
     env.proxy = proxy
     # TODO: create logger and pass it to model
@@ -38,14 +37,14 @@ def main(config):
         config.gflownet, env=env, buffer=config.env.buffer
     )
 
-    # TODO:
-    ## Active learning loop
-    # for round in range(config.al_n_rounds):
-        # proxy = proxy.train(dataset)
-        # sampler = sampler.train(proxy)
-        # queries = sampler.sample(config.al_batch_size)
-        # energies = oracle(queries)
-        # dataset = dataset.add(queries, energies)
+    for _ in range(config.al_n_rounds):
+        regressor.fit()
+        # TODO: rename gflownet to sampler once we have other sampling techniques ready
+        gflownet.train()
+        batch, times = gflownet.sample_batch(env, config.n_samples, train=False)
+        queries = env.state2oracle(batch)
+        energies = oracle(queries).tolist()
+        data_handler.update_dataset(batch, energies)
 
 
 if __name__ == "__main__":
