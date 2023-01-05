@@ -5,6 +5,7 @@ import numpy as np
 import os
 from torch.optim import Adam
 import hydra
+from tqdm import tqdm
 
 ACTIVATION_KEY = {
     "tanh": nn.Tanh(),
@@ -110,7 +111,7 @@ class DropoutRegressor:
         [self.err_tr_hist, self.err_te_hist] = [[], []]
 
         # get training data in torch format
-        train_loader, test_loader = self.dataset.get_data_loaders()
+        train_loader, test_loader = self.dataset.get_dataloader()
 
         self.converged = 0
         self.epochs = 0
@@ -161,10 +162,11 @@ class DropoutRegressor:
         """
         err_tr = []
         self.model.train(True)
-        for x_batch, y_batch in enumerate(tr):
-            output = self.model(x_batch)
-            loss = F.mse_loss(output[:, 0], y_batch.float())
-            self.logger.log_metric("proxy_train_mse", loss.item())
+        for x_batch, y_batch in tqdm(tr):
+            output = self.model(x_batch.to(self.device))
+            loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
+            if self.logger:
+                self.logger.log_metric("proxy_train_mse", loss.item())
             err_tr.append(loss.data)
             self.optimizer.zero_grad()
             loss.backward()
@@ -176,10 +178,11 @@ class DropoutRegressor:
         err_te = []
         self.model.eval()
         with torch.no_grad():
-            for x_batch, y_batch in enumerate(te):
-                output = self.model(x_batch)
-                loss = F.mse_loss(output[:, 0], y_batch.float())
-                self.logger.log_metric("proxy_val_mse", loss.item())
+            for x_batch, y_batch in tqdm(te):
+                output = self.model(x_batch.to(self.device))
+                loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
+                if self.logger:
+                    self.logger.log_metric("proxy_val_mse", loss.item())
                 err_te.append(loss.data)
         self.err_te_hist.append(torch.mean(torch.stack(err_te)).cpu().detach().numpy())
 
