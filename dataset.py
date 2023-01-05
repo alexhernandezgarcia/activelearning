@@ -67,7 +67,7 @@ class DataHandler:
         - splits the data into train and test
         """
         self.samples = torch.FloatTensor(
-            list(map(self.env.state2proxy, self.dataset["samples"]))
+            np.array(list(map(self.env.state2proxy, self.dataset["samples"])))
         )
         self.targets = torch.FloatTensor(self.dataset["energies"])
 
