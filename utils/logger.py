@@ -1,36 +1,29 @@
-"""
-Logger utils, to be developed.
-"""
 import wandb
-import os
-import torch
 import matplotlib.pyplot as plt
 from datetime import datetime
+import numpy as np
 
 
-class Logger:
+class wandb_logger:
     """
     Utils functions to compute and handle the statistics (saving them or send to
-    comet).  Incorporates the previous function "getModelState", ...  Like
-    FormatHandler, it can be passed on to querier, gfn, proxy, ... to get the
+    wandb). It can be passed on to querier, gfn, proxy, ... to get the
     statistics of training of the generated data at real time
     """
 
-    def __init__(self, config):
+    def __init__(self, config, project_name, run_name=None):
         self.config = config
-        date_time = datetime.today().strftime("%d/%m-%H:%M:%S")
-        run_name = "proxy{}_oracle{}_gfn{}_minLen{}_maxLen{}_{}".format(
-            config.proxy.model.upper(),
-            config.oracle.main.upper(),
-            config.gflownet.policy_model.upper(),
-            config.env.min_len,
-            config.env.max_len,
-            date_time,
-        )
-        self.run = wandb.init(
-            config=config, project="ActiveLearningPipeline", name=run_name
-        )
-        self.context = ""
+        if run_name is None:
+            date_time = datetime.today().strftime("%d/%m-%H:%M:%S")
+            run_name = "{}".format(
+                date_time,
+            )
+        self.run = wandb.init(config=config, project=project_name, name=run_name)
+        self.add_tags(config.log.tags)
+        self.context = "0"
+
+    def add_tags(self, tags):
+        self.run.tags = self.run.tags + tags
 
     def set_context(self, context):
         self.context = context
@@ -50,7 +43,12 @@ class Logger:
         plt.xlabel(key)
         fig = wandb.Image(fig)
         wandb.log({key: fig})
-        # wandb.log({key: wandb.Histogram(value)})
 
-    def finish(self):
+    def log_metrics(self, metrics, step, use_context=True):
+        if use_context:
+            for key, _ in metrics.items():
+                key = self.context + "/" + key
+        wandb.log(metrics, step)
+
+    def end(self):
         wandb.finish()
