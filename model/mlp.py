@@ -64,9 +64,9 @@ class MLP(nn.Module):
 
         """
         # Pads the tensor till maximum length of dataset
-        input = torch.zeros(x.shape[0], self.input_max_length, self.input_classes)
-        input[:, : x.shape[1], :] = x
-        # Reshapes the tensor to batch_size x init_layer_depth
-        x = input.reshape(x.shape[0], -1)
+        input = torch.zeros(x.shape[0], self.input_max_length*self.input_classes)
+        input[:, : x.shape[1]] = x
+        # TODO: Check if the following is reqd for aptamers. Reshapes the tensor to batch_size x init_layer_depth
+        # x = input.reshape(x.shape[0], -1)
         # Performs a forward call
         return self.model(x)
