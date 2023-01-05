@@ -1,6 +1,0 @@
-_target_: dataset.DataHandler
-
-normalise_data: True
-shuffle_data: True
-train_fraction: 0.8
-batch_size: 32
