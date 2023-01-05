@@ -1,4 +1,3 @@
-# from gflownet.src.gflownet.envs.base import make_train_set, make_test_set
 from sklearn.utils import shuffle
 from torch.utils.data import Dataset, DataLoader
 import torch
