@@ -1,0 +1,9 @@
+_target_: proxy.acquisition.BotorchUCB
+
+num_dropout_samples: 20
+model_path: "./storage/model_proxy/proxy"
+kappa: 0.1
+sampler:
+  seed: 0
+  resample: False
+  num_samples: 500

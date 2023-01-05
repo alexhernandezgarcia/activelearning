@@ -1,4 +1,4 @@
-_target_: src.model.mlp.MLP
+_target_: model.mlp.MLP
 
 activation: 'relu'
 num_output: 1
