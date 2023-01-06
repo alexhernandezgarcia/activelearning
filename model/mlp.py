@@ -1,7 +1,12 @@
 import torch.nn as nn
-from .regressor import ACTIVATION_KEY
 import torch
 
+ACTIVATION_KEY = {
+    "tanh": nn.Tanh(),
+    "relu": nn.ReLU(),
+    "sigmoid": nn.Sigmoid(),
+    "leaky_relu": nn.LeakyReLU(),
+}
 
 class MLP(nn.Module):
     def __init__(

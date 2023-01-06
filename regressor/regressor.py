@@ -7,13 +7,6 @@ from torch.optim import Adam
 import hydra
 from tqdm import tqdm
 
-ACTIVATION_KEY = {
-    "tanh": nn.Tanh(),
-    "relu": nn.ReLU(),
-    "sigmoid": nn.Sigmoid(),
-    "leaky_relu": nn.LeakyReLU(),
-}
-
 
 class DropoutRegressor:
     def __init__(
