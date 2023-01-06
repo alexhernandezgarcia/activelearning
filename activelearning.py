@@ -25,9 +25,9 @@ def main(config):
     data_handler = hydra.utils.instantiate(config.dataset, env=env)
     # Regressor initialises a model which requires env-specific params so we pass the env-config with recursive=False os that the config as it is is passed instead of instantiating an object
     regressor = hydra.utils.instantiate(
-        config.model,
+        config.regressor,
         config_env=config.env,
-        config_network=config.network,
+        config_network=config.model,
         dataset=data_handler,
         _recursive_=False,
     )
