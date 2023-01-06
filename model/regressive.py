@@ -19,13 +19,13 @@ class RegressiveMLP(nn.Module):
         config_env,
     ):
         """
-        Implements regressive deep learning networks in the mulit-fidelity setting as done Shibo Li et. al. 
+        Implements regressive deep learning networks in the mulit-fidelity setting as done Shibo Li et. al.
         For the emebedding variant, see nikita-0209/mf-proxy repo
         """
         super(RegressiveMLP, self).__init__()
         self.num_fid = num_fid
-        input_classes = config_env.length  
-        input_max_length = config_env.n_dim  
+        input_classes = config_env.length
+        input_max_length = config_env.n_dim
         self.init_layer_depth = int((input_classes) * (input_max_length))
         self.fid_num_hidden = fid_num_hidden
         self.num_output = num_output
@@ -42,7 +42,9 @@ class RegressiveMLP(nn.Module):
         for i in range(1, len(self.base_hidden_layers)):
             base_layers.extend(
                 [
-                    nn.Linear(self.base_hidden_layers[i - 1], self.base_hidden_layers[i]),
+                    nn.Linear(
+                        self.base_hidden_layers[i - 1], self.base_hidden_layers[i]
+                    ),
                     self.activation,
                     nn.Dropout(dropout_base),
                 ]
@@ -102,7 +104,7 @@ class RegressiveMLP(nn.Module):
         fid_ohe = F.one_hot(fid, num_classes=self.num_fid + 1)[:, 1:].to(torch.float32)
         fid_ohe = fid_ohe.to(self.device)
         return input, fid_ohe
-    
+
     def forward_seq_regressive(self, input, fid):
         """Implementation of DNN-MFBO"""
         input, fid_ohe = self.preprocess(input, fid)
