@@ -18,12 +18,15 @@ def main(config):
     log_config = {"/".join(("config", key)): val for key, val in log_config.items()}
 
     ## Instantiate objects
-    oracle = hydra.utils.instantiate(config.oracle)
-    # TODO: Check if initialising env.proxy later breaks anything -- i.e., to check that nothin in the init() depends on the proxy
-    env = hydra.utils.instantiate(config.env, oracle=oracle)
-    # Note to Self: DataHandler needs env to make the train data. But DataHandler is required by regressor that's required by proxy that's required by env so we have to initalise env.proxy later on
+    N_FID = len(config._oracle_dict)
+    oracles = []
+    for fid in range(1, N_FID + 1):
+        oracle = hydra.utils.instantiate(config._oracle_dict[str(fid)])
+        oracles.append(oracle)
+
+    # Assume oracle list has highest fidelity first so that is used to calculate the true density
+    env = hydra.utils.instantiate(config.env, oracle=oracles[0])
     data_handler = hydra.utils.instantiate(config.dataset, env=env)
-    # Regressor initialises a model which requires env-specific params so we pass the env-config with recursive=False os that the config as it is is passed instead of instantiating an object
     regressor = hydra.utils.instantiate(
         config.model,
         config_env=config.env,
@@ -43,8 +46,9 @@ def main(config):
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
         gflownet.train()
         batch, times = gflownet.sample_batch(env, config.n_samples, train=False)
-        queries = env.state2oracle(batch)
-        energies = oracle(queries).tolist()
+        for fid in range(config.n_fid):
+            queries = env.state2oracle[fid](batch)
+            energies = oracles[fid](queries).tolist()
         data_handler.update_dataset(batch, energies)
 
 
