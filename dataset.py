@@ -7,12 +7,13 @@ import pandas as pd
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data):
+    def __init__(self, X_data, y_data, fid):
         self.X_data = X_data
         self.y_data = y_data
+        self.fid = fid
 
     def __getitem__(self, index):
-        return self.X_data[index], self.y_data[index]
+        return self.X_data[index], self.y_data[index], self.fid[index]
 
     def __len__(self):
         return len(self.X_data)
@@ -59,6 +60,8 @@ class DataHandler:
         if self.load_data:
             self.dataset = pd.read_csv(self.data_path)
         else:
+            # env.make_train_set requires fidelity to do score the samples
+            # assume that the fidelity is saved to the dataset as well
             self.dataset = self.env.make_train_set(ntrain=self.n_samples)
         if self.save_data:
             self.dataset.to_csv(self.data_path)
@@ -75,6 +78,7 @@ class DataHandler:
             list(map(self.env.state2proxy, self.dataset["samples"]))
         )
         self.targets = torch.FloatTensor(self.dataset["energies"])
+        self.fidelity = torch.FloatTensor(self.dataset["fidelity"])
 
         if self.normalise_data:
             self.targets = self.normalise_dataset()
@@ -84,8 +88,16 @@ class DataHandler:
         # total number of samples is updated with each AL iteration so fraction is multiplied by number of samples at the current iteration
         train_size = int(self.train_fraction * self.samples.shape[0])
 
-        self.train_data = Data(self.samples[:train_size], self.targets[:train_size])
-        self.test_data = Data(self.samples[train_size:], self.targets[train_size:])
+        self.train_data = Data(
+            self.samples[:train_size],
+            self.targets[:train_size],
+            self.fidelity[:train_size],
+        )
+        self.test_data = Data(
+            self.samples[train_size:],
+            self.targets[train_size:],
+            self.fidelity[train_size:],
+        )
 
     def get_statistics(self):
         """
@@ -121,7 +133,7 @@ class DataHandler:
         Saves the updated dataset if save_data=True
         """
         if self.save_data:
-            # load the saved dataset
+            # loads the saved dataset
             self.dataset = pd.read_csv(self.path_data)
         query_dataset = pd.DataFrame({"samples": queries, "energies": energies})
         self.dataset = pd.concat([self.dataset, query_dataset], ignore_index=True)
@@ -133,8 +145,11 @@ class DataHandler:
         """
         Reshuffle the entire dataset (called before creating train and test subsets)
         """
-        self.samples, self.targets = shuffle(
-            self.samples.numpy(), self.targets.numpy(), random_state=self.seed_data
+        self.samples, self.targets, self.fidelity = shuffle(
+            self.samples.numpy(),
+            self.targets.numpy(),
+            self.fidelity.numpy(),
+            random_state=self.seed_data,
         )
 
     def collate_batch(self, batch):
