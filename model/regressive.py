@@ -96,6 +96,13 @@ class RegressiveMLP(nn.Module):
                 ]
             )
 
+    def preprocess(self, input, fid):
+        input = torch.zeros(input.shape[0], self.input_max_length * self.input_classes)
+        input[:, : input.shape[1]] = input
+        fid_ohe = F.one_hot(fid, num_classes=self.num_fid + 1)[:, 1:].to(torch.float32)
+        fid_ohe = fid_ohe.to(self.device)
+        return input, fid_ohe
+    
     def forward_seq_regressive(self, input, fid):
         """Implementation of DNN-MFBO"""
         input, fid_ohe = self.preprocess(input, fid)
@@ -108,13 +115,6 @@ class RegressiveMLP(nn.Module):
         output_tensor = torch.stack(outputs, dim=1).to(self.device)
         output_masked = output_tensor[fid_ohe == 1]
         return output_masked
-
-    def preprocess(self, input, fid):
-        input = torch.zeros(input.shape[0], self.input_max_length * self.input_classes)
-        input[:, : input.shape[1]] = input
-        fid_ohe = F.one_hot(fid, num_classes=self.num_fid + 1)[:, 1:].to(torch.float32)
-        fid_ohe = fid_ohe.to(self.device)
-        return input, fid_ohe
 
     def forward_full_regressive(self, input, fid):
         """Implementation of BMBO-DARN"""
