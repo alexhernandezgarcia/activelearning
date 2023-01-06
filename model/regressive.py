@@ -29,8 +29,6 @@ class RegressiveMLP(nn.Module):
         self.init_layer_depth = int((input_classes) * (input_max_length))
         self.fid_num_hidden = fid_num_hidden
         self.num_output = num_output
-        self.dropout_fid = dropout_fid
-        self.dropout_base = dropout_base
         self.activation = ACTIVATION_KEY[activation]
 
         self.base_hidden_layers = [base_num_hidden] * base_num_layer
@@ -46,7 +44,7 @@ class RegressiveMLP(nn.Module):
                 [
                     nn.Linear(self.base_hidden_layers[i - 1], self.base_hidden_layers[i]),
                     self.activation,
-                    nn.Dropout(self.dropout_prob),
+                    nn.Dropout(dropout_base),
                 ]
             )
         base_layers.append(nn.Linear(self.base_hidden_layers[-1], self.num_output))
@@ -62,13 +60,13 @@ class RegressiveMLP(nn.Module):
                             self.input_dim + (self.num_output * i),
                             self.fid_num_hidden,
                         ),
-                        nn.Dropout(self.dropout_fid),
+                        nn.Dropout(dropout_fid),
                         self.activation,
                         nn.Linear(self.fid_num_hidden, self.fid_num_hidden),
-                        nn.Dropout(self.dropout_fid),
+                        nn.Dropout(dropout_fid),
                         self.activation,
                         nn.Linear(self.fid_num_hidden, self.fid_num_hidden),
-                        nn.Dropout(self.dropout_fid),
+                        nn.Dropout(dropout_fid),
                         self.activation,
                         nn.Linear(self.fid_num_hidden, self.num_output),
                     )
@@ -84,13 +82,13 @@ class RegressiveMLP(nn.Module):
                             self.input_dim + (self.num_output + i) * i,
                             self.fid_num_hidden,
                         ),
-                        nn.Dropout(self.dropout_fid),
+                        nn.Dropout(dropout_fid),
                         self.activation,
                         nn.Linear(self.fid_num_hidden, self.fid_num_hidden),
-                        nn.Dropout(self.dropout_fid),
+                        nn.Dropout(dropout_fid),
                         self.activation,
                         nn.Linear(self.fid_num_hidden, self.fid_num_hidden),
-                        nn.Dropout(self.dropout_fid),
+                        nn.Dropout(dropout_fid),
                         self.activation,
                         nn.Linear(self.fid_num_hidden, self.num_output),
                     )
