@@ -17,6 +17,7 @@ def main(config):
     log_config = flatten_config(OmegaConf.to_container(config, resolve=True), sep="/")
     log_config = {"/".join(("config", key)): val for key, val in log_config.items()}
 
+    logger = None
     if config.log.skip == False:
         logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
@@ -37,7 +38,7 @@ def main(config):
     )
     proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
     env.proxy = proxy
-    # TODO: pass wandb logger to gflownet once it is compatible with wanb (i.e., once PR17 is merged)
+    # TODO: pass wandb logger to gflownet once it is compatible with wandb (i.e., once PR17 is merged)
     gflownet = hydra.utils.instantiate(
         config.gflownet, env=env, buffer=config.env.buffer
     )
