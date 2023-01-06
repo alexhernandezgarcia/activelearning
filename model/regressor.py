@@ -162,8 +162,8 @@ class DropoutRegressor:
         """
         err_tr = []
         self.model.train(True)
-        for x_batch, y_batch in tqdm(tr, leave=False):
-            output = self.model(x_batch.to(self.device))
+        for x_batch, y_batch, fid_batch in tqdm(tr, leave=False):
+            output = self.model(x_batch.to(self.device), fid_batch)
             loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
             if self.logger:
                 self.logger.log_metric("proxy_train_mse", loss.item())
@@ -178,8 +178,8 @@ class DropoutRegressor:
         err_te = []
         self.model.eval()
         with torch.no_grad():
-            for x_batch, y_batch in tqdm(te, leave=False):
-                output = self.model(x_batch.to(self.device))
+            for x_batch, y_batch, fid_batch in tqdm(te, leave=False):
+                output = self.model(x_batch.to(self.device), fid_batch)
                 loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
                 if self.logger:
                     self.logger.log_metric("proxy_val_mse", loss.item())
@@ -221,8 +221,10 @@ class DropoutRegressor:
                 )
             )
 
-    def forward_with_uncertainty(self, x, num_dropout_samples=10):
+    def forward_with_uncertainty(self, x, fid, num_dropout_samples=10):
         self.model.train()
         with torch.no_grad():
-            outputs = torch.cat([self.forward(x) for _ in range(num_dropout_samples)])
+            outputs = torch.cat(
+                [self.forward(x, fid) for _ in range(num_dropout_samples)]
+            )
         return outputs

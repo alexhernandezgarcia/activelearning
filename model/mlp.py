@@ -56,7 +56,7 @@ class MLP(nn.Module):
         layers.append(nn.Linear(self.hidden_layers[-1], self.out_dim))
         self.model = nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         """
         Args:
             tensor of dimension batch x max_seq_length_in_batch x k,
