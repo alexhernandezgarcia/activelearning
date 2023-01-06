@@ -7,4 +7,5 @@ batch_size: 32
 seed_data: 0
 n_samples: 1000
 save_data: False
+load_data: False
 data_path: "./storage/data_oracle/database.npy"
