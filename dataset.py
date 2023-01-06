@@ -53,15 +53,17 @@ class DataHandler:
     def initialise_dataset(self):
         """
         - calls env-specific function get a pandas dataframe of samples (list) and energies (list)
+        - convert the dataframe to dictionary for easy saving and loading of arrays
         - saves the un-transformed (no proxy transformation) de-normalised data
         - calls preprocess_for_dataloader
         """
         if self.load_data:
             self.dataset = pd.read_csv(self.data_path)
         else:
-            self.dataset = self.env.make_train_set(ntrain=self.n_samples)
+            self.dataset = self.env.make_train_set(ntrain=self.n_samples).to_dict(orient="list")
         if self.save_data:
-            self.dataset.to_csv(self.data_path)
+            np.save(self.data_path, self.dataset)
+            # self.dataset.to_csv(self.data_path, index=False)
         self.preprocess_for_dataloader()
 
     def preprocess_for_dataloader(self):
@@ -122,12 +124,14 @@ class DataHandler:
         """
         if self.save_data:
             # load the saved dataset
-            self.dataset = pd.read_csv(self.data_path)
-        query_dataset = pd.DataFrame({"samples": queries, "energies": energies})
-        self.dataset = pd.concat([self.dataset, query_dataset], ignore_index=True)
+            dataset = np.load(self.data_path, allow_pickle=True)
+            self.dataset = dataset.item()
+            # index_col=False
+        self.dataset["samples"] += queries
+        self.dataset["energies"] += energies
         self.preprocess_for_dataloader()
         if self.save_data:
-            self.dataset.to_csv(self.data_path)
+            np.save(self.data_path, self.dataset)
 
     def reshuffle(self):
         """
