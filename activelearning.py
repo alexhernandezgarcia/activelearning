@@ -20,7 +20,7 @@ def main(config):
     ## Instantiate objects
     N_FID = len(config._oracle_dict)
     oracles = []
-    for fid in range(1, N_FID + 1):
+    for fid in range(1, N_FID+1):
         oracle = hydra.utils.instantiate(config._oracle_dict[str(fid)])
         oracles.append(oracle)
 
@@ -45,10 +45,9 @@ def main(config):
         regressor.fit()
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
         gflownet.train()
-        batch, times = gflownet.sample_batch(env, config.n_samples, train=False)
-        for fid in range(config.n_fid):
-            queries = env.state2oracle[fid](batch)
-            energies = oracles[fid](queries).tolist()
+        batch, fid, times = gflownet.sample_batch(env, config.n_samples, train=False)
+        queries = [env.state2oracle[f](b) for f, b in zip(fid, batch)]
+        energies = [oracles[f](q) for f, q in zip(fid, queries)]
         data_handler.update_dataset(batch, energies)
 
 
