@@ -24,10 +24,12 @@ def main(config):
     # Note to Self: DataHandler needs env to make the train data. But DataHandler is required by regressor that's required by proxy that's required by env so we have to initalise env.proxy later on
     data_handler = hydra.utils.instantiate(config.dataset, env=env)
     # Regressor initialises a model which requires env-specific params so we pass the env-config with recursive=False os that the config as it is is passed instead of instantiating an object
+    # TODO: Merge mf-al as NUM_FID is defined in the mf-al branch
     regressor = hydra.utils.instantiate(
         config.regressor,
         config_env=config.env,
         config_network=config.model,
+        num_fid=NUM_FID,
         dataset=data_handler,
         _recursive_=False,
     )
