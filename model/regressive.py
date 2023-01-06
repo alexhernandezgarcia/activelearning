@@ -9,6 +9,7 @@ class RegressiveMLP(nn.Module):
         self,
         regressive_mode,
         base_num_hidden,
+        base_num_layer,
         fid_num_hidden,
         activation,
         dropout_base,
@@ -30,19 +31,27 @@ class RegressiveMLP(nn.Module):
         self.num_output = num_output
         self.dropout_fid = dropout_fid
         self.dropout_base = dropout_base
-        self.base_num_hidden = base_num_hidden
         self.activation = ACTIVATION_KEY[activation]
-        self.baseModule = nn.Sequential(
-            nn.Linear(self.init_layer_depth, self.base_num_hidden),
-            nn.Dropout(self.dropout_base),
+
+        self.base_hidden_layers = [base_num_hidden] * base_num_layer
+
+        # base model
+        base_layers = [
+            nn.Linear(self.init_layer_depth, self.base_hidden_layers[0]),
             self.activation,
-            nn.Linear(self.base_num_hidden, self.base_num_hidden),
-            nn.Dropout(self.dropout_base),
-            self.activation,
-            nn.Linear(self.base_num_hidden, self.base_num_hidden),
-            nn.Dropout(self.dropout_base),
-            self.activation,
-        )
+        ]
+        base_layers += [nn.Dropout(self.dropout_prob)]
+        for i in range(1, len(self.base_hidden_layers)):
+            base_layers.extend(
+                [
+                    nn.Linear(self.base_hidden_layers[i - 1], self.base_hidden_layers[i]),
+                    self.activation,
+                    nn.Dropout(self.dropout_prob),
+                ]
+            )
+        base_layers.append(nn.Linear(self.base_hidden_layers[-1], self.num_output))
+        self.base_module = nn.Sequential(*base_layers)
+
         # list of layers created
         if regressive_mode == "seq":
             self.forward = self.forward_seq_regressive
@@ -92,7 +101,7 @@ class RegressiveMLP(nn.Module):
     def forward_seq_regressive(self, input, fid):
         """Implementation of DNN-MFBO"""
         input, fid_ohe = self.preprocess(input, fid)
-        output_interm = self.baseModule(input)
+        output_interm = self.base_module(input)
         outputs = []
         for m in range(self.num_fid):
             augment_input = torch.cat([output_interm, input], axis=1)
@@ -112,7 +121,7 @@ class RegressiveMLP(nn.Module):
     def forward_full_regressive(self, input, fid):
         """Implementation of BMBO-DARN"""
         input, fid_ohe = self.preprocess(input, fid)
-        output_interm = self.baseModule(input)
+        output_interm = self.base_module(input)
         outputs = []
         augment_input = torch.cat([output_interm, inputs], axis=1)
         for m in range(self.num_fid):
