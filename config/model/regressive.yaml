@@ -1,0 +1,10 @@
+_target_: model.regressive.RegressiveMLP
+
+#Choose between full (BMBO-DARN) or seq (DNN-MFBO) implementation
+regressive_mode: "full" 
+base_num_hidden: 512
+fid_num_hidden: 512
+activation: 'relu'
+dropout_base: 0.1
+dropout_fid: 0.1
+num_output: 1
