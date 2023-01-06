@@ -122,12 +122,12 @@ class DataHandler:
         """
         if self.save_data:
             # load the saved dataset
-            self.dataset = pd.read_csv(self.path_data)
+            self.dataset = pd.read_csv(self.data_path)
         query_dataset = pd.DataFrame({"samples": queries, "energies": energies})
         self.dataset = pd.concat([self.dataset, query_dataset], ignore_index=True)
         self.preprocess_for_dataloader()
         if self.save_data:
-            self.dataset.to_csv(self.path_data)
+            self.dataset.to_csv(self.data_path)
 
     def reshuffle(self):
         """
