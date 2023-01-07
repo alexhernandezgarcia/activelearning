@@ -101,7 +101,7 @@ class BotorchUCB(UCB):
 
     def __call__(self, inputs):
         # TODO: Remove once PR38 is merged to gfn
-        inputs = self.preprocess_data(inputs)
+        inputs = self.preprocess_data(inputs).unsqueeze(-2)
         self.load_model()
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler
