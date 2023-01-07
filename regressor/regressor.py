@@ -15,8 +15,9 @@ class DropoutRegressor:
         path_model,
         training,
         dataset,
-        config_network,
+        config_model,
         config_env,
+        num_fid,
         logger=None,
     ):
         """
@@ -28,8 +29,9 @@ class DropoutRegressor:
         Inialises model and optimiser. Fits the model and saves it once convergence is reached.
         """
         self.logger = logger
-        self.config_network = config_network
+        self.config_model = config_model
         self.config_env = config_env
+        self.num_fid = num_fid
 
         self.device = device
         self.path_model = path_model
@@ -51,7 +53,10 @@ class DropoutRegressor:
         Initialize the network (MLP, Transformer, RNN)
         """
         self.model = hydra.utils.instantiate(
-            self.config_network, config_env=self.config_env, _recursive_=False
+            self.config_model,
+            num_fid=self.num_fid,
+            config_env=self.config_env,
+            _recursive_=False,
         ).to(self.device)
         self.optimizer = Adam(
             self.model.parameters(),

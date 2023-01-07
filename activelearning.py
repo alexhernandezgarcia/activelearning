@@ -27,7 +27,7 @@ def main(config):
     regressor = hydra.utils.instantiate(
         config.regressor,
         config_env=config.env,
-        config_network=config.model,
+        config_model=config.model,
         dataset=data_handler,
         _recursive_=False,
     )
