@@ -217,5 +217,7 @@ class DropoutRegressor:
     def forward_with_uncertainty(self, x, num_dropout_samples=10):
         self.model.train()
         with torch.no_grad():
-            outputs = torch.cat([self.forward(x) for _ in range(num_dropout_samples)])
+            outputs = torch.hstack(
+                [self.model(x.to(self.device)) for _ in range(num_dropout_samples)]
+            )
         return outputs
