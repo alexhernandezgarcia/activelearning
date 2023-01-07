@@ -11,7 +11,7 @@ training:
   eps : 1.0e-4
   #TODO: dropout is currently passed as a oarameter to the models so the following is currently unused.
   dropout : 0.1
-  max_epochs : 500
+  max_epochs : 300
   training_batch : 8
   history : 50
   learning_rate: 1.0e-3
