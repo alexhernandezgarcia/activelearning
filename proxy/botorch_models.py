@@ -18,14 +18,14 @@ class ProxyBotorchUCB(Model):
         self.regressor.model.train()
         dim = X.ndim
         if dim == 3:
-            X = X.squeeze(-2)
+            X = X.squeeze(0)
 
         with torch.no_grad():
             outputs = self.regressor.forward_with_uncertainty(
                 X, self.num_dropout_samples
             )
-        mean = torch.mean(outputs, axis=1).unsqueeze(-1)
-        var = torch.var(outputs, axis=1).unsqueeze(-1)
+        mean = torch.mean(outputs, dim=1).unsqueeze(-1)
+        var = torch.var(outputs, dim=1).unsqueeze(-1)
         # if var is an array of zeros then we add a small value to it
         var = torch.where(var == 0, torch.ones_like(var) * 1e-4, var)
 
