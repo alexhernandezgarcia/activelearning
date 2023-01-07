@@ -59,7 +59,7 @@ class RegressiveMLP(nn.Module):
                 [
                     nn.Sequential(
                         nn.Linear(
-                            self.init_layer_depth + (self.num_output * i),
+                            self.init_layer_depth + self.num_output,
                             self.fid_num_hidden,
                         ),
                         nn.Dropout(dropout_fid),
