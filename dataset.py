@@ -34,6 +34,7 @@ class DataHandler:
         n_samples,
         seed_data,
         save_data,
+        load_data,
         data_path,
     ):
         self.env = env
@@ -44,19 +45,31 @@ class DataHandler:
         self.n_samples = n_samples
         self.seed_data = seed_data
         self.save_data = save_data
+        self.load_data = load_data
         self.data_path = data_path
 
         self.initialise_dataset()
 
     def initialise_dataset(self):
         """
-        - calls env-specific function get a pandas dataframe of samples (list) and energies (list)
-        - saves the un-transformed (no proxy transformation) de-normalised data
-        - calls preprocess_for_dataloader
+        Loads the dataset as a dictionary
+        OR
+        Initialises the dataset using env-specific make_train_set function (returns a dataframe that is converted to a dictionary)
+
+        - dataset['samples']: list of arrays
+        - dataset['energies']: list of float values
+
+        If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
         """
-        self.dataset = self.env.make_train_set(ntrain=self.n_samples)
-        if self.save_data:
-            self.dataset.to_csv(self.data_path)
+        if self.load_data:
+            dataset = np.load(self.data_path, allow_pickle=True)
+            self.dataset = dataset.item()
+        else:
+            self.dataset = self.env.make_train_set(ntrain=self.n_samples).to_dict(
+                orient="list"
+            )
+            if self.save_data:
+                np.save(self.data_path, self.dataset)
         self.preprocess_for_dataloader()
 
     def preprocess_for_dataloader(self):
@@ -84,7 +97,8 @@ class DataHandler:
 
     def get_statistics(self):
         """
-        called each time the dataset is updated so has the most recent metrics"""
+        called each time the dataset is updated so has the most recent metrics
+        """
         self.mean = torch.mean(self.targets)
         self.std = torch.std(self.targets)
         return self.mean, self.std
@@ -111,20 +125,23 @@ class DataHandler:
             queries: list of queries [[0, 0], [1, 1], ...]
             energies: list of energies [-0.6, -0.1, ...]
         Update the dataset with new data after AL iteration
-        Also update the dataset stats
+        Updates the dataset stats
+        Saves the updated dataset if save_data=True
         """
         if self.save_data:
             # load the saved dataset
-            self.dataset = pd.read_csv(self.path_data)
-        query_dataset = pd.DataFrame({"samples": queries, "energies": energies})
-        self.dataset = pd.concat([self.dataset, query_dataset], ignore_index=True)
+            dataset = np.load(self.data_path, allow_pickle=True)
+            self.dataset = dataset.item()
+            # index_col=False
+        self.dataset["samples"] += queries
+        self.dataset["energies"] += energies
         self.preprocess_for_dataloader()
         if self.save_data:
-            self.dataset.to_csv(self.path_data)
+            np.save(self.data_path, self.dataset)
 
     def reshuffle(self):
         """
-        Reshuffle the entire dataset before creating train and test subsets
+        Reshuffle the entire dataset (called before creating train and test subsets)
         """
         self.samples, self.targets = shuffle(
             self.samples.numpy(), self.targets.numpy(), random_state=self.seed_data

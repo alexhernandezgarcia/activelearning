@@ -60,41 +60,49 @@ class DropoutRegressor(Proxy):
 
 
 class UCB(DropoutRegressor):
-    def __init__(self, regressor, num_dropout_samples, model_path, kappa) -> None:
-        super().__init__(regressor, model_path, num_dropout_samples)
+    def __init__(
+        self, regressor, num_dropout_samples, model_path, device, kappa
+    ) -> None:
+        super().__init__(regressor, num_dropout_samples, model_path, device)
         self.kappa = kappa
 
     def __call__(self, inputs):
+        """
+        Args
+            inputs: batch x obs_dim
+        Returns:
+            score of dim (n_samples,), i.e, ndim=1"""
         self.load_model()
         # TODO: Remove once PR38 is merged to gfn
         inputs = self.preprocess_data(inputs)
-        self.regressor.model.train()
         outputs = self.regressor.forward_with_uncertainty(
             inputs, self.num_dropout_samples
         )
         mean, std = torch.mean(outputs, dim=1), torch.std(outputs, dim=1)
         score = mean + self.kappa * std
-        score = torch.Tensor(score)
-        score = score.unsqueeze(1)
-        return score.detach().cpu().numpy()
+        score = torch.Tensor(score).detach().cpu().numpy()
+        return score
 
 
 class BotorchUCB(UCB):
-    def __init__(self, regressor, num_dropout_samples, model_path, sampler, kappa):
-        super().__init__(regressor, num_dropout_samples, model_path, kappa)
-        self.sampler = SobolQMCNormalSampler(
-            num_samples=sampler.num_samples,
-            seed=sampler.seed,
-            resample=sampler.resample,
-        )
+    def __init__(
+        self, regressor, num_dropout_samples, model_path, device, kappa, sampler
+    ):
+        super().__init__(regressor, num_dropout_samples, model_path, device, kappa)
+        self.sampler_config = sampler
 
     def load_model(self):
         super().load_model()
         self.model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
+        self.sampler = SobolQMCNormalSampler(
+            sample_shape=torch.Size([self.sampler_config.num_samples]),
+            seed=self.sampler_config.seed,
+        )
 
     def __call__(self, inputs):
         # TODO: Remove once PR38 is merged to gfn
         inputs = self.preprocess_data(inputs)
+        self.load_model()
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler
         )
