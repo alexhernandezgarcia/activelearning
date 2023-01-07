@@ -99,13 +99,29 @@ class RegressiveMLP(nn.Module):
             )
 
     def preprocess(self, x, fid):
+        """
+        Args:
+            x: one hot encoded tensor of shape (batch_size, obs_dim)
+                paddded till the maximum el lwngth in the batch
+            fid: tensor of shape (batch_size) with integers representing the fidelity
+        Returns:
+            input: tensor of shape (batch_size, init_layer_depth)
+                padded till the maximum length in the dataset
+            fid_ohe: one hot encoded represenation of fidelity (1 is represented as [1, 0] and 2 as [0, 1])
+        """
         input = torch.zeros(x.shape[0], self.init_layer_depth)
         input[:, : x.shape[1]] = x
         fid_ohe = F.one_hot(fid, num_classes=self.num_fid + 1)[:, 1:].to(torch.float32)
         return input.to(x.device), fid_ohe
 
     def forward_seq_regressive(self, input, fid):
-        """Implementation of DNN-MFBO"""
+        """Implementation of DNN-MFBO
+        Args:
+            input: one hot encoded input tensor
+            fid: tensor of integers representing the fidelity
+                example: tensor([2, 1])
+        Returns:
+            output_masked: tensor of shape (batch_size, num_output=1)"""
         input, fid_ohe = self.preprocess(input, fid)
         output_interm = self.base_module(input)
         outputs = []
@@ -118,7 +134,13 @@ class RegressiveMLP(nn.Module):
         return output_masked
 
     def forward_full_regressive(self, input, fid):
-        """Implementation of BMBO-DARN"""
+        """Implementation of BMBO-DARN
+        Args:
+            input: one hot encoded input tensor
+            fid: tensor of integers representing the fidelity
+                example: tensor([2, 1])
+        Returns:
+            output_masked: tensor of shape (batch_size, num_output=1)"""
         input, fid_ohe = self.preprocess(input, fid)
         output_interm = self.base_module(input)
         outputs = []

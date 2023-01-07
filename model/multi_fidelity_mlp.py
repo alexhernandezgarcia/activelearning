@@ -92,12 +92,8 @@ class MultiFidelityMLP(nn.Module):
         Need to extend functionality to more fidelities if need be.
         """
         x, fid_ohe = self.preprocess(inputs, fid)
-        # For debugging
-        # fid_ohe = torch.FloatTensor([1, 0]).repeat(x.shape[0], 1)
         embed = self.embed_module(x)
-        # [1, 0]
         output_fid_1 = self.fid_0_module(embed)
-        # [0, 1]
         output_fid_2 = self.fid_1_module(embed)
         out = torch.stack([output_fid_1, output_fid_2], dim=-1).squeeze(-2)
         output = out[fid_ohe == 1].unsqueeze(dim=-1)
