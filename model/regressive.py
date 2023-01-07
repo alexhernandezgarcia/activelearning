@@ -38,7 +38,7 @@ class RegressiveMLP(nn.Module):
             nn.Linear(self.init_layer_depth, self.base_hidden_layers[0]),
             self.activation,
         ]
-        base_layers += [nn.Dropout(self.dropout_base)]
+        base_layers += [nn.Dropout(dropout_base)]
         for i in range(1, len(self.base_hidden_layers)):
             base_layers.extend(
                 [
@@ -59,7 +59,7 @@ class RegressiveMLP(nn.Module):
                 [
                     nn.Sequential(
                         nn.Linear(
-                            self.input_dim + (self.num_output * i),
+                            self.init_layer_depth + (self.num_output * i),
                             self.fid_num_hidden,
                         ),
                         nn.Dropout(dropout_fid),
@@ -81,7 +81,7 @@ class RegressiveMLP(nn.Module):
                 [
                     nn.Sequential(
                         nn.Linear(
-                            self.input_dim + (self.num_output + i) * i,
+                            self.init_layer_depth + (self.num_output + i),
                             self.fid_num_hidden,
                         ),
                         nn.Dropout(dropout_fid),
@@ -98,12 +98,11 @@ class RegressiveMLP(nn.Module):
                 ]
             )
 
-    def preprocess(self, input, fid):
-        input = torch.zeros(input.shape[0], self.input_max_length * self.input_classes)
-        input[:, : input.shape[1]] = input
+    def preprocess(self, x, fid):
+        input = torch.zeros(x.shape[0], self.init_layer_depth)
+        input[:, : x.shape[1]] = x
         fid_ohe = F.one_hot(fid, num_classes=self.num_fid + 1)[:, 1:].to(torch.float32)
-        fid_ohe = fid_ohe.to(self.device)
-        return input, fid_ohe
+        return input.to(x.device), fid_ohe
 
     def forward_seq_regressive(self, input, fid):
         """Implementation of DNN-MFBO"""
@@ -114,7 +113,7 @@ class RegressiveMLP(nn.Module):
             augment_input = torch.cat([output_interm, input], axis=1)
             output_interm = self.layers[m](augment_input)
             outputs.append(output_interm)
-        output_tensor = torch.stack(outputs, dim=1).to(self.device)
+        output_tensor = torch.stack(outputs, dim=1).to(input.device)
         output_masked = output_tensor[fid_ohe == 1]
         return output_masked
 
@@ -123,11 +122,11 @@ class RegressiveMLP(nn.Module):
         input, fid_ohe = self.preprocess(input, fid)
         output_interm = self.base_module(input)
         outputs = []
-        augment_input = torch.cat([output_interm, inputs], axis=1)
+        augment_input = torch.cat([output_interm, input], axis=1)
         for m in range(self.num_fid):
             output_fid = self.layers[m](augment_input)
             augment_input = torch.cat([output_fid, augment_input], axis=1)
             outputs.append(output_fid)
-        output_tensor = torch.stack(outputs, dim=1).to(self.device)
+        output_tensor = torch.stack(outputs, dim=1).to(input.device)
         output_masked = output_tensor[fid_ohe == 1]
         return output_masked
