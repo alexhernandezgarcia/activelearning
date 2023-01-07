@@ -26,7 +26,7 @@ class wandb_logger:
         self.run.tags = self.run.tags + tags
 
     def set_context(self, context):
-        self.context = context
+        self.context = str(context)
 
     def log_metric(self, key, value, use_context=True):
         if use_context:

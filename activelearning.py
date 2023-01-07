@@ -43,7 +43,9 @@ def main(config):
         config.gflownet, env=env, buffer=config.env.buffer
     )
 
-    for _ in range(config.al_n_rounds):
+    for iter in range(1, config.al_n_rounds + 1):
+        if logger:
+            logger.set_context(iter)
         regressor.fit()
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
         gflownet.train()
