@@ -18,6 +18,7 @@ class MLP(nn.Module):
         activation,
         config_env,
         transformerCall=False,
+        **kwargs
     ):
         super(MLP, self).__init__()
         """

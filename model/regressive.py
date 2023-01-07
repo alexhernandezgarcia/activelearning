@@ -38,7 +38,7 @@ class RegressiveMLP(nn.Module):
             nn.Linear(self.init_layer_depth, self.base_hidden_layers[0]),
             self.activation,
         ]
-        base_layers += [nn.Dropout(self.dropout_prob)]
+        base_layers += [nn.Dropout(self.dropout_base)]
         for i in range(1, len(self.base_hidden_layers)):
             base_layers.extend(
                 [
