@@ -7,7 +7,7 @@ import torch.nn.functional as F
 class MultiFidelityMLP(nn.Module):
     def __init__(
         self,
-        multi_head,
+        shared_head,
         base_num_hidden,
         base_num_layer,
         fid_num_hidden,
@@ -48,7 +48,10 @@ class MultiFidelityMLP(nn.Module):
         self.embed_module = nn.Sequential(*embed_layers)
 
         fid_layers = [
-            nn.Linear(self.embed_hidden_layers[-1], self.fid_hidden_layers[0]),
+            nn.Linear(
+                self.embed_hidden_layers[-1] + self.num_fid * (shared_head),
+                self.fid_hidden_layers[0],
+            ),
             self.activation,
         ]
         fid_layers += [nn.Dropout(dropout_prob)]
@@ -61,12 +64,13 @@ class MultiFidelityMLP(nn.Module):
                 ]
             )
         fid_layers.append(nn.Linear(self.fid_hidden_layers[-1], self.num_output))
-        for i in range(self.num_fid):
-            setattr(self, f"fid_{i}_module", nn.Sequential(*fid_layers))
 
-        if multi_head == True:
+        if shared_head == False:
             self.forward = self.forward_multiple_head
+            for i in range(self.num_fid):
+                setattr(self, f"fid_{i}_module", nn.Sequential(*fid_layers))
         else:
+            self.fid_module = nn.Sequential(*fid_layers)
             self.forward = self.forward_shared_head
 
     def preprocess(self, x, fid):
@@ -78,10 +82,8 @@ class MultiFidelityMLP(nn.Module):
     def forward_shared_head(self, input, fid):
         x, fid_ohe = self.preprocess(input, fid)
         embed = self.embed_module(x)
-        # TODO: Check if the below line is required
-        embed = embed.view(x.size(0), -1)
         embed_with_fid = torch.concat([embed, fid_ohe], dim=1)
-        out = self.fid_0_module(embed_with_fid)
+        out = self.fid_module(embed_with_fid)
         return out
 
     def forward_multiple_head(self, inputs, fid):
@@ -93,8 +95,6 @@ class MultiFidelityMLP(nn.Module):
         # For debugging
         # fid_ohe = torch.FloatTensor([1, 0]).repeat(x.shape[0], 1)
         embed = self.embed_module(x)
-        # TODO: Check if the below line is required
-        embed = embed.view(x.size(0), -1)
         # [1, 0]
         output_fid_1 = self.fid_0_module(embed)
         # [0, 1]
