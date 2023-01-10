@@ -17,6 +17,10 @@ def main(config):
     log_config = flatten_config(OmegaConf.to_container(config, resolve=True), sep="/")
     log_config = {"/".join(("config", key)): val for key, val in log_config.items()}
 
+    logger = None
+    if config.log.skip == False:
+        logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
+
     ## Instantiate objects
     oracle = hydra.utils.instantiate(config.oracle)
     # TODO: Check if initialising env.proxy later breaks anything -- i.e., to check that nothin in the init() depends on the proxy
@@ -30,15 +34,18 @@ def main(config):
         config_network=config.network,
         dataset=data_handler,
         _recursive_=False,
+        logger=logger,
     )
     proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
     env.proxy = proxy
-    # TODO: create logger and pass it to model
+    # TODO: pass wandb logger to gflownet once it is compatible with wandb (i.e., once PR17 is merged)
     gflownet = hydra.utils.instantiate(
         config.gflownet, env=env, buffer=config.env.buffer
     )
 
-    for _ in range(config.al_n_rounds):
+    for iter in range(1, config.al_n_rounds + 1):
+        if logger:
+            logger.set_context(iter)
         regressor.fit()
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
         gflownet.train()
