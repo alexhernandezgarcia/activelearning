@@ -1,4 +1,4 @@
-_target_: src.model.transformer.Transformer
+_target_: model.transformer.Transformer
 # Incomplete. Need to add transofmer specific parameters like embedding_dim
 activation: 'relu'
 num_output: 1

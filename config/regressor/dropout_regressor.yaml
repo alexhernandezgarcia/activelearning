@@ -1,4 +1,4 @@
-_target_: model.regressor.DropoutRegressor
+_target_: regressor.regressor.DropoutRegressor
 
 # Device
 device: cuda
