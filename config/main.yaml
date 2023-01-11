@@ -2,7 +2,8 @@ defaults:
   - env: grid
   - gflownet: gflownet
   - proxy: dropout_regressor
-  - oracle: grid_corners
+  - oracle@_oracle_dict.1: grid_corners
+  - oracle@_oracle_dict.2: grid_corners
   - dataset: dataset
   - model: dropout_regressor
   - network: mlp

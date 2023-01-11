@@ -38,7 +38,7 @@ class DropoutRegressor(Proxy):
         inputs = torch.FloatTensor(list(map(self.state2proxy, inputs))).to(self.device)
         return inputs
 
-    def __call__(self, inputs):
+    def __call__(self, inputs, fids):
         """
         Args:
             inputs: proxy-compatible input tensor
@@ -54,8 +54,11 @@ class DropoutRegressor(Proxy):
         self.load_model()
         inputs = self.preprocess_data(inputs)
         self.regressor.model.train()
+        # TODO: check what preprocessing is required by fids
         with torch.no_grad():
-            output = self.regressor.model(inputs).detach().cpu().numpy().squeeze(-1)
+            output = (
+                self.regressor.model(inputs, fids).detach().cpu().numpy().squeeze(-1)
+            )
         return output
 
 
@@ -66,7 +69,7 @@ class UCB(DropoutRegressor):
         super().__init__(regressor, num_dropout_samples, model_path, device)
         self.kappa = kappa
 
-    def __call__(self, inputs):
+    def __call__(self, inputs, fids):
         """
         Args
             inputs: batch x obs_dim
@@ -76,7 +79,7 @@ class UCB(DropoutRegressor):
         # TODO: Remove once PR38 is merged to gfn
         inputs = self.preprocess_data(inputs)
         outputs = self.regressor.forward_with_uncertainty(
-            inputs, self.num_dropout_samples
+            inputs, fids, self.num_dropout_samples
         )
         mean, std = torch.mean(outputs, dim=1), torch.std(outputs, dim=1)
         score = mean + self.kappa * std
@@ -99,7 +102,7 @@ class BotorchUCB(UCB):
             seed=self.sampler_config.seed,
         )
 
-    def __call__(self, inputs):
+    def __call__(self, inputs, fids):
         # TODO: Remove once PR38 is merged to gfn
         inputs = self.preprocess_data(inputs)
         self.load_model()
