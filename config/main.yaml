@@ -1,10 +1,11 @@
 defaults:
   - env: grid
   - gflownet: gflownet
-  - proxy: botorch_ucb
+  - proxy: dropout_regressor
   - oracle: grid_corners
   - dataset: dataset
   - model: dropout_regressor
   - network: mlp
 
-n_samples: 1000
+n_samples: 100
+al_n_rounds: 10

@@ -13,6 +13,18 @@ class ProxyBotorchUCB(Model):
         self.num_dropout_samples = num_dropout_samples
 
     def posterior(self, X, observation_noise=False, posterior_transform=None):
+        """
+        Args:
+            X (Tensor): A `batch_shape x q x d`-dim Tensor of inputs.
+        Calculates:
+            mean (tensor): A `batch_shape x q`-dim
+            var (tensor): A `batch_shape x q`-dim of variance
+        Returns:
+            posterior:
+                base_sample_shape = torch.Size([batch_shape, q, num_output]) = torch.Size([batch_shape, 1, 1])
+                event_shape = torch.Size([batch_shape, q, num_output])
+                variance:  torch.Size([batch_shape, num_output, num_output]) = torch.Size([batch_shape, 1, 1])
+        """
         super().posterior(X, observation_noise, posterior_transform)
 
         self.regressor.model.train()
@@ -24,8 +36,8 @@ class ProxyBotorchUCB(Model):
             outputs = self.regressor.forward_with_uncertainty(
                 X, self.num_dropout_samples
             )
-        mean = torch.mean(outputs, axis=1).unsqueeze(-1)
-        var = torch.var(outputs, axis=1).unsqueeze(-1)
+        mean = torch.mean(outputs, dim=1).unsqueeze(-1)
+        var = torch.var(outputs, dim=1).unsqueeze(-1)
         # if var is an array of zeros then we add a small value to it
         var = torch.where(var == 0, torch.ones_like(var) * 1e-4, var)
 
