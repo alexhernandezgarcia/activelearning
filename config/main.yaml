@@ -5,8 +5,8 @@ defaults:
   - proxy: dropout_regressor
   - oracle: grid_corners
   - dataset: dataset
-  - model: dropout_regressor
-  - network: mlp
+  - regressor: dropout_regressor
+  - model: mlp
   - logger: wandb
   - user: nikita
 

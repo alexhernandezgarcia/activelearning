@@ -7,13 +7,6 @@ from torch.optim import Adam
 import hydra
 from tqdm import tqdm
 
-ACTIVATION_KEY = {
-    "tanh": nn.Tanh(),
-    "relu": nn.ReLU(),
-    "sigmoid": nn.Sigmoid(),
-    "leaky_relu": nn.LeakyReLU(),
-}
-
 
 class DropoutRegressor:
     def __init__(
@@ -22,8 +15,9 @@ class DropoutRegressor:
         checkpoint,
         training,
         dataset,
-        config_network,
+        config_model,
         config_env,
+        num_fid,
         logger=None,
     ):
         """
@@ -35,8 +29,9 @@ class DropoutRegressor:
         Inialises model and optimiser. Fits the model and saves it once convergence is reached.
         """
         self.logger = logger
-        self.config_network = config_network
+        self.config_model = config_model
         self.config_env = config_env
+        self.num_fid = num_fid
 
         self.device = device
 
@@ -62,7 +57,10 @@ class DropoutRegressor:
         Initialize the network (MLP, Transformer, RNN)
         """
         self.model = hydra.utils.instantiate(
-            self.config_network, config_env=self.config_env, _recursive_=False
+            self.config_model,
+            num_fid=self.num_fid,
+            config_env=self.config_env,
+            _recursive_=False,
         ).to(self.device)
         self.optimizer = Adam(
             self.model.parameters(),
