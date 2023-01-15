@@ -2,24 +2,31 @@
 Runnable script with hydra capabilities
 """
 import sys
+import os
 import random
 import hydra
 from omegaconf import OmegaConf
-
+import yaml
 from gflownet.utils.common import flatten_config
 
 
 @hydra.main(config_path="./config", config_name="main")
 def main(config):
+    cwd = os.getcwd()
+    config.logger.logdir.root = cwd
     # Reset seed for job-name generation in multirun jobs
     random.seed(None)
+    # Set other random seeds
+    set_seeds(config.seed)
     # Log config
+    # TODO: Move log config to Logger
     log_config = flatten_config(OmegaConf.to_container(config, resolve=True), sep="/")
     log_config = {"/".join(("config", key)): val for key, val in log_config.items()}
+    with open(cwd + "/config.yml", "w") as f:
+        yaml.dump(log_config, f, default_flow_style=False)
 
-    logger = None
-    if config.log.skip == False:
-        logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
+    # Logger
+    logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
     ## Instantiate objects
     oracle = hydra.utils.instantiate(config.oracle)
@@ -40,7 +47,11 @@ def main(config):
     env.proxy = proxy
     # TODO: pass wandb logger to gflownet once it is compatible with wandb (i.e., once PR17 is merged)
     gflownet = hydra.utils.instantiate(
-        config.gflownet, env=env, buffer=config.env.buffer
+        config.gflownet,
+        env=env,
+        buffer=config.env.buffer,
+        logger=logger,
+        device=config.device,
     )
 
     for iter in range(1, config.al_n_rounds + 1):
@@ -53,6 +64,17 @@ def main(config):
         queries = env.state2oracle(batch)
         energies = oracle(queries).tolist()
         data_handler.update_dataset(batch, energies)
+
+
+def set_seeds(seed):
+    import torch
+    import numpy as np
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 
 if __name__ == "__main__":
