@@ -1,4 +1,5 @@
 defaults:
+  - _self_
   - env: grid
   - gflownet: gflownet
   - proxy: dropout_regressor
@@ -7,11 +8,18 @@ defaults:
   - model: dropout_regressor
   - network: mlp
   - logger: wandb
+  - user: alex
 
 n_samples: 100
+seed: 0
 al_n_rounds: 10
-log:
-  skip: False 
-  tags: 
-    - dummy1
-    - dummy2
+
+# Hydra config
+hydra:
+  # See: https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+    chdir: True

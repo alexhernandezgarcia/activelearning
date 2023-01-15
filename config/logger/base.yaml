@@ -1,0 +1,12 @@
+_target_: logger.Logger
+
+do:
+  online: False
+  times: False
+logdir:
+  root: ./logs
+  ckpts: ckpts
+  overwrite: True
+debug: False 
+lightweight: False 
+progress: True 
