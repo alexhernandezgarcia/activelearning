@@ -6,6 +6,7 @@ do:
 logdir:
   root: ./logs
   ckpts: ckpts
+  data: data
   overwrite: True
 debug: False 
 lightweight: False 

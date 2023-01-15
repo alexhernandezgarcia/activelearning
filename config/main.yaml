@@ -1,9 +1,9 @@
 defaults:
   - _self_
-  - env: grid
+  - env: amp
   - gflownet: gflownet
   - proxy: dropout_regressor
-  - oracle: grid_corners
+  - oracle: amp
   - dataset: dataset
   - regressor: dropout_regressor
   - model: mlp
