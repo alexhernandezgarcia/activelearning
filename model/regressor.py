@@ -19,7 +19,7 @@ class DropoutRegressor:
     def __init__(
         self,
         device,
-        path_model,
+        checkpoint,
         training,
         dataset,
         config_network,
@@ -39,7 +39,6 @@ class DropoutRegressor:
         self.config_env = config_env
 
         self.device = device
-        self.path_model = path_model
 
         # Training Parameters
         self.training_eps = training.eps
@@ -52,6 +51,11 @@ class DropoutRegressor:
 
         # Dataset
         self.dataset = dataset
+
+        # Logger
+        self.progress = self.logger.progress
+        if checkpoint:
+            self.logger.set_proxy_path(checkpoint)
 
     def init_model(self):
         """
@@ -70,13 +74,15 @@ class DropoutRegressor:
         """
         Load and returns the model
         """
-        if dir_name == None:
-            dir_name = self.path_model
+        stem = (
+            self.logger.proxy_ckpt_path.stem + self.logger.context + "final" + ".ckpt"
+        )
+        path = self.logger.proxy_ckpt_path.parent + stem
 
         self.init_model()
 
-        if os.path.exists(dir_name):
-            checkpoint = torch.load(dir_name)
+        if os.path.exists(path):
+            checkpoint = torch.load(path)
             self.model.load_state_dict(checkpoint["model_state_dict"])
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             self.model.to(self.device)
@@ -87,21 +93,9 @@ class DropoutRegressor:
         else:
             raise FileNotFoundError
 
-    def save_model(self):
-        """
-        Saves model once convergence is attained.
-        """
-        torch.save(
-            {
-                "model_state_dict": self.model.state_dict(),
-                "optimizer_state_dict": self.optimizer.state_dict(),
-            },
-            self.path_model,
-        )
-
     def fit(self):
         """
-        Initlaises the model and dataloaders.
+        Initialises the model and dataloaders.
         Trains the model and saves it once convergence is attained.
         """
         # we reset the model, cf primacy bias, here we train on more and more data
@@ -113,47 +107,35 @@ class DropoutRegressor:
         # get training data in torch format
         train_loader, test_loader = self.dataset.get_dataloader()
 
+        pbar = tqdm(range(1, self.max_epochs + 1), disable=not self.progress)
         self.converged = 0
-        self.epochs = 0
 
-        while self.converged != 1:
-
-            if (
-                self.epochs > 0
-            ):  #  this allows us to keep the previous model if it is better than any produced on this run
-                self.train(train_loader)  # already appends to self.err_tr_hist
-            else:
-                self.err_tr_hist.append(0)
-
+        for epoch in pbar:
             self.test(test_loader)
-            if self.err_te_hist[-1] == np.min(
-                self.err_te_hist
-            ):  # if this is the best test loss we've seen
-                self.save_model()
-                print(
-                    "new best found at epoch {}, of value {:.4f}".format(
-                        self.epochs, self.err_te_hist[-1]
-                    )
-                )
+
+            # if model is the best so far
+            self.logger.save_proxy(self.model, final=False, epoch=epoch)
+
+            self.train(train_loader)
 
             # after training at least "history" epochs, check convergence
-            if self.epochs >= self.history + 1:
-                self.check_convergence()
+            if epoch > self.history:
+                self.check_convergence(epoch)
+                if self.converged == 1:
+                    self.logger.save_proxy(self.model, final=True, epoch=epoch)
+                    if self.progress:
+                        print(
+                            "Convergence reached at epoch {}, with MSE {:.4f}".format(
+                                epoch, self.err_te_hist[-1]
+                            )
+                        )
+                    break
 
-            if self.epochs % 10 == 0:
-                print(
-                    "Model epoch {} test loss {:.4f}".format(
-                        self.epochs, self.err_te_hist[-1]
-                    )
+            if self.progress:
+                description = "Train MSE: {:.4f} | Test MSE: {:.4f}".format(
+                    self.err_tr_hist[-1], self.err_te_hist[-1]
                 )
-
-            self.epochs += 1
-
-            # TODO : implement comet logger (with logger object in activelearning.py)
-            # if self.converged == 1:
-            #     self.statistics.log_comet_proxy_training(
-            #         self.err_tr_hist, self.err_te_hist
-            #     )
+                pbar.set_description(description)
 
     def train(self, tr):
         """
@@ -172,13 +154,13 @@ class DropoutRegressor:
             loss.backward()
             self.optimizer.step()
 
-        self.err_te_hist.append(torch.mean(torch.stack(err_tr)).cpu().detach().numpy())
+        self.err_tr_hist.append(torch.mean(torch.stack(err_tr)).cpu().detach().numpy())
 
     def test(self, te):
         err_te = []
         self.model.eval()
         with torch.no_grad():
-            for x_batch, y_batch in tqdm(te, leave=False):
+            for x_batch, y_batch in te:
                 output = self.model(x_batch.to(self.device))
                 loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
                 if self.logger:
@@ -186,7 +168,7 @@ class DropoutRegressor:
                 err_te.append(loss.data)
         self.err_te_hist.append(torch.mean(torch.stack(err_te)).cpu().detach().numpy())
 
-    def check_convergence(self):
+    def check_convergence(self, epoch):
         eps = self.training_eps
         history = self.history
         max_epochs = self.max_epochs
@@ -195,11 +177,7 @@ class DropoutRegressor:
             np.asarray(self.err_te_hist[-history + 1 :]) > self.err_te_hist[-history]
         ):  # early stopping
             self.converged = 1  # not a legitimate criteria to stop convergence ...
-            print(
-                "Model converged after {} epochs - test loss increasing at {:.4f}".format(
-                    self.epochs + 1, min(self.err_te_hist)
-                )
-            )
+            print("\nTest loss increasing.")
 
         if (
             abs(self.err_te_hist[-history] - np.average(self.err_te_hist[-history:]))
@@ -207,19 +185,13 @@ class DropoutRegressor:
             < eps
         ):
             self.converged = 1
-            print(
-                "Model converged after {} epochs - hit test loss convergence criterion at {:.4f}".format(
-                    self.epochs + 1, min(self.err_te_hist)
-                )
-            )
+            if self.progress:
+                print("\nHit test loss convergence criterion.")
 
-        if self.epochs >= max_epochs:
+        if epoch >= max_epochs:
             self.converged = 1
-            print(
-                "Model converged after {} epochs- epoch limit was hit with test loss {:.4f}".format(
-                    self.epochs + 1, min(self.err_te_hist)
-                )
-            )
+            if self.progress:
+                print("\nReached max_epochs.")
 
     def forward_with_uncertainty(self, x, num_dropout_samples=10):
         self.model.train()

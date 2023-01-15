@@ -1,7 +1,7 @@
 defaults:
   - base
 
-_target_: gflownet.utils.logger.Logger
+_target_: utils.logger.AL_Logger
 
 do:
   online: True
@@ -28,3 +28,5 @@ sampler:
       - 1
       - 10
       - 100
+proxy:
+  period: 5
