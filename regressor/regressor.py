@@ -17,7 +17,6 @@ class DropoutRegressor:
         dataset,
         config_model,
         config_env,
-        num_fid,
         logger=None,
     ):
         """
@@ -31,7 +30,6 @@ class DropoutRegressor:
         self.logger = logger
         self.config_model = config_model
         self.config_env = config_env
-        self.num_fid = num_fid
 
         self.device = device
 
@@ -58,7 +56,6 @@ class DropoutRegressor:
         """
         self.model = hydra.utils.instantiate(
             self.config_model,
-            num_fid=self.num_fid,
             config_env=self.config_env,
             _recursive_=False,
         ).to(self.device)

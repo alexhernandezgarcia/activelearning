@@ -29,11 +29,13 @@ def main(config):
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
     ## Instantiate objects
-    oracle = hydra.utils.instantiate(config.oracle)
+    oracle = hydra.utils.instantiate(config.oracle, device=config.device)
     # TODO: Check if initialising env.proxy later breaks anything -- i.e., to check that nothin in the init() depends on the proxy
     env = hydra.utils.instantiate(config.env, oracle=oracle)
     # Note to Self: DataHandler needs env to make the train data. But DataHandler is required by regressor that's required by proxy that's required by env so we have to initalise env.proxy later on
-    data_handler = hydra.utils.instantiate(config.dataset, env=env)
+    data_handler = hydra.utils.instantiate(
+        config.dataset, env=env, logger=logger, oracle=oracle
+    )
     # Regressor initialises a model which requires env-specific params so we pass the env-config with recursive=False os that the config as it is is passed instead of instantiating an object
     regressor = hydra.utils.instantiate(
         config.regressor,
