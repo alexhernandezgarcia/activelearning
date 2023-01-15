@@ -8,11 +8,12 @@ defaults:
   - model: dropout_regressor
   - network: mlp
   - logger: wandb
-  - user: alex
+  - user: nikita
 
 n_samples: 100
 seed: 0
 al_n_rounds: 10
+device: cuda
 
 # Hydra config
 hydra:

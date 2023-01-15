@@ -4,7 +4,7 @@ _target_: model.regressor.DropoutRegressor
 device: cuda
 
 # Path
-path_model: "./storage/model_proxy/proxy"
+checkpoint: proxy
 
 # Training
 training:
@@ -13,6 +13,6 @@ training:
   dropout : 0.1
   max_epochs : 300
   training_batch : 8
-  history : 50
+  history : 10
   learning_rate: 1.0e-3
   weight_decay: 0.0
