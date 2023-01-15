@@ -13,3 +13,4 @@ sh/
 !requirements.txt
 *.out
 wandb/
+logs/
