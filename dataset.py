@@ -3,6 +3,8 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
+from pathlib import Path
+from sklearn.model_selection import train_test_split
 import pandas as pd
 
 
@@ -28,26 +30,25 @@ class DataHandler:
         self,
         env,
         normalise_data,
-        shuffle_data,
         train_fraction,
-        batch_size,
+        dataloader,
         n_samples,
-        seed_data,
-        save_data,
-        load_data,
-        data_path,
+        path,
+        logger,
+        oracle,
+        split,
     ):
         self.env = env
         self.normalise_data = normalise_data
-        self.shuffle_data = shuffle_data
         self.train_fraction = train_fraction
-        self.batch_size = batch_size
+        self.dataloader = dataloader
         self.n_samples = n_samples
-        self.seed_data = seed_data
-        self.save_data = save_data
-        self.load_data = load_data
-        self.data_path = data_path
-
+        self.split = split
+        self.path = path
+        self.logger = logger
+        self.progress = self.logger.progress
+        self.oracle = oracle
+        self.logger.set_data_path(self.path.dataset)
         self.initialise_dataset()
 
     def initialise_dataset(self):
@@ -61,49 +62,106 @@ class DataHandler:
 
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
         """
-        if self.load_data:
+        if self.path.oracle_dataset:
+            # TODO: Refine logic when I have a dataset
+            path = self.logger.data_path.parent / Path(path.dataset)
             dataset = np.load(self.data_path, allow_pickle=True)
-            self.dataset = dataset.item()
-        else:
-            self.dataset = self.env.make_train_set(ntrain=self.n_samples).to_dict(
-                orient="list"
-            )
-            if self.save_data:
-                np.save(self.data_path, self.dataset)
-        self.preprocess_for_dataloader()
+            dataset = dataset.item()
 
-    def preprocess_for_dataloader(self):
+        else:
+            dataset = self.env.load_dataset()
+
+        if self.split == "random":
+            train_samples, test_samples = train_test_split(
+                dataset, train_size=self.train_fraction
+            )
+        else:
+            train_samples, train_targets, test_samples, test_targets = (
+                dataset[0],
+                dataset[1],
+                dataset[2],
+                dataset[3],
+            )
+        # UNCOMMENT ONCE DONE TESTING
+        # train_targets = self.oracle(train_samples)
+        # test_targets = self.oracle(test_samples)
+
+        self.train_dataset = {"samples": train_samples, "energies": train_targets}
+        self.test_dataset = {"samples": test_samples, "energies": test_targets}
+
+        # Save the raw (un-normalised) dataset
+        self.logger.save_dataset(self.train_dataset, self.test_dataset)
+
+        self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
+        self.train_data = Data(
+            self.train_dataset["samples"], self.train_dataset["energies"]
+        )
+
+        self.test_dataset, self.test_stats = self.preprocess(self.test_dataset)
+        self.test_data = Data(
+            self.test_dataset["samples"], self.test_dataset["energies"]
+        )
+
+        # Log the dataset statistics
+        self.logger.log_dataset_stats(self.train_stats, self.test_stats)
+        if self.progress:
+            print("Normalise:{} Dataset Statistics".format(self.normalise_data))
+            print(
+                "\t TRAIN \n  Mean: {:.2f} Std:{:.2f} Min:{:.2f} Max{:.2f}".format(
+                    self.train_stats["mean"],
+                    self.train_stats["std"],
+                    self.train_stats["min"],
+                    self.train_stats["max"],
+                )
+            )
+            print(
+                "\t TEST \n Mean:{:.2f} Std:{:.2f} Min:{:.2f} Max{:.2f}".format(
+                    self.test_stats["mean"],
+                    self.test_stats["std"],
+                    self.test_stats["min"],
+                    self.test_stats["max"],
+                )
+            )
+
+    def preprocess(self, dataset):
         """
         - converts samples to proxy space
         - normalises the energies
         - shuffles the data
         - splits the data into train and test
         """
-        self.samples = torch.FloatTensor(
-            np.array(list(map(self.env.state2proxy, self.dataset["samples"])))
+        samples = dataset["samples"]
+        targets = dataset["energies"]
+
+        samples = torch.FloatTensor(
+            np.array(
+                [
+                    self.env.state2proxy(self.env.readable2state(sample))
+                    for sample in samples
+                ]
+            )
         )
-        self.targets = torch.FloatTensor(self.dataset["energies"])
+        targets = torch.FloatTensor(targets)
 
-        if self.normalise_data:
-            self.targets = self.normalise_dataset()
-        if self.shuffle_data:
-            self.reshuffle()
+        dataset = {"samples": samples, "energies": targets}
 
-        # total number of samples is updated with each AL iteration so fraction is multiplied by number of samples at the current iteration
-        train_size = int(self.train_fraction * self.samples.shape[0])
+        stats = self.get_statistics(targets)
+        dataset["energies"] = self.normalise(dataset["energies"], stats)
 
-        self.train_data = Data(self.samples[:train_size], self.targets[:train_size])
-        self.test_data = Data(self.samples[train_size:], self.targets[train_size:])
+        return dataset, stats
 
-    def get_statistics(self):
+    def get_statistics(self, y):
         """
         called each time the dataset is updated so has the most recent metrics
         """
-        self.mean = torch.mean(self.targets)
-        self.std = torch.std(self.targets)
-        return self.mean, self.std
+        dict = {}
+        dict["mean"] = torch.mean(y)
+        dict["std"] = torch.std(y)
+        dict["max"] = torch.max(y)
+        dict["min"] = torch.min(y)
+        return dict
 
-    def normalise_dataset(self, y=None, mean=None, std=None):
+    def normalise(self, y, stats):
         """
         Args:
             y: targets to normalise (tensor)
@@ -112,11 +170,19 @@ class DataHandler:
         Returns:
             y: normalised targets (tensor)
         """
-        if y == None:
-            y = self.targets
-        if mean == None or std == None:
-            mean, std = self.get_statistics()
-        y = (y - mean) / std
+        y = (y - stats["mean"]) / stats["std"]
+        return y
+
+    def denormalise(self, y, stats):
+        """
+        Args:
+            y: targets to denormalise (tensor)
+            mean: mean of targets (tensor)
+            std: std of targets (tensor)
+        Returns:
+            y: denormalised targets (tensor)
+        """
+        y = y * stats["std"] + stats["mean"]
         return y
 
     def update_dataset(self, queries, energies):
@@ -128,18 +194,66 @@ class DataHandler:
         Updates the dataset stats
         Saves the updated dataset if save_data=True
         """
-        if self.save_data:
-            # load the saved dataset
-            dataset = np.load(self.data_path, allow_pickle=True)
-            self.dataset = dataset.item()
-            # index_col=False
-        self.dataset["samples"] += queries
-        self.dataset["energies"] += energies
-        self.preprocess_for_dataloader()
-        if self.save_data:
-            np.save(self.data_path, self.dataset)
+        # TODO: Deprecate the "if" statement
+        # if self.save_data:
+        #     # load the saved dataset
+        #     dataset = np.load(self.data_path, allow_pickle=True)
+        #     self.dataset = dataset.item()
+        #     # index_col=False
+
+        queries = torch.FloatTensor(
+            np.array(
+                [
+                    self.env.state2proxy(self.env.readable2state(sample))
+                    for sample in samples
+                ]
+            )
+        )
+        energies = torch.FloatTensor(energies)
+
+        if self.normalise_data:
+            self.train_dataset["energies"] = self.denormalise(
+                self.train_dataset["energies"], stats=self.train_stats
+            )
+
+        self.train_dataset["energies"] = torch.cat(
+            (self.train_dataset["energies"], energies), dim=0
+        )
+        self.train_dataset["samples"] = torch.cat(
+            (self.train_dataset["samples"], queries), dim=0
+        )
+
+        self.train_stats = self.get_statistics(self.train_dataset["energies"])
+        if self.normalise_data:
+            self.train_dataset["energies"] = self.normalise(
+                self.train_dataset["energies"], self.train_stats["mean"]
+            )
+        self.train_data = Data(
+            self.train_dataset["samples"], self.train_dataset["energies"]
+        )
+
+        self.logger.log_dataset_stats(self.train_stats, self.test_stats)
+        if self.progress:
+            print("Normalise:{} Dataset Statistics".format(self.normalise_data))
+            print(
+                "TRAIN Mean:{:.2f} Std:{:.2f} Min:{:.2f} Max{:.2f}".format(
+                    self.train_stats["mean"],
+                    self.train_stats["std"],
+                    self.train_stats["min"],
+                    self.train_stats["max"],
+                )
+            )
+            print(
+                "TEST Mean:{:.2f} Std:{:.2f} Min:{:.2f} Max{:.2f}".format(
+                    self.test_stats["mean"],
+                    self.test_stats["std"],
+                    self.test_stats["min"],
+                    self.test_stats["max"],
+                )
+            )
 
     def reshuffle(self):
+        # TODO: Deprecated. Remove once sure it's not used.
         """
         Reshuffle the entire dataset (called before creating train and test subsets)
         """
@@ -169,11 +283,10 @@ class DataHandler:
             x: self.env.state2proxy(input)
             y: normalised (if need be) energies
         """
-        # TODO: Add parameter to config for batch based shuffling (while creating the dataloader) if need be
         tr = DataLoader(
             self.train_data,
-            batch_size=self.batch_size,
-            shuffle=True,
+            batch_size=self.dataloader.train.batch_size,
+            shuffle=self.dataloader.train.shuffle,
             num_workers=0,
             pin_memory=False,
             collate_fn=self.collate_batch,
@@ -181,8 +294,8 @@ class DataHandler:
 
         te = DataLoader(
             self.test_data,
-            batch_size=self.batch_size,
-            shuffle=True,
+            batch_size=self.dataloader.test.batch_size,
+            shuffle=self.dataloader.test.shuffle,
             num_workers=0,
             pin_memory=False,
             collate_fn=self.collate_batch,
