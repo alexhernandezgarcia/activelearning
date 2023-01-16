@@ -62,18 +62,18 @@ class AL_Logger(Logger):
                 )
                 path = self.proxy_ckpt_path.parent / stem
                 torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                },
-                path,
+                    {
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                    },
+                    path,
                 )
 
     def log_dataset_stats(self, train_stats, test_stats):
         if not self.do.online:
             return
-        self.log_metrics(train_stats, use_context = True)
-        self.log_metrics(test_stats, use_context =True)
+        self.log_metrics(train_stats, use_context=True)
+        self.log_metrics(test_stats, use_context=True)
 
     def set_data_path(self, data_path: str = None):
         if data_path is None:

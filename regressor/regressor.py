@@ -118,7 +118,9 @@ class DropoutRegressor:
             if epoch > self.history:
                 self.check_convergence(epoch)
                 if self.converged == 1:
-                    self.logger.save_proxy(self.model, self.optimizer, final=True, epoch=epoch)
+                    self.logger.save_proxy(
+                        self.model, self.optimizer, final=True, epoch=epoch
+                    )
                     if self.progress:
                         print(
                             "Convergence reached in {} epochs with MSE {:.4f}".format(
