@@ -1,4 +1,4 @@
-_target_: src.model.regressor.DropoutRegressor
+_target_: model.regressor.DropoutRegressor
 
 # Device
 device: cuda
@@ -13,3 +13,5 @@ training:
   max_epochs : 300
   training_batch : 8
   history : 50
+  learning_rate: 1.0e-3
+  weight_decay: 0.0
