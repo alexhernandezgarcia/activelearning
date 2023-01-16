@@ -72,8 +72,9 @@ class AL_Logger(Logger):
     def log_dataset_stats(self, train_stats, test_stats):
         if not self.do.online:
             return
-        self.log_metrics(train_stats, use_context=True)
-        self.log_metrics(test_stats, use_context=True)
+        for key in train_stats.keys():
+            self.log_metric("train_" + key, train_stats[key], use_context=True)
+            self.log_metric("test_" + key, test_stats[key], use_context=True)
 
     def set_data_path(self, data_path: str = None):
         if data_path is None:

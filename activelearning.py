@@ -57,6 +57,7 @@ def main(config):
     )
 
     for iter in range(1, config.al_n_rounds + 1):
+        print(f"\n Starting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
         regressor.fit()

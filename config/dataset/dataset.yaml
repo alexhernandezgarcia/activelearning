@@ -1,6 +1,6 @@
 _target_: dataset.DataHandler
 
-normalise_data: True
+normalise_data: False
 train_fraction: 0.8
 dataloader: 
   train: 

@@ -40,6 +40,7 @@ random_action_prob: 0.0
 pct_batch_empirical: 0.0
 # Replay buffer
 replay_capacity: 0
+al: True
 policy:
   forward:
     type: mlp
