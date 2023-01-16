@@ -65,26 +65,27 @@ class DropoutRegressor:
             weight_decay=self.weight_decay,
         )
 
-    def load_model(self, dir_name=None):
+    def load_model(self):
         """
         Load and returns the model
         """
         stem = (
             self.logger.proxy_ckpt_path.stem + self.logger.context + "final" + ".ckpt"
         )
-        path = self.logger.proxy_ckpt_path.parent + stem
+        path = self.logger.proxy_ckpt_path.parent / stem
 
         self.init_model()
 
         if os.path.exists(path):
             checkpoint = torch.load(path)
-            self.model.load_state_dict(checkpoint["model_state_dict"])
+            self.model.load_state_dict(torch.load(path))
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             self.model.to(self.device)
             for state in self.optimizer.state.values():  # move optimizer to GPU
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
                         state[k] = v.to(self.device)
+            return True
         else:
             raise FileNotFoundError
 
@@ -139,7 +140,7 @@ class DropoutRegressor:
         """
         err_tr = []
         self.model.train(True)
-        for x_batch, y_batch in tqdm(tr, leave=False):
+        for x_batch, y_batch in tqdm(tr, disable=True):
             output = self.model(x_batch.to(self.device))
             loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
             if self.logger:
@@ -155,7 +156,7 @@ class DropoutRegressor:
         err_te = []
         self.model.eval()
         with torch.no_grad():
-            for x_batch, y_batch in te:
+            for x_batch, y_batch in tqdm(te, disable=True):
                 output = self.model(x_batch.to(self.device))
                 loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
                 if self.logger:
