@@ -13,9 +13,7 @@ class DropoutRegressor(Proxy):
         self.device = device
 
     def load_model(self):
-        if os.path.exists(self.model_path):
-            self.regressor.load_model(self.model_path)
-        else:
+        if not self.regressor.load_model():
             raise FileNotFoundError
 
     # TODO: Remove once PR38 is merged to gfn
