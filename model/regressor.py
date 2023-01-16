@@ -83,7 +83,6 @@ class DropoutRegressor:
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
                         state[k] = v.to(self.device)
-            return self.model
         else:
             raise FileNotFoundError
 
@@ -219,10 +218,8 @@ class DropoutRegressor:
                 )
             )
 
-    def forward_with_uncertainty(self, x):
+    def forward_with_uncertainty(self, x, num_dropout_samples=10):
         self.model.train()
         with torch.no_grad():
-            outputs = torch.cat(
-                [self.forward(x) for _ in range(self.config.num_dropout_samples)]
-            )
-        return outputs.mean(dim=0), outputs.std(dim=0)
+            outputs = torch.cat([self.forward(x) for _ in range(num_dropout_samples)])
+        return outputs

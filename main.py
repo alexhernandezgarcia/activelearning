@@ -30,7 +30,8 @@ def main(config):
         _recursive_=False,
     )
     # TODO: Create a proxy that takes the regressor.
-    # env.proxy = proxy
+    proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
+    env.proxy = proxy
     # TODO: create logger and pass it to model
     gflownet = hydra.utils.instantiate(
         config.gflownet, env=env, buffer=config.env.buffer
