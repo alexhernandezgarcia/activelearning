@@ -6,7 +6,7 @@ _target_: gflownet.envs.amp.AMP
 id: amp
 # Minimum and maximum length for the sequences
 min_seq_length: 1
-max_seq_length: 65
+max_seq_length: 50
 # Number of letters in alphabet
 n_alphabet: 20
 # Minimum and maximum number of steps in the action space
@@ -20,7 +20,8 @@ reward_beta: 8.0
 buffer:
   replay_capacity: 10
   train:
-    path: /home/mila/n/nikita.saxena/activelearning/logs/2023-01-15_17-12-02/data/data_train.csv
+    # path: /home/mila/n/nikita.saxena/gflownet/logs/train_dataset_D1.csv
+    path: data_train.csv
     n: 20
     seed: 168
     output: None
