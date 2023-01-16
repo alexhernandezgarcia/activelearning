@@ -78,7 +78,7 @@ class DropoutRegressor:
 
         if os.path.exists(path):
             checkpoint = torch.load(path)
-            self.model.load_state_dict(torch.load(path))
+            self.model.load_state_dict(checkpoint["model_state_dict"])
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             self.model.to(self.device)
             for state in self.optimizer.state.values():  # move optimizer to GPU
@@ -110,7 +110,7 @@ class DropoutRegressor:
             self.test(test_loader)
 
             # if model is the best so far
-            self.logger.save_proxy(self.model, final=False, epoch=epoch)
+            self.logger.save_proxy(self.model, self.optimizer, final=False, epoch=epoch)
 
             self.train(train_loader)
 
@@ -118,7 +118,7 @@ class DropoutRegressor:
             if epoch > self.history:
                 self.check_convergence(epoch)
                 if self.converged == 1:
-                    self.logger.save_proxy(self.model, final=True, epoch=epoch)
+                    self.logger.save_proxy(self.model, self.optimizer, final=True, epoch=epoch)
                     if self.progress:
                         print(
                             "Convergence reached in {} epochs with MSE {:.4f}".format(

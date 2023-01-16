@@ -62,10 +62,13 @@ def main(config):
         regressor.fit()
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
         gflownet.train()
-        batch, times = gflownet.sample_batch(env, config.n_samples, train=False)
-        queries = env.state2oracle(batch)
-        energies = oracle(queries).tolist()
-        data_handler.update_dataset(batch, energies)
+        if config.n_samples > 0 and config.n_samples <= 1e5:
+            samples, times = gflownet.sample_batch(env, config.n_samples, train=False)
+            energies = env.oracle(env.state2oracle(samples))
+            gflownet.evaluate(
+            samples, energies
+        )
+        data_handler.update_dataset(samples, energies)
 
 
 def set_seeds(seed):

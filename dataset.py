@@ -76,7 +76,7 @@ class DataHandler:
                 dataset, train_size=self.train_fraction
             )
         else:
-            train_samples, train_targets, test_samples, test_targets = (
+            train_samples, train_targets, test_samples, test_targets= (
                 dataset[0],
                 dataset[1],
                 dataset[2],
@@ -105,9 +105,10 @@ class DataHandler:
         # Log the dataset statistics
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            print("Normalise:{} Dataset Statistics".format(self.normalise_data))
+            prefix = "Normalised " if self.normalise else ""
+            print(prefix +"Dataset Statistics")
             print(
-                "\t TRAIN \n  Mean: {:.2f} Std:{:.2f} Min:{:.2f} Max{:.2f}".format(
+                "Train Data \n \t Mean Score:{:.2f} \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.train_stats["mean"],
                     self.train_stats["std"],
                     self.train_stats["min"],
@@ -115,7 +116,7 @@ class DataHandler:
                 )
             )
             print(
-                "\t TEST \n Mean:{:.2f} Std:{:.2f} Min:{:.2f} Max{:.2f}".format(
+                "Test Data \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.test_stats["mean"],
                     self.test_stats["std"],
                     self.test_stats["min"],
@@ -204,8 +205,8 @@ class DataHandler:
         queries = torch.FloatTensor(
             np.array(
                 [
-                    self.env.state2proxy(self.env.readable2state(sample))
-                    for sample in samples
+                    self.env.state2proxy(sample)
+                    for sample in queries
                 ]
             )
         )
@@ -226,7 +227,7 @@ class DataHandler:
         self.train_stats = self.get_statistics(self.train_dataset["energies"])
         if self.normalise_data:
             self.train_dataset["energies"] = self.normalise(
-                self.train_dataset["energies"], self.train_stats["mean"]
+                self.train_dataset["energies"], self.train_stats
             )
         self.train_data = Data(
             self.train_dataset["samples"], self.train_dataset["energies"]
@@ -234,9 +235,10 @@ class DataHandler:
 
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            print("Normalise:{} Dataset Statistics".format(self.normalise_data))
+            prefix = "Normalised " if self.normalise else ""
+            print(prefix +"Dataset Statistics")
             print(
-                "TRAIN Mean:{:.2f} Std:{:.2f} Min:{:.2f} Max{:.2f}".format(
+                "Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.train_stats["mean"],
                     self.train_stats["std"],
                     self.train_stats["min"],
@@ -244,7 +246,7 @@ class DataHandler:
                 )
             )
             print(
-                "TEST Mean:{:.2f} Std:{:.2f} Min:{:.2f} Max{:.2f}".format(
+                "Test \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.test_stats["mean"],
                     self.test_stats["std"],
                     self.test_stats["min"],
@@ -271,7 +273,7 @@ class DataHandler:
         )
         for (_sequence, _label) in batch:
             y.append(_label)
-            x.append(torch.tensor(_sequence))
+            x.append(_sequence)
         y = torch.tensor(y, dtype=torch.float)
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
         return xPadded, y

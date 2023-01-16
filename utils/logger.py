@@ -50,7 +50,7 @@ class AL_Logger(Logger):
         else:
             self.proxy_ckpt_path = self.ckpts_dir / f"{ckpt_id}"
 
-    def save_proxy(self, model, final, epoch):
+    def save_proxy(self, model, optimizer, final, epoch):
         if not epoch % self.proxy_period or final:
             if final:
                 ckpt_id = "final"
@@ -63,22 +63,17 @@ class AL_Logger(Logger):
                 path = self.proxy_ckpt_path.parent / stem
                 torch.save(
                 {
-                    "model_state_dict": self.model.state_dict(),
-                    "optimizer_state_dict": self.optimizer.state_dict(),
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
                 },
                 path,
                 )
-                
+
     def log_dataset_stats(self, train_stats, test_stats):
         if not self.do.online:
             return
-        for key, _ in train_stats.items():
-            key = "Train_" + key
-        for key, _ in test_stats.items():
-            key = "Test_" + key
-
-        self.log_metrics(train_stats, True)
-        self.log_metrics(test_stats, True)
+        self.log_metrics(train_stats, use_context = True)
+        self.log_metrics(test_stats, use_context =True)
 
     def set_data_path(self, data_path: str = None):
         if data_path is None:
