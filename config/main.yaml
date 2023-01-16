@@ -2,7 +2,7 @@ defaults:
   - _self_
   - env: amp
   - gflownet: gflownet
-  - proxy: ucb
+  - proxy: dropout_regressor
   - oracle: amp
   - dataset: dataset
   - regressor: dropout_regressor
@@ -10,9 +10,9 @@ defaults:
   - logger: wandb
   - user: nikita
 
-n_samples: 100
+n_samples: 1000
 seed: 0
-al_n_rounds: 10
+al_n_rounds: 15
 device: cuda
 
 # Hydra config

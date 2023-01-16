@@ -76,15 +76,15 @@ class DataHandler:
                 dataset, train_size=self.train_fraction
             )
         else:
-            train_samples, train_targets, test_samples, test_targets = (
+            train_samples, test_samples = (
                 dataset[0],
                 dataset[1],
-                dataset[2],
-                dataset[3],
+                # dataset[2],
+                # dataset[3],
             )
         # UNCOMMENT ONCE DONE TESTING
-        # train_targets = self.oracle(train_samples)
-        # test_targets = self.oracle(test_samples)
+        train_targets = self.oracle(train_samples)
+        test_targets = self.oracle(test_samples)
 
         self.train_dataset = {"samples": train_samples, "energies": train_targets}
         self.test_dataset = {"samples": test_samples, "energies": test_targets}
