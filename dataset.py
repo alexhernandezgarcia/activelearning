@@ -231,7 +231,7 @@ class DataHandler:
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
             prefix = "Normalised " if self.normalise_data else ""
-            print(prefix + "Dataset Statistics")
+            print(prefix + "Updated Dataset Statistics")
             print(
                 "Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.train_stats["mean"],

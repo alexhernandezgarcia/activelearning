@@ -19,8 +19,7 @@ class UCB(DropoutRegressor):
         Returns:
             score of dim (n_samples,), i.e, ndim=1"""
         self.load_model()
-        # TODO: Remove once PR38 is merged to gfn
-        inputs = self.preprocess_data(inputs)
+        inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
             inputs, self.num_dropout_samples
         )
@@ -47,7 +46,8 @@ class BotorchUCB(UCB):
 
     def __call__(self, inputs):
         # TODO: Remove once PR38 is merged to gfn
-        inputs = self.preprocess_data(inputs)
+        # inputs = self.preprocess_data(inputs)
+        inputs = torch.FloatTensor(inputs).to(self.device)
         self.load_model()
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler

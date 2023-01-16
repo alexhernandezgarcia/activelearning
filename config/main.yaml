@@ -2,7 +2,7 @@ defaults:
   - _self_
   - env: amp
   - gflownet: gflownet
-  - proxy: dropout_regressor
+  - proxy: ucb
   - oracle: amp
   - dataset: dataset
   - regressor: dropout_regressor
