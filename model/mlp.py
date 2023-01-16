@@ -30,8 +30,8 @@ class MLP(nn.Module):
         self.activation = ACTIVATION_KEY[activation]
 
         # TODO: this is grid specific for now, make it general (for apatamers and torus)
-        self.input_max_length = config_env.n_dim
-        self.input_classes = config_env.length
+        self.input_max_length = config_env.max_seq_length #config_env.n_dim
+        self.input_classes = config_env.n_alphabet #config_env.length
         self.out_dim = num_output
 
         if transformerCall == False:
@@ -71,7 +71,5 @@ class MLP(nn.Module):
         # Pads the tensor till maximum length of dataset
         input = torch.zeros(x.shape[0], self.input_max_length * self.input_classes)
         input[:, : x.shape[1]] = x
-        # TODO: Check if the following is reqd for aptamers. Reshapes the tensor to batch_size x init_layer_depth
-        # x = input.reshape(x.shape[0], -1)
         # Performs a forward call
         return self.model(x)
