@@ -47,26 +47,27 @@ def main(config):
     )
     proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
     env.proxy = proxy
-    # TODO: pass wandb logger to gflownet once it is compatible with wandb (i.e., once PR17 is merged)
-    gflownet = hydra.utils.instantiate(
-        config.gflownet,
-        env=env,
-        buffer=config.env.buffer,
-        logger=logger,
-        device=config.device,
-    )
+    
 
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\n Starting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
         regressor.fit()
+        gflownet = hydra.utils.instantiate(
+        config.gflownet,
+        env=env,
+        buffer=config.env.buffer,
+        logger=logger,
+        device=config.device,
+        )
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
         gflownet.train()
         if config.n_samples > 0 and config.n_samples <= 1e5:
             samples, times = gflownet.sample_batch(env, config.n_samples, train=False)
+            # TODO: Change state2oracle after continous branch merge
             energies = env.oracle(env.state2oracle(samples))
-            gflownet.evaluate(samples, energies)
+            gflownet.evaluate(samples, energies, data_handler.train_dataset['samples'])
         data_handler.update_dataset(samples, energies)
 
 

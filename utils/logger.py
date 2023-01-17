@@ -73,8 +73,8 @@ class AL_Logger(Logger):
         if not self.do.online:
             return
         for key in train_stats.keys():
-            self.log_metric("train_" + key, train_stats[key], use_context=True)
-            self.log_metric("test_" + key, test_stats[key], use_context=True)
+            self.log_metric("train_" + key, train_stats[key], use_context=False)
+            self.log_metric("test_" + key, test_stats[key], use_context=False)
 
     def set_data_path(self, data_path: str = None):
         if data_path is None:
@@ -82,15 +82,11 @@ class AL_Logger(Logger):
         else:
             self.data_path = self.data_dir / f"{data_path}"
 
-    def save_dataset(self, train_dataset, test_dataset):
+    def save_dataset(self, dataset, type):
         if self.data_path is not None:
-            train = pd.DataFrame(train_dataset)
-            test = pd.DataFrame(test_dataset)
-
-            train_stem = Path(self.data_path.stem + "_train.csv")
-            train_path = self.data_path.parent / train_stem
-
-            test_stem = Path(self.data_path.stem + "_test.csv")
-            test_path = self.data_path.parent / test_stem
-            train.to_csv(train_path)
-            test.to_csv(test_path)
+            data = pd.DataFrame(dataset)
+            if type=="sampled":
+                type = type + "_iter"+ self.context
+            name = Path(self.data_path.stem + "_" + type + ".csv")
+            path = self.data_path.parent / name
+            data.to_csv(path)

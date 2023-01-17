@@ -76,7 +76,7 @@ class DataHandler:
                 dataset, train_size=self.train_fraction
             )
         else:
-            train_samples, test_samples = (
+            train_samples, test_samples  = (
                 dataset[0],
                 dataset[1],
                 # dataset[2],
@@ -90,7 +90,8 @@ class DataHandler:
         self.test_dataset = {"samples": test_samples, "energies": test_targets}
 
         # Save the raw (un-normalised) dataset
-        self.logger.save_dataset(self.train_dataset, self.test_dataset)
+        self.logger.save_dataset(self.train_dataset, "train")
+        self.logger.save_dataset(self.test_dataset, "test")
 
         self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
         self.train_data = Data(
@@ -147,7 +148,8 @@ class DataHandler:
         dataset = {"samples": samples, "energies": targets}
 
         stats = self.get_statistics(targets)
-        dataset["energies"] = self.normalise(dataset["energies"], stats)
+        if self.normalise_data:
+            dataset["energies"] = self.normalise(dataset["energies"], stats)
 
         return dataset, stats
 
@@ -201,6 +203,8 @@ class DataHandler:
         #     dataset = np.load(self.data_path, allow_pickle=True)
         #     self.dataset = dataset.item()
         #     # index_col=False
+        dataset = {'samples': queries, 'energies': energies}
+        self.logger.save_dataset(dataset, "sampled")
 
         queries = torch.FloatTensor(
             np.array([self.env.state2proxy(sample) for sample in queries])

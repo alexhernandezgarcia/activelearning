@@ -5,6 +5,7 @@ _target_: utils.logger.AL_Logger
 
 do:
   online: True
+  times: False
 
 project_name: "ActiveLearningPipeline"
 tags: 
@@ -22,7 +23,7 @@ sampler:
     period: -1
   oracle:
     # Period (number of iterations) for computing oracle metrics
-    period: 100
+    period: 1000
     # List of K, for Top-K oracle metrics
     k:
       - 1
