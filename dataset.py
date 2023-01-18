@@ -62,29 +62,31 @@ class DataHandler:
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
         """
         if self.path.oracle_dataset:
-            # TODO: Refine logic when I have a dataset
-            path = self.logger.data_path.parent / Path(path.dataset)
-            dataset = np.load(self.data_path, allow_pickle=True)
-            dataset = dataset.item()
+            train = pd.read_csv(
+                self.path.oracle_dataset.train
+                )
+            test = pd.read_csv(
+                self.path.oracle_dataset.train
+            )
+            train_samples = train["samples"].values.tolist()
+            train_targets = train["energies"].values.tolist()
+            test_samples = test["samples"].values.tolist()
+            test_targets = test["energies"].values.tolist()
 
         else:
             dataset = self.env.load_dataset()
 
-        if self.split == "random":
-            train_samples, test_samples = train_test_split(
-                dataset, train_size=self.train_fraction
-            )
-        else:
-            train_samples, test_samples = (
-                dataset[0],
-                dataset[1],
-                # TODO: Comment below
-                # dataset[2],
-                # dataset[3],
-            )
-        # TODO: UNCOMMENT ONCE DONE TESTING and delete train_targets, test_targets in line 77
-        train_targets = self.oracle(train_samples)
-        test_targets = self.oracle(test_samples)
+            if self.split == "random":
+                train_samples, test_samples = train_test_split(
+                    dataset, train_size=self.train_fraction
+                )
+            else:
+                train_samples, test_samples = (
+                    dataset[0],
+                    dataset[1],
+                )
+                train_targets = self.oracle(train_samples)
+                test_targets = self.oracle(test_samples)
 
         self.train_dataset = {"samples": train_samples, "energies": train_targets}
         self.test_dataset = {"samples": test_samples, "energies": test_targets}

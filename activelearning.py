@@ -20,6 +20,9 @@ def main(config):
     random.seed(None)
     # Set other random seeds
     set_seeds(config.seed)
+    # Configure device count
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    print(torch.cuda.device_count())
     # Log config
     # TODO: Move log config to Logger
     log_config = flatten_config(OmegaConf.to_container(config, resolve=True), sep="/")
