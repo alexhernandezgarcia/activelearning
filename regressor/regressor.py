@@ -86,7 +86,7 @@ class DropoutRegressor:
         self.init_model()
 
         if os.path.exists(path):
-            checkpoint = torch.load(path, map_location='cuda:0')
+            checkpoint = torch.load(path, map_location="cuda:0")
             self.model.load_state_dict(checkpoint["model_state_dict"])
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             self.model.to(self.device)

@@ -62,12 +62,8 @@ class DataHandler:
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
         """
         if self.path.oracle_dataset:
-            train = pd.read_csv(
-                self.path.oracle_dataset.train
-                )
-            test = pd.read_csv(
-                self.path.oracle_dataset.train
-            )
+            train = pd.read_csv(self.path.oracle_dataset.train)
+            test = pd.read_csv(self.path.oracle_dataset.train)
             train_samples = train["samples"].values.tolist()
             train_targets = train["energies"].values.tolist()
             test_samples = test["samples"].values.tolist()

@@ -21,7 +21,7 @@ def main(config):
     # Set other random seeds
     set_seeds(config.seed)
     # Configure device count
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     print(torch.cuda.device_count())
     # Log config
     # TODO: Move log config to Logger
