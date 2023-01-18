@@ -8,11 +8,12 @@ ACTIVATION_KEY = {
     "leaky_relu": nn.LeakyReLU(),
 }
 
+
 class MLP(nn.Module):
     def __init__(
         self,
-        hidden_dim,
-        num_layer,
+        n_hid,
+        n_layers,
         num_output,
         dropout_prob,
         activation,
@@ -30,12 +31,12 @@ class MLP(nn.Module):
         self.activation = ACTIVATION_KEY[activation]
 
         # TODO: this is grid specific for now, make it general (for apatamers and torus)
-        self.input_max_length = config_env.max_seq_length #config_env.n_dim
-        self.input_classes = config_env.n_alphabet #config_env.length
+        self.input_max_length = config_env.max_seq_length  # config_env.n_dim
+        self.input_classes = config_env.n_alphabet  # config_env.length
         self.out_dim = num_output
 
         if transformerCall == False:
-            self.hidden_layers = [hidden_dim] * num_layer
+            self.hidden_layers = [n_hid] * n_layers
             self.dropout_prob = dropout_prob
             self.init_layer_depth = int((self.input_classes) * (self.input_max_length))
 

@@ -20,6 +20,7 @@ class Data(Dataset):
         return len(self.X_data)
 
 
+# TODO: Rename samples to states
 class DataHandler:
     """
     Intialises the train data using env-specific train function
@@ -32,7 +33,6 @@ class DataHandler:
         normalise_data,
         train_fraction,
         dataloader,
-        n_samples,
         path,
         logger,
         oracle,
@@ -42,7 +42,6 @@ class DataHandler:
         self.normalise_data = normalise_data
         self.train_fraction = train_fraction
         self.dataloader = dataloader
-        self.n_samples = n_samples
         self.split = split
         self.path = path
         self.logger = logger
@@ -76,13 +75,14 @@ class DataHandler:
                 dataset, train_size=self.train_fraction
             )
         else:
-            train_samples, test_samples  = (
+            train_samples, test_samples = (
                 dataset[0],
                 dataset[1],
+                # TODO: Comment below
                 # dataset[2],
                 # dataset[3],
             )
-        # UNCOMMENT ONCE DONE TESTING
+        # TODO: UNCOMMENT ONCE DONE TESTING and delete train_targets, test_targets in line 77
         train_targets = self.oracle(train_samples)
         test_targets = self.oracle(test_samples)
 
@@ -137,10 +137,9 @@ class DataHandler:
 
         samples = torch.FloatTensor(
             np.array(
-                [
-                    self.env.state2proxy(self.env.readable2state(sample))
-                    for sample in samples
-                ]
+                self.env.state2proxy(
+                    self.env.readable2state(sample) for sample in samples
+                )
             )
         )
         targets = torch.FloatTensor(targets)
@@ -188,7 +187,7 @@ class DataHandler:
         y = y * stats["std"] + stats["mean"]
         return y
 
-    def update_dataset(self, queries, energies):
+    def update_dataset(self, states, energies):
         """
         Args:
             queries: list of queries [[0, 0], [1, 1], ...]
@@ -203,12 +202,10 @@ class DataHandler:
         #     dataset = np.load(self.data_path, allow_pickle=True)
         #     self.dataset = dataset.item()
         #     # index_col=False
-        dataset = {'samples': queries, 'energies': energies}
+        dataset = {"samples": states, "energies": energies}
         self.logger.save_dataset(dataset, "sampled")
 
-        queries = torch.FloatTensor(
-            np.array([self.env.state2proxy(sample) for sample in queries])
-        )
+        states = torch.FloatTensor(np.array(self.env.state2proxy(states)))
         energies = torch.FloatTensor(energies)
 
         if self.normalise_data:
@@ -220,7 +217,7 @@ class DataHandler:
             (self.train_dataset["energies"], energies), dim=0
         )
         self.train_dataset["samples"] = torch.cat(
-            (self.train_dataset["samples"], queries), dim=0
+            (self.train_dataset["samples"], states), dim=0
         )
 
         self.train_stats = self.get_statistics(self.train_dataset["energies"])

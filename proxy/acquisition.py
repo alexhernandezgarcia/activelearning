@@ -6,10 +6,8 @@ from .dropout_regressor import DropoutRegressor
 
 
 class UCB(DropoutRegressor):
-    def __init__(
-        self, regressor, num_dropout_samples, model_path, device, kappa
-    ) -> None:
-        super().__init__(regressor, num_dropout_samples, model_path, device)
+    def __init__(self, regressor, num_dropout_samples, device, kappa) -> None:
+        super().__init__(regressor, num_dropout_samples, device)
         self.kappa = kappa
 
     def __call__(self, inputs):
@@ -30,10 +28,8 @@ class UCB(DropoutRegressor):
 
 
 class BotorchUCB(UCB):
-    def __init__(
-        self, regressor, num_dropout_samples, model_path, device, kappa, sampler
-    ):
-        super().__init__(regressor, num_dropout_samples, model_path, device, kappa)
+    def __init__(self, regressor, num_dropout_samples, device, kappa, sampler):
+        super().__init__(regressor, num_dropout_samples, device, kappa)
         self.sampler_config = sampler
 
     def load_model(self):
@@ -47,7 +43,7 @@ class BotorchUCB(UCB):
     def __call__(self, inputs):
         # TODO: Remove once PR38 is merged to gfn
         # inputs = self.preprocess_data(inputs)
-        inputs = torch.FloatTensor(inputs).to(self.device)
+        inputs = torch.FloatTensor(inputs).to(self.device).unsqueeze(-2)
         self.load_model()
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler

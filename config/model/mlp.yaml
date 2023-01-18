@@ -2,6 +2,6 @@ _target_: model.mlp.MLP
 
 activation: 'relu'
 num_output: 1
-hidden_dim: 64
+n_hid: 64
 dropout_prob: 0.1
-num_layer: 4
+n_layers: 4

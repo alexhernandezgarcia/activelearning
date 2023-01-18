@@ -8,6 +8,8 @@ import hydra
 from omegaconf import OmegaConf
 import yaml
 from gflownet.utils.common import flatten_config
+import numpy as np
+import torch
 
 
 @hydra.main(config_path="./config", config_name="main")
@@ -47,7 +49,6 @@ def main(config):
     )
     proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
     env.proxy = proxy
-    
 
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\n Starting iteration {iter} of active learning")
@@ -55,20 +56,31 @@ def main(config):
             logger.set_context(iter)
         regressor.fit()
         gflownet = hydra.utils.instantiate(
-        config.gflownet,
-        env=env,
-        buffer=config.env.buffer,
-        logger=logger,
-        device=config.device,
+            config.gflownet,
+            env=env,
+            buffer=config.env.buffer,
+            logger=logger,
+            device=config.device,
         )
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
         gflownet.train()
         if config.n_samples > 0 and config.n_samples <= 1e5:
-            samples, times = gflownet.sample_batch(env, config.n_samples, train=False)
+            states, times = gflownet.sample_batch(
+                env, config.n_samples * 5, train=False
+            )
             # TODO: Change state2oracle after continous branch merge
-            energies = env.oracle(env.state2oracle(samples))
-            gflownet.evaluate(samples, energies, data_handler.train_dataset['samples'])
-        data_handler.update_dataset(samples, energies)
+            scores = env.proxy(env.state2proxy(states))
+            idx_pick = np.argsort(scores)[::-1][: config.n_samples].tolist()
+            picked_states = [states[i] for i in idx_pick]
+            # picked_states = states[idx_pick]
+            picked_samples = env.state2oracle(picked_states)
+            energies = oracle(picked_samples)
+            # evaluate involves calculting distance between strings hence samples is sent
+            gflownet.evaluate(
+                picked_samples, energies, data_handler.train_dataset["samples"]
+            )
+            # dataset will eventuall store in proxy-format so states are sent to avoid the readable2state conversion
+            data_handler.update_dataset(picked_states, energies)
 
 
 def set_seeds(seed):

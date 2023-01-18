@@ -1,3 +1,2 @@
-num_dropout_samples: 20
-model_path: "./storage/model_proxy/proxy"
+num_dropout_samples: 25
 device: 'cuda'

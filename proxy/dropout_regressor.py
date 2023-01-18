@@ -5,33 +5,32 @@ import numpy as np
 
 
 class DropoutRegressor(Proxy):
-    def __init__(self, regressor, num_dropout_samples, model_path, device) -> None:
+    def __init__(self, regressor, num_dropout_samples, device) -> None:
         super().__init__()
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
-        self.model_path = model_path
         self.device = device
 
     def load_model(self):
         if not self.regressor.load_model():
             raise FileNotFoundError
 
-    # TODO: Remove once PR38 is merged to gfn
-    def state2proxy(self, state):
-        # convert from oracle-friendly form to state as before PR38, state2oralce is performed on the state and then sent here
-        state = state + 1
-        state = state.astype(int)
-        # state2proxy
-        obs = np.zeros(6, dtype=np.float32)
-        obs[(np.arange(len(state)) * 3 + state)] = 1
-        return obs
+    # # TODO: Remove once PR38 is merged to gfn
+    # def state2proxy(self, state):
+    #     # convert from oracle-friendly form to state as before PR38, state2oralce is performed on the state and then sent here
+    #     state = state + 1
+    #     state = state.astype(int)
+    #     # state2proxy
+    #     obs = np.zeros(6, dtype=np.float32)
+    #     obs[(np.arange(len(state)) * 3 + state)] = 1
+    #     return obs
 
-    def preprocess_data(self, inputs):
-        # TODO: Remove once PR38 is merged to gfn
-        """
-        Return proxy-friendly tensor on desired device"""
-        inputs = torch.FloatTensor(list(map(self.state2proxy, inputs))).to(self.device)
-        return inputs
+    # def preprocess_data(self, inputs):
+    #     # TODO: Remove once PR38 is merged to gfn
+    #     """
+    #     Return proxy-friendly tensor on desired device"""
+    #     inputs = torch.FloatTensor(inputs).to(self.device)
+    #     return inputs
 
     def __call__(self, inputs):
         """

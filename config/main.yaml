@@ -1,18 +1,19 @@
 defaults:
   - _self_
-  - env: amp
+  - env: grid
   - gflownet: gflownet
   - proxy: dropout_regressor
-  - oracle: amp
+  # TODO: change to grid once continuous is merged
+  - oracle: grid_corners
   - dataset: dataset
   - regressor: dropout_regressor
   - model: mlp
   - logger: wandb
-  - user: nikita
+  - user: alex
 
-n_samples: 1000
+n_samples: 1024
 seed: 0
-al_n_rounds: 15
+al_n_rounds: 10
 device: cuda
 
 # Hydra config
