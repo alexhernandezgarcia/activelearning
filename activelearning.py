@@ -10,10 +10,9 @@ import yaml
 from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
-# from memory_profiler import profile
+
 
 @hydra.main(config_path="./config", config_name="main")
-# @profile
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -76,14 +75,13 @@ def main(config):
             scores = env.proxy(env.state2proxy(states))
             idx_pick = np.argsort(scores)[::-1][: config.n_samples].tolist()
             picked_states = [states[i] for i in idx_pick]
-            # picked_states = states[idx_pick]
             picked_samples = env.state2oracle(picked_states)
             energies = oracle(picked_samples)
             # evaluate involves calculting distance between strings hence samples is sent
             gflownet.evaluate(
                 picked_samples, energies, data_handler.train_dataset["samples"]
             )
-            # dataset will eventuall store in proxy-format so states are sent to avoid the readable2state conversion
+            # dataset will eventually store in proxy-format so states are sent to avoid the readable2state conversion
             data_handler.update_dataset(picked_states, energies)
         del gflownet
         del proxy

@@ -6,7 +6,7 @@ import os
 from torch.optim import Adam
 import hydra
 from tqdm import tqdm
-from memory_profiler import profile
+
 
 class DropoutRegressor:
     def __init__(
@@ -97,7 +97,7 @@ class DropoutRegressor:
             return True
         else:
             raise FileNotFoundError
-    # @profile
+
     def fit(self):
         """
         Initialises the model and dataloaders.
