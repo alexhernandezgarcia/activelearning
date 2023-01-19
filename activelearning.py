@@ -10,10 +10,10 @@ import yaml
 from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
-from memory_profiler import profile
+# from memory_profiler import profile
 
 @hydra.main(config_path="./config", config_name="main")
-@profile
+# @profile
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd

@@ -32,9 +32,11 @@ class BotorchUCB(UCB):
     def __init__(self, regressor, num_dropout_samples, device, kappa, sampler):
         super().__init__(regressor, num_dropout_samples, device, kappa)
         self.sampler_config = sampler
+        if not self.regressor.load_model():
+            raise FileNotFoundError
 
     def load_model(self):
-        super().load_model()
+        # super().load_model()
         self.model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
         self.sampler = SobolQMCNormalSampler(
             sample_shape=torch.Size([self.sampler_config.num_samples]),
@@ -45,7 +47,7 @@ class BotorchUCB(UCB):
         # TODO: Remove once PR38 is merged to gfn
         # inputs = self.preprocess_data(inputs)
         inputs = torch.FloatTensor(inputs).to(self.device).unsqueeze(-2)
-        self.load_model()
+        # self.load_model()
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler
         )

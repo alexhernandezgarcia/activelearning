@@ -33,7 +33,7 @@ class DropoutRegressor(Proxy):
     #     Return proxy-friendly tensor on desired device"""
     #     inputs = torch.FloatTensor(inputs).to(self.device)
     #     return inputs
-    @profile
+    # @profile
     def __call__(self, inputs):
         """
         Args:
