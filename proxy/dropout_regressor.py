@@ -1,8 +1,6 @@
 from gflownet.proxy.base import Proxy
-import os
 import torch
-import numpy as np
-from memory_profiler import profile
+
 
 class DropoutRegressor(Proxy):
     def __init__(self, regressor, num_dropout_samples, device) -> None:
@@ -13,27 +11,6 @@ class DropoutRegressor(Proxy):
         if not self.regressor.load_model():
             raise FileNotFoundError
 
-    # def load_model(self):
-    #     if not self.regressor.load_model():
-    #         raise FileNotFoundError
-
-    # # TODO: Remove once PR38 is merged to gfn
-    # def state2proxy(self, state):
-    #     # convert from oracle-friendly form to state as before PR38, state2oralce is performed on the state and then sent here
-    #     state = state + 1
-    #     state = state.astype(int)
-    #     # state2proxy
-    #     obs = np.zeros(6, dtype=np.float32)
-    #     obs[(np.arange(len(state)) * 3 + state)] = 1
-    #     return obs
-
-    # def preprocess_data(self, inputs):
-    #     # TODO: Remove once PR38 is merged to gfn
-    #     """
-    #     Return proxy-friendly tensor on desired device"""
-    #     inputs = torch.FloatTensor(inputs).to(self.device)
-    #     return inputs
-    # @profile
     def __call__(self, inputs):
         """
         Args:
