@@ -10,9 +10,10 @@ import yaml
 from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
-
+from memory_profiler import profile
 
 @hydra.main(config_path="./config", config_name="main")
+@profile
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -20,7 +21,7 @@ def main(config):
     random.seed(None)
     # Set other random seeds
     set_seeds(config.seed)
-    # Configure device count
+    # Configure device count to avoid derserialise error
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     print(torch.cuda.device_count())
     # Log config
@@ -50,14 +51,14 @@ def main(config):
         _recursive_=False,
         logger=logger,
     )
-    proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
-    env.proxy = proxy
 
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\n Starting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
         regressor.fit()
+        proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
+        env.proxy = proxy
         gflownet = hydra.utils.instantiate(
             config.gflownet,
             env=env,
@@ -84,6 +85,8 @@ def main(config):
             )
             # dataset will eventuall store in proxy-format so states are sent to avoid the readable2state conversion
             data_handler.update_dataset(picked_states, energies)
+        del gflownet
+        del proxy
 
 
 def set_seeds(seed):

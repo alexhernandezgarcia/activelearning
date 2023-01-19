@@ -9,6 +9,8 @@ class UCB(DropoutRegressor):
     def __init__(self, regressor, num_dropout_samples, device, kappa) -> None:
         super().__init__(regressor, num_dropout_samples, device)
         self.kappa = kappa
+        if not self.regressor.load_model():
+            raise FileNotFoundError
 
     def __call__(self, inputs):
         """
@@ -16,7 +18,6 @@ class UCB(DropoutRegressor):
             inputs: batch x obs_dim
         Returns:
             score of dim (n_samples,), i.e, ndim=1"""
-        self.load_model()
         inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
             inputs, self.num_dropout_samples

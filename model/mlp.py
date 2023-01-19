@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch
+from memory_profiler import profile
 
 ACTIVATION_KEY = {
     "tanh": nn.Tanh(),
@@ -62,6 +63,7 @@ class MLP(nn.Module):
         layers.append(nn.Linear(self.hidden_layers[-1], self.out_dim))
         self.model = nn.Sequential(*layers)
 
+    # @profile
     def forward(self, x):
         """
         Args:

@@ -2,7 +2,7 @@ from gflownet.proxy.base import Proxy
 import os
 import torch
 import numpy as np
-
+from memory_profiler import profile
 
 class DropoutRegressor(Proxy):
     def __init__(self, regressor, num_dropout_samples, device) -> None:
@@ -10,10 +10,12 @@ class DropoutRegressor(Proxy):
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
         self.device = device
-
-    def load_model(self):
         if not self.regressor.load_model():
             raise FileNotFoundError
+
+    # def load_model(self):
+    #     if not self.regressor.load_model():
+    #         raise FileNotFoundError
 
     # # TODO: Remove once PR38 is merged to gfn
     # def state2proxy(self, state):
@@ -31,7 +33,7 @@ class DropoutRegressor(Proxy):
     #     Return proxy-friendly tensor on desired device"""
     #     inputs = torch.FloatTensor(inputs).to(self.device)
     #     return inputs
-
+    @profile
     def __call__(self, inputs):
         """
         Args:
@@ -45,7 +47,7 @@ class DropoutRegressor(Proxy):
                 - ndim = 1
 
         """
-        self.load_model()
+        # self.load_model()
         inputs = torch.FloatTensor(inputs).to(self.device)
         self.regressor.model.train()
         with torch.no_grad():
