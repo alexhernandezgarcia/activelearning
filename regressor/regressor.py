@@ -12,12 +12,17 @@ class DropoutRegressor:
     def __init__(
         self,
         device,
-        path_model,
-        training,
+        checkpoint,
+        eps,
+        max_epochs,
+        history,
+        lr,
+        weight_decay,
+        beta1,
+        beta2,
         dataset,
         config_model,
         config_env,
-        num_fid,
         logger=None,
     ):
         """
@@ -31,22 +36,27 @@ class DropoutRegressor:
         self.logger = logger
         self.config_model = config_model
         self.config_env = config_env
-        self.num_fid = num_fid
 
         self.device = device
-        self.path_model = path_model
 
         # Training Parameters
-        self.training_eps = training.eps
-        self.max_epochs = training.max_epochs
-        self.history = training.history
+        self.eps = eps
+        self.max_epochs = max_epochs
+        self.history = history
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.beta1 = beta1
+        self.beta2 = beta2
+
         assert self.history <= self.max_epochs
-        self.batch_size = training.training_batch
-        self.learning_rate = training.learning_rate
-        self.weight_decay = training.weight_decay
 
         # Dataset
         self.dataset = dataset
+
+        # Logger
+        self.progress = self.logger.progress
+        if checkpoint:
+            self.logger.set_proxy_path(checkpoint)
 
     def init_model(self):
         """
@@ -54,27 +64,29 @@ class DropoutRegressor:
         """
         self.model = hydra.utils.instantiate(
             self.config_model,
-            num_fid=self.num_fid,
             config_env=self.config_env,
             _recursive_=False,
         ).to(self.device)
         self.optimizer = Adam(
             self.model.parameters(),
-            lr=self.learning_rate,
+            lr=self.lr,
             weight_decay=self.weight_decay,
+            betas=(self.beta1, self.beta2),
         )
 
-    def load_model(self, dir_name=None):
+    def load_model(self):
         """
         Load and returns the model
         """
-        if dir_name == None:
-            dir_name = self.path_model
+        stem = (
+            self.logger.proxy_ckpt_path.stem + self.logger.context + "final" + ".ckpt"
+        )
+        path = self.logger.proxy_ckpt_path.parent / stem
 
         self.init_model()
 
-        if os.path.exists(dir_name):
-            checkpoint = torch.load(dir_name)
+        if os.path.exists(path):
+            checkpoint = torch.load(path, map_location="cuda:0")
             self.model.load_state_dict(checkpoint["model_state_dict"])
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
             self.model.to(self.device)
@@ -82,142 +94,118 @@ class DropoutRegressor:
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
                         state[k] = v.to(self.device)
+            return True
         else:
             raise FileNotFoundError
 
-    def save_model(self):
-        """
-        Saves model once convergence is attained.
-        """
-        torch.save(
-            {
-                "model_state_dict": self.model.state_dict(),
-                "optimizer_state_dict": self.optimizer.state_dict(),
-            },
-            self.path_model,
-        )
-
     def fit(self):
         """
-        Initlaises the model and dataloaders.
+        Initialises the model and dataloaders.
         Trains the model and saves it once convergence is attained.
         """
         # we reset the model, cf primacy bias, here we train on more and more data
         self.init_model()
 
         # for statistics we save the tr and te errors
-        [self.err_tr_hist, self.err_te_hist] = [[], []]
+        [self.err_train_hist, self.err_test_hist] = [[], []]
 
         # get training data in torch format
         train_loader, test_loader = self.dataset.get_dataloader()
 
+        pbar = tqdm(range(1, self.max_epochs + 1), disable=not self.progress)
         self.converged = 0
-        self.epochs = 0
 
-        while self.converged != 1:
-
-            if (
-                self.epochs > 0
-            ):  #  this allows us to keep the previous model if it is better than any produced on this run
-                self.train(train_loader)  # already appends to self.err_tr_hist
-            else:
-                self.err_tr_hist.append(0)
-
+        for epoch in pbar:
             self.test(test_loader)
-            if self.err_te_hist[-1] == np.min(
-                self.err_te_hist
-            ):  # if this is the best test loss we've seen
-                self.save_model()
-                print(
-                    "new best found at epoch {}, of value {:.4f}".format(
-                        self.epochs, self.err_te_hist[-1]
-                    )
-                )
+
+            # if model is the best so far
+            self.logger.save_proxy(self.model, self.optimizer, final=False, epoch=epoch)
+
+            self.train(train_loader)
 
             # after training at least "history" epochs, check convergence
-            if self.epochs >= self.history + 1:
-                self.check_convergence()
-
-            if self.epochs % 10 == 0:
-                print(
-                    "Model epoch {} test loss {:.4f}".format(
-                        self.epochs, self.err_te_hist[-1]
+            if epoch > self.history:
+                self.check_convergence(epoch)
+                if self.converged == 1:
+                    self.logger.save_proxy(
+                        self.model, self.optimizer, final=True, epoch=epoch
                     )
+                    if self.progress:
+                        print(
+                            "Convergence reached in {} epochs with MSE {:.4f}".format(
+                                epoch, self.err_test_hist[-1]
+                            )
+                        )
+                    break
+
+            if self.progress:
+                description = "Train MSE: {:.4f} | Test MSE: {:.4f}".format(
+                    self.err_train_hist[-1], self.err_test_hist[-1]
                 )
+                pbar.set_description(description)
 
-            self.epochs += 1
-
-            # TODO : implement comet logger (with logger object in activelearning.py)
-            # if self.converged == 1:
-            #     self.statistics.log_comet_proxy_training(
-            #         self.err_tr_hist, self.err_te_hist
-            #     )
-
-    def train(self, tr):
+    def train(self, train_loader):
         """
         Args:
             train-loader
         """
-        err_tr = []
+        err_train = []
         self.model.train(True)
-        for x_batch, y_batch, fid in tqdm(tr, leave=False):
+        for x_batch, y_batch, fid in tqdm(train_loader, leave=False):
             output = self.model(x_batch.to(self.device), fid.to(self.device))
             loss = F.mse_loss(output[:, 0], y_batch.to(self.device))
             if self.logger:
                 self.logger.log_metric("proxy_train_mse", loss.item())
-            err_tr.append(loss.data)
+            err_train.append(loss.data)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-        self.err_te_hist.append(torch.mean(torch.stack(err_tr)).cpu().detach().numpy())
+        self.err_train_hist.append(
+            torch.mean(torch.stack(err_train)).cpu().detach().numpy()
+        )
 
-    def test(self, te):
-        err_te = []
+    def test(self, test_loader):
+        err_test = []
         self.model.eval()
         with torch.no_grad():
-            for x_batch, y_batch, fid in tqdm(te, leave=False):
+            for x_batch, y_batch, fid in tqdm(test_loader, leave=False):
                 output = self.model(x_batch.to(self.device), fid.to(self.device))
                 loss = F.mse_loss(output[:, 0], y_batch.to(self.device))
                 if self.logger:
                     self.logger.log_metric("proxy_val_mse", loss.item())
-                err_te.append(loss.data)
-        self.err_te_hist.append(torch.mean(torch.stack(err_te)).cpu().detach().numpy())
+                err_test.append(loss.data)
+        self.err_test_hist.append(
+            torch.mean(torch.stack(err_test)).cpu().detach().numpy()
+        )
 
-    def check_convergence(self):
-        eps = self.training_eps
+    def check_convergence(self, epoch):
+        eps = self.eps
         history = self.history
         max_epochs = self.max_epochs
 
         if all(
-            np.asarray(self.err_te_hist[-history + 1 :]) > self.err_te_hist[-history]
+            np.asarray(self.err_test_hist[-history + 1 :])
+            > self.err_test_hist[-history]
         ):  # early stopping
             self.converged = 1  # not a legitimate criteria to stop convergence ...
-            print(
-                "Model converged after {} epochs - test loss increasing at {:.4f}".format(
-                    self.epochs + 1, min(self.err_te_hist)
-                )
-            )
+            print("\nTest loss increasing.")
 
         if (
-            abs(self.err_te_hist[-history] - np.average(self.err_te_hist[-history:]))
-            / self.err_te_hist[-history]
+            abs(
+                self.err_test_hist[-history] - np.average(self.err_test_hist[-history:])
+            )
+            / self.err_test_hist[-history]
             < eps
         ):
             self.converged = 1
-            print(
-                "Model converged after {} epochs - hit test loss convergence criterion at {:.4f}".format(
-                    self.epochs + 1, min(self.err_te_hist)
-                )
-            )
+            if self.progress:
+                print("\nHit test loss convergence criterion.")
 
-        if self.epochs >= max_epochs:
+        if epoch >= max_epochs:
             self.converged = 1
-            print(
-                "Model converged after {} epochs- epoch limit was hit with test loss {:.4f}".format(
-                    self.epochs + 1, min(self.err_te_hist)
-                )
-            )
+            if self.progress:
+                print("\nReached max_epochs.")
 
     def forward_with_uncertainty(self, x, num_dropout_samples=10):
         self.model.train()

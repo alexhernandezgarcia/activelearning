@@ -18,7 +18,7 @@ class ProxyBotorchUCB(Model):
         self.regressor.model.train()
         dim = X.ndim
         if dim == 3:
-            X = X.squeeze(0)
+            X = X.squeeze(-2)
 
         with torch.no_grad():
             outputs = self.regressor.forward_with_uncertainty(

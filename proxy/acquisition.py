@@ -6,11 +6,11 @@ from .dropout_regressor import DropoutRegressor
 
 
 class UCB(DropoutRegressor):
-    def __init__(
-        self, regressor, num_dropout_samples, model_path, device, kappa
-    ) -> None:
-        super().__init__(regressor, num_dropout_samples, model_path, device)
+    def __init__(self, regressor, num_dropout_samples, device, kappa) -> None:
+        super().__init__(regressor, num_dropout_samples, device)
         self.kappa = kappa
+        if not self.regressor.load_model():
+            raise FileNotFoundError
 
     def __call__(self, inputs):
         """
@@ -18,9 +18,7 @@ class UCB(DropoutRegressor):
             inputs: batch x obs_dim
         Returns:
             score of dim (n_samples,), i.e, ndim=1"""
-        self.load_model()
-        # TODO: Remove once PR38 is merged to gfn
-        inputs = self.preprocess_data(inputs)
+        inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
             inputs, self.num_dropout_samples
         )
@@ -31,14 +29,11 @@ class UCB(DropoutRegressor):
 
 
 class BotorchUCB(UCB):
-    def __init__(
-        self, regressor, num_dropout_samples, model_path, device, kappa, sampler
-    ):
-        super().__init__(regressor, num_dropout_samples, model_path, device, kappa)
+    def __init__(self, regressor, num_dropout_samples, device, kappa, sampler):
+        super().__init__(regressor, num_dropout_samples, device, kappa)
         self.sampler_config = sampler
-
-    def load_model(self):
-        super().load_model()
+        if not self.regressor.load_model():
+            raise FileNotFoundError
         self.model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
         self.sampler = SobolQMCNormalSampler(
             sample_shape=torch.Size([self.sampler_config.num_samples]),
@@ -46,9 +41,7 @@ class BotorchUCB(UCB):
         )
 
     def __call__(self, inputs):
-        # TODO: Remove once PR38 is merged to gfn
-        inputs = self.preprocess_data(inputs)
-        self.load_model()
+        inputs = torch.FloatTensor(inputs).to(self.device).unsqueeze(-2)
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler
         )
