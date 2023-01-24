@@ -10,6 +10,7 @@ import yaml
 from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
+from gflownet.envs import MultiFidelityEnv
 
 
 @hydra.main(config_path="./config", config_name="main")
@@ -41,6 +42,8 @@ def main(config):
         oracles.append(oracle)
     # TODO: Check if initialising env.proxy later breaks anything -- i.e., to check that nothin in the init() depends on the proxy
     env = hydra.utils.instantiate(config.env, oracle=oracle)
+    if N_FID>1:
+        env = MultiFidelityEnv(env, oracles)
     # Note to Self: DataHandler needs env to make the train data. But DataHandler is required by regressor that's required by proxy that's required by env so we have to initalise env.proxy later on
     data_handler = hydra.utils.instantiate(
         config.dataset, env=env, logger=logger, oracle=oracle
