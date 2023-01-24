@@ -1,12 +1,28 @@
 defaults:
+  - _self_
   - env: grid
   - gflownet: gflownet
   - proxy: dropout_regressor
+  # TODO: change to grid once continuous is merged
   - oracle@_oracle_dict.1: grid_corners
   - oracle@_oracle_dict.2: grid_corners
   - dataset: dataset
-  - model: dropout_regressor
-  - network: mlp
+  - regressor: dropout_regressor
+  - model: mlp
+  - logger: wandb
+  - user: alex
 
-n_samples: 100
+n_samples: 1024
+seed: 0
 al_n_rounds: 10
+device: cuda
+
+# Hydra config
+hydra:
+  # See: https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+    chdir: True

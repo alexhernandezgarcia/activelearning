@@ -1,0 +1,16 @@
+_target_: regressor.regressor.DropoutRegressor
+
+# Device
+device: cuda
+
+# Path
+checkpoint: proxy
+
+# Training
+eps : 1.0e-4
+max_epochs : 300
+history : 10
+lr: 1.0e-4
+weight_decay: 0.0
+beta1: 0.9
+beta2: 0.999

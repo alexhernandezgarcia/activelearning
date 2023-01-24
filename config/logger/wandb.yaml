@@ -1,0 +1,33 @@
+defaults:
+  - base
+
+_target_: utils.logger.AL_Logger
+
+do:
+  online: True
+  times: False
+
+project_name: "ActiveLearningPipeline"
+tags: 
+    - dummy1
+    - dummy2
+sampler:
+  policy:
+    # Period (number of iterations) of saving models
+    period: 10000
+  train:
+    # Period (number of iterations) of computing train metrics
+    period: 1
+  test:
+    # Period (number of iterations) of computing logq and kl-div
+    period: -1
+  oracle:
+    # Period (number of iterations) for computing oracle metrics
+    period: 1000
+    # List of K, for Top-K oracle metrics
+    k:
+      - 1
+      - 10
+      - 100
+proxy:
+  period: 5
