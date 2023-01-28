@@ -157,9 +157,9 @@ class DropoutRegressor:
             if self.logger:
                 self.logger.log_metric("proxy_train_mse", loss.item())
             err_train.append(loss.data)
-            self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            self.optimizer.zero_grad()
 
         self.err_train_hist.append(
             torch.mean(torch.stack(err_train)).cpu().detach().numpy()
