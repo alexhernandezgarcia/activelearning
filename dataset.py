@@ -136,14 +136,8 @@ class DataHandler:
         """
         samples = dataset["samples"]
         targets = dataset["energies"]
-
-        samples = torch.FloatTensor(
-            np.array(
-                self.env.state2proxy(
-                    self.env.readable2state(sample) for sample in samples
-                )
-            )
-        )
+        state_batch = [self.env.readable2state(sample) for sample in samples]
+        samples = torch.FloatTensor(self.env.statebatch2proxy(state_batch))
         targets = torch.FloatTensor(targets)
         fidelity = torch.FloatTensor(fidelity)
 
@@ -208,7 +202,7 @@ class DataHandler:
         dataset = {"samples": states, "energies": energies}
         self.logger.save_dataset(dataset, "sampled")
 
-        states = torch.FloatTensor(np.array(self.env.state2proxy(states)))
+        states = torch.FloatTensor(np.array(self.env.statebatch2proxy(states)))
         energies = torch.FloatTensor(energies)
 
         if self.normalise_data:
@@ -287,7 +281,7 @@ class DataHandler:
         """
         Build and return the dataloader for the networks
         The dataloader should return x and y such that:
-            x: self.env.state2proxy(input)
+            x: self.env.statebatch2proxy(input)
             y: normalised (if need be) energies
         """
         train_loader = DataLoader(

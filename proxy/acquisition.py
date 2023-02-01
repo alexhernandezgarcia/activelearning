@@ -3,11 +3,11 @@ from .botorch_models import ProxyBotorchUCB
 from botorch.acquisition.monte_carlo import qUpperConfidenceBound
 from botorch.sampling import SobolQMCNormalSampler
 from .dropout_regressor import DropoutRegressor
-
+import numpy as np
 
 class UCB(DropoutRegressor):
-    def __init__(self, regressor, num_dropout_samples, device, kappa) -> None:
-        super().__init__(regressor, num_dropout_samples, device)
+    def __init__(self, kappa, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.kappa = kappa
         if not self.regressor.load_model():
             raise FileNotFoundError
@@ -18,7 +18,8 @@ class UCB(DropoutRegressor):
             inputs: batch x obs_dim
         Returns:
             score of dim (n_samples,), i.e, ndim=1"""
-        inputs = torch.FloatTensor(inputs).to(self.device)
+        if isinstance(inputs, np.ndarray):
+            inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
             inputs, fids, self.num_dropout_samples
         )
@@ -29,8 +30,8 @@ class UCB(DropoutRegressor):
 
 
 class BotorchUCB(UCB):
-    def __init__(self, regressor, num_dropout_samples, device, kappa, sampler):
-        super().__init__(regressor, num_dropout_samples, device, kappa)
+    def __init__(self, sampler, **kwargs):
+        super().__init__(**kwargs)
         self.sampler_config = sampler
         if not self.regressor.load_model():
             raise FileNotFoundError
@@ -41,7 +42,9 @@ class BotorchUCB(UCB):
         )
 
     def __call__(self, inputs):
-        inputs = torch.FloatTensor(inputs).to(self.device).unsqueeze(-2)
+        if isinstance(inputs, np.ndarray):
+            inputs = torch.FloatTensor(inputs).to(self.device)
+        inputs = inputs.unsqueeze(-2)
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler
         )

@@ -1,13 +1,12 @@
 from gflownet.proxy.base import Proxy
 import torch
-
+import numpy as np
 
 class DropoutRegressor(Proxy):
-    def __init__(self, regressor, num_dropout_samples, device) -> None:
-        super().__init__()
+    def __init__(self, regressor, num_dropout_samples, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
-        self.device = device
         if not self.regressor.load_model():
             raise FileNotFoundError
 
@@ -24,8 +23,11 @@ class DropoutRegressor(Proxy):
                 - ndim = 1
 
         """
-        inputs = torch.FloatTensor(inputs).to(self.device)
+        # TODO: Resolve: when called to get rewards, input is tensor
+        # But when called to get scores after GFN training, input is numpy array
+        if isinstance(inputs, np.ndarray):
+            inputs = torch.FloatTensor(inputs).to(self.device)
         self.regressor.model.train()
         with torch.no_grad():
-            output = self.regressor.model(inputs).detach().cpu().numpy().squeeze(-1)
+            output = self.regressor.model(inputs).squeeze(-1)
         return output

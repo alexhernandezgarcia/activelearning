@@ -12,10 +12,16 @@ defaults:
   - logger: wandb
   - user: alex
 
+# Number of objects to sample at the end of training
 n_samples: 1024
+# Random seeds
 seed: 0
+# Number of active learning iterations
 al_n_rounds: 10
+# Device
 device: cuda
+# Float precision
+float_precision: 32
 
 # Hydra config
 hydra:

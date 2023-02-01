@@ -1,2 +1,1 @@
 num_dropout_samples: 25
-device: 'cuda'
