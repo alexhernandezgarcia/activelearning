@@ -3,7 +3,12 @@ _target_: logger.Logger
 do:
   online: False
   times: False
-
+ckpts:
+  policy:
+   # Period (number of iterations) of saving models
+    period: 10000
+  regressor:
+    period: 10
 # Train metrics
 train:
   period: 1
