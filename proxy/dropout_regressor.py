@@ -3,11 +3,10 @@ import torch
 
 
 class DropoutRegressor(Proxy):
-    def __init__(self, regressor, num_dropout_samples, device) -> None:
-        super().__init__()
+    def __init__(self, regressor, num_dropout_samples, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
-        self.device = device
         if not self.regressor.load_model():
             raise FileNotFoundError
 
