@@ -6,8 +6,6 @@ import os
 from torch.optim import Adam
 import hydra
 from tqdm import tqdm
-import torch.profiler
-
 
 class DropoutRegressor:
     def __init__(
@@ -85,10 +83,6 @@ class DropoutRegressor:
         path = self.logger.proxy_ckpt_path.parent / name
 
         self.init_model()
-        # for name, param in self.model.named_parameters():
-        #     if (name == 'model.0.weight'):
-        #         print (name, param.data, param.requires_grad)
-        #         break
         if os.path.exists(path):
             checkpoint = torch.load(path, map_location="cuda:0")
             self.model.load_state_dict(checkpoint["model_state_dict"])
@@ -98,10 +92,6 @@ class DropoutRegressor:
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
                         state[k] = v.to(self.device)
-            # for name, param in self.model.named_parameters():
-            #     if (name == 'model.0.weight'):
-            #         print (name, param.data, param.requires_grad)
-            #         break
             return True
         else:
             raise FileNotFoundError
@@ -135,10 +125,6 @@ class DropoutRegressor:
             if epoch > self.history:
                 self.check_convergence(epoch)
                 if self.converged == 1:
-                    # for name, param in self.model.named_parameters():
-                    #     if (name == 'model.0.weight'):
-                    #         print (name, param.data, param.requires_grad)
-                    #         break
                     self.logger.save_proxy(
                         self.model, self.optimizer, final=True, epoch=epoch
                     )
@@ -163,12 +149,6 @@ class DropoutRegressor:
         """
         err_train = []
         self.model.train(True)
-        # profiler_path = self.logger.logdir / "profiler"
-        # with torch.profiler.profile(schedule=torch.profiler.schedule(wait=10, warmup=5, active=5, repeat=2),
-        #                             on_trace_ready=torch.profiler.tensorboard_trace_handler(profiler_path),
-        #                             record_shapes=True,
-        #                             profile_memory=True,
-        #                             with_stack=True) as prof:
         for x_batch, y_batch in tqdm(train_loader, disable=True):
             output = self.model(x_batch.to(self.device))
             loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
@@ -178,7 +158,6 @@ class DropoutRegressor:
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
-                # prof.step()
 
         self.err_train_hist.append(
             torch.mean(torch.stack(err_train)).cpu().detach().numpy()
