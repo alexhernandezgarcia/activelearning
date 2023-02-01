@@ -88,16 +88,14 @@ def main(config):
                 env, config.n_samples * 5, train=False
             )
             scores = env.proxy(env.statetorch2proxy(states))
-            idx_pick = np.argsort(scores)[::-1][: config.n_samples].tolist()
+            idx_pick = torch.argsort(scores, descending= True)[: config.n_samples].tolist()
             picked_states = [states[i] for i in idx_pick]
-            picked_samples = env.state2oracle(picked_states)
+            picked_samples = env.statebatch2oracle(picked_states)
             energies = oracle(picked_samples)
-            # evaluate involves calculting distance between strings hence samples is sent
             gflownet.evaluate(
                 picked_samples, energies, data_handler.train_dataset["samples"]
             )
-            # dataset will eventually store in proxy-format so states are sent to avoid the readable2state conversion
-            data_handler.update_dataset(picked_states, energies)
+            data_handler.update_dataset(picked_states, energies.detach().cpu().numpy())
         del gflownet
         del proxy
 
