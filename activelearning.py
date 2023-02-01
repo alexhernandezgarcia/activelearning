@@ -97,7 +97,6 @@ def main(config):
             picked_states = [states[i] for i in idx_pick]
             picked_samples = env.statebatch2oracle(picked_states)
             energies = oracle(picked_samples)
-            # evaluate involves calculting distance between strings hence samples is sent
             gflownet.evaluate(
                 picked_samples, energies, data_handler.train_dataset["samples"]
             )
@@ -105,7 +104,7 @@ def main(config):
             # batch, fid, times = gflownet.sample_batch(env, config.n_samples, train=False)
             # queries = [env.state2oracle[f](b) for f, b in zip(fid, batch)]
             # energies = [oracles[f](q) for f, q in zip(fid, queries)]
-            data_handler.update_dataset(picked_states, energies)
+            data_handler.update_dataset(picked_states, energies.detach().cpu().numpy())
         del gflownet
         del proxy
 
