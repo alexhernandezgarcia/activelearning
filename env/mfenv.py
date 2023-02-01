@@ -14,7 +14,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Does not require the different oracles as scoring is performed by GFN not env
     """
 
-    def __init__(self, env, n_fid):
+    def __init__(self, env, n_fid, oracle):
         self.env = env
         self.n_fid = n_fid
         self.fid = self.env.eos + 1
@@ -99,7 +99,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def readable2state(self, readable):
         fid = readable.split(";")[-1]
         state = super().readable2state(readable)
-        state = state + [fid]
+        # TODO: fid integer or float?
+        state = state + [int(fid)]
         return state
 
     def get_parents(self, state=None, done=None, action=None):
