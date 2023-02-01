@@ -24,7 +24,6 @@ class DropoutRegressor(Proxy):
                 - ndim = 1
 
         """
-        # self.load_model()
         inputs = torch.FloatTensor(inputs).to(self.device)
         self.regressor.model.train()
         with torch.no_grad():
