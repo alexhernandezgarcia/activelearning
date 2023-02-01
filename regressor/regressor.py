@@ -78,13 +78,12 @@ class DropoutRegressor:
         """
         Load and returns the model
         """
-        stem = (
+        name = (
             self.logger.proxy_ckpt_path.stem + self.logger.context + "final" + ".ckpt"
         )
-        path = self.logger.proxy_ckpt_path.parent / stem
+        path = self.logger.proxy_ckpt_path.parent / name
 
         self.init_model()
-
         if os.path.exists(path):
             checkpoint = torch.load(path, map_location="cuda:0")
             self.model.load_state_dict(checkpoint["model_state_dict"])

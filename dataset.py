@@ -64,7 +64,7 @@ class DataHandler:
         """
         if self.path.oracle_dataset:
             train = pd.read_csv(self.path.oracle_dataset.train)
-            test = pd.read_csv(self.path.oracle_dataset.train)
+            test = pd.read_csv(self.path.oracle_dataset.test)
             train_samples = train["samples"].values.tolist()
             train_targets = train["energies"].values.tolist()
             test_samples = test["samples"].values.tolist()
@@ -73,17 +73,20 @@ class DataHandler:
         else:
             dataset = self.env.load_dataset()
 
-            if self.split == "random":
-                train_samples, test_samples = train_test_split(
-                    dataset, train_size=self.train_fraction
-                )
-            else:
-                train_samples, test_samples = (
-                    dataset[0],
-                    dataset[1],
-                )
-                train_targets = self.oracle(train_samples)
-                test_targets = self.oracle(test_samples)
+        if self.split == "random":
+            # randomly select 10 element from the list train_samples and test_samples
+            samples = train_samples + test_samples
+            targets = train_targets + test_targets
+            train_samples, test_samples, train_targets, test_targets = train_test_split(
+                samples, targets, train_size=self.train_fraction
+            )
+            # else:
+            # train_samples, test_samples = (
+            #     dataset[0],
+            #     dataset[1],
+            # )
+            # train_targets = self.oracle(train_samples)
+            # test_targets = self.oracle(test_samples)
 
         self.train_dataset = {"samples": train_samples, "energies": train_targets}
         self.test_dataset = {"samples": test_samples, "energies": test_targets}
