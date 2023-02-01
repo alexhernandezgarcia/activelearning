@@ -1,8 +1,5 @@
 _target_: regressor.regressor.DropoutRegressor
 
-# Device
-device: cuda
-
 # Path
 checkpoint: proxy
 
