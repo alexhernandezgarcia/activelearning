@@ -77,15 +77,15 @@ class DataHandler:
             samples = train_samples + test_samples
             targets = train_targets + test_targets
             train_samples, test_samples, train_targets, test_targets = train_test_split(
-                    samples, targets, train_size=self.train_fraction
-                )
+                samples, targets, train_size=self.train_fraction
+            )
             # else:
-                # train_samples, test_samples = (
-                #     dataset[0],
-                #     dataset[1],
-                # )
-                # train_targets = self.oracle(train_samples)
-                # test_targets = self.oracle(test_samples)
+            # train_samples, test_samples = (
+            #     dataset[0],
+            #     dataset[1],
+            # )
+            # train_targets = self.oracle(train_samples)
+            # test_targets = self.oracle(test_samples)
 
         self.train_dataset = {"samples": train_samples, "energies": train_targets}
         self.test_dataset = {"samples": test_samples, "energies": test_targets}
