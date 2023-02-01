@@ -3,11 +3,31 @@ _target_: logger.Logger
 do:
   online: False
   times: False
+
+# Train metrics
+train:
+  period: 1
+# Test metrics
+test:
+  first_it: True
+  period: 100
+  n: 100
+  kde:
+    bandwidth: 0.1
+    kernel: gaussian
+# Oracle metrics
+oracle:
+  period: 100000
+  k:
+    - 1
+    - 10
+    - 100
+# Log dir
 logdir:
   root: ./logs
   ckpts: ckpts
   data: data
   overwrite: True
-debug: False 
 lightweight: False 
-progress: True 
+progress: True
+debug: False 

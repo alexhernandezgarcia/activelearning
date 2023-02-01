@@ -23,8 +23,8 @@ class DropoutRegressor(Proxy):
                 - ndim = 1
 
         """
-        inputs = torch.FloatTensor(inputs).to(self.device)
         self.regressor.model.train()
         with torch.no_grad():
-            output = self.regressor.model(inputs).detach().cpu().numpy().squeeze(-1)
+            # detach().cpu().numpy()
+            output = self.regressor.model(inputs).squeeze(-1)
         return output
