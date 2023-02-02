@@ -10,10 +10,11 @@ import yaml
 from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
-from gflownet.envs import MultiFidelityEnv
+from env.mfenv import MultiFidelityEnvWrapper
+from utils.multifidelity_toy import ToyOracle, make_dataset
 
 
-@hydra.main(config_path="./config", config_name="main")
+@hydra.main(config_path="./config", config_name="mf_debug_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -21,9 +22,9 @@ def main(config):
     random.seed(None)
     # Set other random seeds
     set_seeds(config.seed)
-    # Configure device count to avoid derserialise error
+    # Configure device count to avoid deserialise error
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    print(torch.cuda.device_count())
+    # print(torch.cuda.device_count())
     # Log config
     # TODO: Move log config to Logger
     log_config = flatten_config(OmegaConf.to_container(config, resolve=True), sep="/")
@@ -32,51 +33,95 @@ def main(config):
         yaml.dump(log_config, f, default_flow_style=False)
 
     # Logger
-    # TODO: rmeove debug once we figure out where it goes
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
-    ## Instantiate objects
-    N_FID = len(config._oracle_dict)
+
+    if config.multifidelity.toy:
+        N_FID = config.multifidelity.n_fid
+    else:
+        N_FID = len(config._oracle_dict)
+
     oracles = []
-    for _ in range(1, N_FID+1):
+    if config.multifidelity.toy:
         oracle = hydra.utils.instantiate(
-        config.oracle,
-        device=config.device,
-        float_precision=config.float_precision,
+            config.oracle, device=config.device, float_precision=config.float_precision
         )
-        oracles.append(oracle)
+        for fid in range(1, N_FID + 1):
+            toy = ToyOracle(
+                oracle,
+                config._noise_dict[str(fid)],
+                config.device,
+                config.float_precision,
+            )
+            oracles.append(toy)
+    else:
+        for fid in range(1, N_FID + 1):
+            oracle = hydra.utils.instantiate(
+                config._oracle_dict[str(fid)],
+                device=config.device,
+                float_precision=config.float_precision,
+            )
+            oracles.append(oracle)
+
     env = hydra.utils.instantiate(
         config.env,
         oracle=oracle,
         device=config.device,
         float_precision=config.float_precision,
     )
-    if N_FID>1:
-        env = MultiFidelityEnv(env, oracles)
-    
-    data_handler = hydra.utils.instantiate(
-        config.dataset, env=env, logger=logger, oracle=oracle
-    )
-    regressor = hydra.utils.instantiate(
-        config.regressor,
-        config_env=config.env,
-        config_model=config.model,
-        dataset=data_handler,
-        device=config.device,
-        _recursive_=False,
-        logger=logger,
-    )
+
+    if N_FID > 1:
+        env = MultiFidelityEnvWrapper(
+            env, n_fid=N_FID, oracle=oracles, is_oracle_proxy=config.multifidelity.toy
+        )
+
+    if config.multifidelity.toy == False:
+        data_handler = hydra.utils.instantiate(
+            config.dataset, env=env, logger=logger, oracle=oracle
+        )
+        regressor = hydra.utils.instantiate(
+            config.regressor,
+            config_env=config.env,
+            config_model=config.model,
+            dataset=data_handler,
+            device=config.device,
+            _recursive_=False,
+            logger=logger,
+        )
+    # check if path exists
+    elif config.multifidelity.toy and not os.path.exists(
+        config.multifidelity.candidate_set_path
+    ):
+        make_dataset(
+            env,
+            oracles,
+            N_FID,
+            device=config.device,
+            path=config.multifidelity.candidate_set_path,
+        )
 
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\n Starting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
-        regressor.fit()
-        proxy = hydra.utils.instantiate(
-            config.proxy,
-            regressor=regressor,
-            device=config.device,
-            float_precision=config.float_precision,
-        )
+        if config.multifidelity.toy == False:
+            regressor.fit()
+            proxy = hydra.utils.instantiate(
+                config.proxy,
+                regressor=regressor,
+                device=config.device,
+                float_precision=config.float_precision,
+            )
+        else:
+            # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state
+            proxy = hydra.utils.instantiate(
+                config.proxy,
+                device=config.device,
+                float_precision=config.float_precision,
+                n_fid=N_FID,
+                logger=logger,
+                oracle=oracles,
+                env=env,
+            )
         env.proxy = proxy
         gflownet = hydra.utils.instantiate(
             config.gflownet,
@@ -87,15 +132,18 @@ def main(config):
             float_precision=config.float_precision,
         )
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
-        gflownet.train()  
+        gflownet.train()
         if config.n_samples > 0 and config.n_samples <= 1e5:
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
             scores = env.proxy(env.statetorch2proxy(states))
-            idx_pick = torch.argsort(scores, descending = True)[: config.n_samples].tolist()
+            idx_pick = torch.argsort(scores, descending=True)[
+                : config.n_samples
+            ].tolist()
             picked_states = [states[i] for i in idx_pick]
             picked_samples = env.statebatch2oracle(picked_states)
+
             energies = oracle(picked_samples)
             gflownet.evaluate(
                 picked_samples, energies, data_handler.train_dataset["samples"]

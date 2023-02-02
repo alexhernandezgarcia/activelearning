@@ -5,6 +5,7 @@ from botorch.sampling import SobolQMCNormalSampler
 from .dropout_regressor import DropoutRegressor
 import numpy as np
 
+
 class UCB(DropoutRegressor):
     def __init__(self, kappa, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -13,6 +14,7 @@ class UCB(DropoutRegressor):
             raise FileNotFoundError
 
     def __call__(self, inputs, fids):
+        # TODO: modify this. input arg would never be fids
         """
         Args
             inputs: batch x obs_dim

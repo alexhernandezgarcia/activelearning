@@ -1,0 +1,3 @@
+_target_: proxy.mf_acquisition.MultiFidelityMESOracle
+data_path: /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
+is_model_oracle: False
