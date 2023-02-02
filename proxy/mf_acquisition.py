@@ -60,20 +60,16 @@ class MultiFidelityMESOracle(Proxy):
 
     def project_oracle_max_fidelity(self, states):
         input_dim = states.ndim
-        if input_dim == 3:
-            states = states[:, :, :-1]
-        elif input_dim == 2:
-            states = states[:, :-1]
-        max_fid = (
-            torch.ones((states.shape[0], 1), device=self.device).long() * self.n_fid
+        max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
+            self.n_fid - 1
         )
         if input_dim == 3:
+            states = states[:, :, :-1]
             max_fid = max_fid.unsqueeze(1)
-        if input_dim == 2:
-            states = torch.cat([states, max_fid], dim=1)
-            states = states.unsqueeze(1)
-        elif input_dim == 3:
             states = torch.cat([states, max_fid], dim=2)
+        elif input_dim == 2:
+            states = states[:, :-1]
+            states = torch.cat([states, max_fid], dim=1)
         return states
 
     def __call__(self, states):

@@ -137,22 +137,25 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
-            scores = env.proxy(env.statetorch2proxy(states))
+            scores = env.proxy(env.statebatch2proxy(states))
             idx_pick = torch.argsort(scores, descending=True)[
                 : config.n_samples
             ].tolist()
             picked_states = [states[i] for i in idx_pick]
             picked_samples = env.statebatch2oracle(picked_states)
 
-            energies = oracle(picked_samples)
-            gflownet.evaluate(
-                picked_samples, energies, data_handler.train_dataset["samples"]
-            )
-            # dataset will eventually store in proxy-format so states are sent to avoid the readable2state conversion
-            # batch, fid, times = gflownet.sample_batch(env, config.n_samples, train=False)
-            # queries = [env.state2oracle[f](b) for f, b in zip(fid, batch)]
-            # energies = [oracles[f](q) for f, q in zip(fid, queries)]
-            data_handler.update_dataset(picked_states, energies.detach().cpu().numpy())
+            energies = env.call_oracle_per_fidelity(picked_samples)
+            if config.multifidelity.toy == False:
+                gflownet.evaluate(
+                    picked_samples, energies, data_handler.train_dataset["samples"]
+                )
+                # dataset will eventually store in proxy-format so states are sent to avoid the readable2state conversion
+                # batch, fid, times = gflownet.sample_batch(env, config.n_samples, train=False)
+                # queries = [env.state2oracle[f](b) for f, b in zip(fid, batch)]
+                # energies = [oracles[f](q) for f, q in zip(fid, queries)]
+                data_handler.update_dataset(
+                    picked_states, energies.detach().cpu().numpy()
+                )
         del gflownet
         del proxy
 

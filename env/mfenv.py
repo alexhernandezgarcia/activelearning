@@ -30,7 +30,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # Assumes that all oracles required the same kind of transformed dtata
             self.statebatch2proxy = self.statebatch2oracle
             self.statetorch2proxy = self.statetorch2oracle
-            self.proxy = self.call_oracle_per_fidelity
+            # self.proxy = self.call_oracle_per_fidelity
         # self.state2oracle = self.env.state2oracle
         self.oracle = oracle
         self.reset()
