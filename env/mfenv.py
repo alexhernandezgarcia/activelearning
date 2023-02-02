@@ -14,25 +14,55 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Does not require the different oracles as scoring is performed by GFN not env
     """
 
-    def __init__(self, env, n_fid):
+    def __init__(self, env, n_fid, oracle, is_oracle_proxy=False, **kwargs):
         self.env = env
         self.n_fid = n_fid
         self.fid = self.env.eos + 1
         # Member variables of env are also member variables of MFENV
+        # function variables of mfenv are not updated with that of env
+        # TODO: can we skip this?
         vars(self).update(vars(self.env))
         self.action_space = self.get_actions_space()
         self.fixed_policy_output = self.get_fixed_policy_output()
         self.policy_input_dim = len(self.state2policy())
         self.random_policy_output = self.fixed_policy_output
-        # Assumes that all oracles required the same kind of transformed dtata
+        if is_oracle_proxy:
+            # Assumes that all oracles required the same kind of transformed dtata
+            self.statebatch2proxy = self.statebatch2oracle
+            self.statetorch2proxy = self.statetorch2oracle
+            self.proxy = self.call_oracle_per_fidelity
         # self.state2oracle = self.env.state2oracle
-        # self.oracle = self.env.oracle
+        self.oracle = oracle
         self.reset()
+
+    def copy(self):
+        env_copy = self.env.copy()
+        class_var = self.__dict__.copy()
+        class_var.pop("env", None)
+        return MultiFidelityEnvWrapper(**class_var, env=env_copy)
+
+    def call_oracle_per_fidelity(self, state: TensorType["batch", "state_dim"]):
+        fidelities = state[:, -1].long()
+        scores = torch.zeros((state.shape[0]), dtype=self.float, device=self.device)
+        state_oracle = state[:, :-1]
+        for fid in range(self.n_fid):
+            idx_fid = torch.where(fidelities == fid)[0]
+            scores[idx_fid] = self.oracle[fid](state_oracle[idx_fid])
+        return scores
 
     def get_actions_space(self):
         actions = self.env.get_actions_space()
         for fid_index in range(self.n_fid):
             actions = actions + [(self.fid, fid_index)]
+        self.action_max_length = max(len(action) for action in actions)
+        # assumes all actions in the sf-env are of the same length
+        # TODO: remove self.action_max_length if we can make the above assumption
+        self.action_pad_length = self.action_max_length - len(actions[0])
+        if self.action_pad_length > 0:
+            actions = [
+                tuple(list(action) + [0] * (self.action_max_length - len(action)))
+                for action in actions
+            ]
         return actions
 
     def reset(self, env_id=None, fid: int = -1):
@@ -92,14 +122,15 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         return state
 
     def state2readable(self, state=None):
-        readable_state = super().state2readable(state[-1])
+        readable_state = self.env.state2readable(state[:-1])
         fid = str(state[-1])
         return readable_state + ";" + fid
 
     def readable2state(self, readable):
         fid = readable.split(";")[-1]
-        state = super().readable2state(readable)
-        state = state + [fid]
+        readable_state = ";".join(readable.split(";")[:-1])
+        state = self.env.readable2state(readable_state)
+        state = state + [int(fid)]
         return state
 
     def get_parents(self, state=None, done=None, action=None):
@@ -109,13 +140,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         if done is None:
             done = self.done
         parents_no_fid, actions = self.env.get_parents(state[:-1])
+        if self.action_pad_length > 0:
+            actions = [
+                tuple(list(action) + [0] * (self.action_pad_length))
+                for action in actions
+            ]
         parents = [parent + [-1] for parent in parents_no_fid]
-        # TODO: if fidelity has been chosen,
-        # parents = parents + [parent + [fid] for parent in parents]
         if state[-1] != -1:
             fid = state[-1]
             parent = state[:-1] + [-1]
-            actions.append((self.fid, fid))
+            actions.append(tuple([self.fid, fid] + [0] * (self.action_max_length - 2)))
             parents.append(parent)
         return parents, actions
 
@@ -129,13 +163,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 raise ValueError("Fidelity has been chosen")
             self.done = self.env.done and self.fid_done
             # TODO: action or eos in else
+            # padded_action = tuple(list(action) + [0]*(self.action_pad_length-len(action)))
             return self.state, action, True
         else:
             fid = self.state[-1]
-            state, action, valid = self.env.step(action)
+            env_action = action[: -self.action_pad_length]
+            state, action, valid = self.env.step(env_action)
             self.state = state + [fid]
             self.done = self.env.done and self.fid_done
-            return self.state, action, valid
+            padded_action = tuple(list(action) + [0] * (self.action_pad_length))
+            return self.state, padded_action, valid
 
     def statetorch2policy(
         self, states: TensorType["batch", "state_dim"]
@@ -150,3 +187,22 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             fid_policy[index, states[index, -1].long()] = 1
         state_fid_policy = torch.cat((state_policy, fid_policy), dim=1)
         return state_fid_policy
+
+    def statebatch2oracle(self, states: List[List]):
+        states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
+        # TODO: state_oracle is tensor in grid but list of strings in AMP. How to make this code compatible with both?
+        state_oracle = self.env.statebatch2oracle(states)
+        fid_torch = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
+        # TODO: fix assertion -- runs into tuple error
+        # assert torch.where(fid_torch == -1)[0].shape == 0
+        state_fid = torch.concatenate((state_oracle, fid_torch), axis=1)
+        return state_fid
+
+    def statetorch2oracle(
+        self, states: TensorType["batch", "state_dim"]
+    ) -> TensorType["batch", "oracle_dim"]:
+        state_oracle = states[:, :-1]
+        state_oracle = self.env.statetorch2oracle(state_oracle)
+        fid = states[:, -1].unsqueeze(-1)
+        state_fid = torch.cat((state_oracle, fid), dim=1)
+        return state_fid
