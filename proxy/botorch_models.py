@@ -50,11 +50,12 @@ class ProxyBotorchUCB(Model):
 
 
 class MultifidelityOracleModel(Model):
-    def __init__(self, oracle, n_fid):
+    def __init__(self, oracle, n_fid, device):
         super().__init__()
         self.oracle = oracle
         self._num_outputs = 1
         self.n_fid = n_fid
+        self.device = device
 
     @property
     def num_outputs(self) -> int:
@@ -70,11 +71,8 @@ class MultifidelityOracleModel(Model):
         return torch.Size([])
 
     def posterior(self, X, observation_noise=False, posterior_transform=None):
-        # assumes mfenv.statetorch2oracle is called
         super().posterior(X, observation_noise, posterior_transform)
         fid_tensor = X[:, -1]
-        state_tensor = X[:, :-1]
-
         mean = torch.zeros(X.shape[0], 1)
         var = torch.zeros(X.shape[0], 1)
 
@@ -85,19 +83,39 @@ class MultifidelityOracleModel(Model):
             var[idx_fid] = self.oracle[fid].sigma ** 2
 
         if len(X.shape) == 2:
+            # candidate points
             mean = mean.squeeze(-1)
             var = var.squeeze(-1)
             covar = torch.diag(var)
         elif len(X.shape) == 4:
-            mean = mean.squeeze(-1).unsqueeze(1)
-            # construct covariance matrix from mean and var
-            covar = [torch.diag(var[i]) for i in range(X.shape[0])]
+            #  32 x 1 x 2 x 2
+            var_curr_fidelity = torch.zeros(X.shape[0], 1)
+            mean_curr_fidelity = torch.zeros(X.shape[0], 1)
+            fid_tensor = X[:, :, 0, -1]
+            for fid in range(self.n_fid):
+                idx_fid = torch.where(fid_tensor == fid)[0]
+                mean_curr_fidelity[idx_fid] = self.oracle[fid].mu
+                var_curr_fidelity[idx_fid] = self.oracle[fid].sigma ** 2
+            mean_max_fidelity = torch.ones((X.shape[0], 1)) * self.oracle[0].mu
+            mean = torch.stack((mean_curr_fidelity, mean_max_fidelity), dim=2)
+            var_max_fidelity = self.oracle[0].sigma ** 2
+            covar = [
+                torch.diag(torch.FloatTensor([var[i], var_max_fidelity]))
+                for i in range(X.shape[0])
+            ]
             covar = torch.stack(covar, axis=0)
             covar = covar.unsqueeze(1)
         elif len(X.shape) == 3:
+            # posterior of max samples
+            mean = torch.ones((X.shape[0], 1)) * self.oracle[0].mu
+            var = torch.ones((X.shape[0], 1)) * self.oracle[0].sigma ** 2
             covar = [torch.diag(var[i]) for i in range(X.shape[0])]
             covar = torch.stack(covar, axis=0)
+            mean = mean.unsqueeze(-1)
+            covar = covar.unsqueeze(-1)
 
+        mean = mean.to(self.device)
+        covar = covar.to(self.device)
         mvn = MultivariateNormal(mean, covar)
         posterior = GPyTorchPosterior(mvn)
         return posterior
