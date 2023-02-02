@@ -32,9 +32,9 @@ class MultiFidelityMESOracle(Proxy):
             raise NotImplementedError("MF-GIBBON project() not adapted to proxy")
 
     def get_cost_utility(self):
-        self.cost_aware_utility = None
-        # cost_model = AffineFidelityCostModel(fidelity_weights={6: 1.0}, fixed_cost=5.0)
-        # self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
+        # self.cost_aware_utility = None
+        cost_model = AffineFidelityCostModel(fidelity_weights={-1: 1.0}, fixed_cost=5.0)
+        self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
 
     def load_candidate_set(self):
         if self.is_model_oracle:
@@ -78,7 +78,10 @@ class MultiFidelityMESOracle(Proxy):
         # add extra dimension for q
         states = states.unsqueeze(-2)
         qMES = qMultiFidelityLowerBoundMaxValueEntropy(
-            self.model, candidate_set=self.candidate_set, project=self.project
+            self.model,
+            candidate_set=self.candidate_set,
+            project=self.project,
+            cost_aware_utility=self.cost_aware_utility,
         )
         mes = qMES(states)
         return mes
