@@ -6,18 +6,23 @@ import pandas as pd
 
 class ToyOracle(Proxy):
     # TODO: resolve the kwargs error here
-    def __init__(self, oracle, noise, device, float_precision):
+    def __init__(self, oracle, noise, device, float_precision, env=None):
         super().__init__(device, float_precision)
         self.oracle = oracle
         self.noise_distribution = torch.distributions.Normal(noise.mu, noise.sigma)
         self.mu = self.oracle.mu + noise.mu
         self.sigma = self.oracle.sigma + noise.sigma
+        # states = env.get_all_terminating_states()
+        # noise = self.noise_distribution.sample(states.shape).to(self.device)
+        # self.state_noise_dict = {
+        # "state": states,
+        # "noise": noise,
+        # }
 
     def __call__(self, states):
         true_values = self.oracle(states)
-        # create noise vector with given mean and sigma
-        # sample vector from normal distribution
         noise = self.noise_distribution.sample(true_values.shape).to(self.device)
+        # noise = self.state_noise_dict[states]
         noisy_values = true_values + noise
         return noisy_values
 

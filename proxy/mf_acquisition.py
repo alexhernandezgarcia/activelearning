@@ -32,9 +32,15 @@ class MultiFidelityMESOracle(Proxy):
             raise NotImplementedError("MF-GIBBON project() not adapted to proxy")
 
     def get_cost_utility(self):
-        # self.cost_aware_utility = None
-        cost_model = AffineFidelityCostModel(fidelity_weights={-1: 1.0}, fixed_cost=5.0)
-        self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
+        if self.is_model_oracle:
+            # target fidelity is 2.0
+            cost_model = AffineFidelityCostModel(
+                fidelity_weights={-1: 2.0}, fixed_cost=5.0
+            )
+            self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
+        else:
+            raise NotImplementedError
+            # cost_model = AffineFidelityCostModel(fidelity_weights={len(): 1.0}, fixed_cost=5.0)
 
     def load_candidate_set(self):
         if self.is_model_oracle:

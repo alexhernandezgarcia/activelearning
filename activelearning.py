@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import ToyOracle, make_dataset
+import operator
 
 
 @hydra.main(config_path="./config", config_name="mf_debug_test")
@@ -45,6 +46,8 @@ def main(config):
         oracle = hydra.utils.instantiate(
             config.oracle, device=config.device, float_precision=config.float_precision
         )
+        # target fidelity must be the last fidelity
+        # config._noise_dict = dict( sorted(config._noise_dict.items(), key=operator.itemgetter(1),reverse=True))
         for fid in range(1, N_FID + 1):
             toy = ToyOracle(
                 oracle,
