@@ -82,20 +82,22 @@ class MultifidelityOracleModel(Model):
             fid_tensor = X[:, -1]
             state_tensor = X[:, :-1]
             scores = self.oracle[self.n_fid - 1](state_tensor)
+            var = torch.zeros(X.shape[0])
+            for fid in range(self.n_fid):
+                idx_fid = torch.where(fid_tensor == fid)[0]
+                var[idx_fid] = self.oracle[fid].sigma ** 2
             # candidate set
-            if torch.all(torch.eq(fid_tensor, self.n_fid - 1)):
-                # posterior max samples generated from candidate set
-                var = torch.ones((X.shape[0])) * self.oracle[0].sigma ** 2
-                # check shape of scores
-                mean = scores
-            else:
-                # posterior of candidate set
-                # mean = torch.zeros(X.shape[0])
-                var = torch.zeros(X.shape[0])
-                for fid in range(self.n_fid):
-                    idx_fid = torch.where(fid_tensor == fid)[0]
-                    # mean[idx_fid] = self.oracle[fid].mu
-                    var[idx_fid] = self.oracle[fid].sigma ** 2
+            # if torch.all(torch.eq(fid_tensor, self.n_fid - 1)):
+            #     # posterior max samples generated from candidate set
+            #     var = torch.ones((X.shape[0])) * self.oracle[0].sigma ** 2
+            #     # check shape of scores
+            # else:
+            #     # posterior of candidate set
+            #     # mean = torch.zeros(X.shape[0])
+            #     var = torch.zeros(X.shape[0])
+            #     for fid in range(self.n_fid):
+            #         idx_fid = torch.where(fid_tensor == fid)[0]
+            #         var[idx_fid] = self.oracle[fid].sigma ** 2
             mean = scores
             covar = torch.diag(var)
         # batch and projected batch
@@ -111,12 +113,10 @@ class MultifidelityOracleModel(Model):
             fid_tensor = X[:, :, 0, -1]
             for fid in range(self.n_fid):
                 idx_fid = torch.where(fid_tensor == fid)[0]
-                # mean_curr_fidelity[idx_fid] = self.oracle[fid].mu
                 var_curr_fidelity[idx_fid] = self.oracle[fid].sigma ** 2
-            # mean_max_fidelity = torch.ones((X.shape[0], 1)) * self.oracle[0].mu
             # mean = torch.stack((mean_curr_fidelity, mean_max_fidelity), dim=2)
             mean = torch.stack((scores, scores), dim=2)
-            var_max_fidelity = self.oracle[0].sigma ** 2
+            var_max_fidelity = self.oracle[self.n_fid - 1].sigma ** 2
             covar = [
                 torch.diag(torch.FloatTensor([var_curr_fidelity[i], var_max_fidelity]))
                 for i in range(X.shape[0])
@@ -135,10 +135,8 @@ class MultifidelityOracleModel(Model):
             for fid in range(self.n_fid):
                 idx_fid = torch.where(fid_tensor == fid)[0]
                 # state_fid = state_tensor[idx_fid]
-                mean[idx_fid] = self.oracle[fid].mu
                 var[idx_fid] = self.oracle[fid].sigma ** 2
             # posterior of max samples
-            # mean = torch.ones((X.shape[0], 1)) * self.oracle[0].mu
             # var = torch.ones((X.shape[0], 1)) * self.oracle[0].sigma ** 2
             covar = [torch.diag(var[i]) for i in range(X.shape[0])]
             covar = torch.stack(covar, axis=0)
