@@ -4,20 +4,20 @@ from botorch.acquisition.max_value_entropy_search import (
 from gflownet.proxy.base import Proxy
 from pathlib import Path
 import pandas as pd
-from .botorch_models import MultifidelityOracleModel
+from .botorch_models import MultifidelityOracleModel, MultiFidelityProxyModel
 import torch
 import numpy as np
 from botorch.models.cost import AffineFidelityCostModel
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 
 from gpytorch.functions import inv_quad
+
 CLAMP_LB = 1.0e-8
 from botorch.models.utils import check_no_nans
 
-class myGIBBON(qMultiFidelityLowerBoundMaxValueEntropy):
 
-    def _compute_information_gain(
-        self, X, mean_M, variance_M, covar_mM):
+class myGIBBON(qMultiFidelityLowerBoundMaxValueEntropy):
+    def _compute_information_gain(self, X, mean_M, variance_M, covar_mM):
         posterior_m = self.model.posterior(
             X, observation_noise=True, posterior_transform=self.posterior_transform
         )
@@ -93,9 +93,18 @@ class myGIBBON(qMultiFidelityLowerBoundMaxValueEntropy):
         return acq + r
 
 
-class MultiFidelityMESOracle(Proxy):
+class MultiFidelityMES(Proxy):
     def __init__(
-        self, data_path, logger, env, is_model_oracle, n_fid, oracle=None, **kwargs
+        self,
+        regressor,
+        num_dropout_samples,
+        data_path,
+        logger,
+        env,
+        is_model_oracle,
+        n_fid,
+        oracle=None,
+        **kwargs
     ):
         super().__init__(**kwargs)
         self.data_path = data_path
@@ -105,14 +114,13 @@ class MultiFidelityMESOracle(Proxy):
         self.oracle = oracle
         self.env = env
         candidate_set = self.load_candidate_set()
-        self.load_model()
+        self.load_model(regressor, num_dropout_samples)
         self.get_cost_utility()
         if self.is_model_oracle:
             self.project = self.project_oracle_max_fidelity
         else:
-            # TODO: implement for proxy, replace one-hot-encoding
-            raise NotImplementedError("MF-GIBBON project() not adapted to proxy")
-        self.qMES = myGIBBON(
+            self.project = self.project_proxy_max_fidelity
+        self.qMES = qMultiFidelityLowerBoundMaxValueEntropy(
             self.model,
             candidate_set=candidate_set,
             project=self.project,
@@ -123,38 +131,42 @@ class MultiFidelityMESOracle(Proxy):
         if self.is_model_oracle:
             # target fidelity is 2.0
             cost_model = AffineFidelityCostModel(
-                fidelity_weights={2: 2.0}, fixed_cost=5.0
+                fidelity_weights={-1: 2.0}, fixed_cost=5.0
             )
             self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
         else:
+            cost_model = AffineFidelityCostModel(
+                fidelity_weights={-1: 1.0, -2: 0.0, -3: 0.0}, fixed_cost=5.0
+            )
+            self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
             # need to chnage subset of fidelity and target fidelity
             # subset is last three colums
             # target is [0 0 1] assuming fid=2 is the best fidelity
-            raise NotImplementedError
-            # cost_model = AffineFidelityCostModel(fidelity_weights={len(): 1.0}, fixed_cost=5.0)
 
     def load_candidate_set(self):
         if self.is_model_oracle:
             path = self.data_path
             data = pd.read_csv(path, index_col=0)
-        else:
-            path = self.logger.logdir.root / Path("data") / self.data_path
-            # TODO: if path is the train datsset of regressor
-        samples = data["samples"]
-        state = [self.env.readable2state(sample) for sample in samples]
-        state_oracle = self.env.statebatch2proxy(state)
-        # Tensor for grid
-        # self.candidate_set = state_oracle
-        return state_oracle
+            samples = data["samples"]
 
-    def load_model(self):
+        else:
+            path = self.logger.data_path.parent / Path("data_train.csv")
+            data = pd.read_csv(path, index_col=0)
+            samples = data["samples"]
+            # state = [self.env.readable2state(sample) for sample in samples]
+        state = [self.env.readable2state(sample) for sample in samples]
+        state_proxy = self.env.statebatch2proxy(state)
+        return torch.FloatTensor(state_proxy).to(self.device)
+
+    def load_model(self, regressor, num_dropout_samples):
         if self.is_model_oracle:
             self.model = MultifidelityOracleModel(
                 self.oracle, self.n_fid, device=self.device
             )
         else:
-            # TODO: if model is regressor
-            raise NotImplementedError
+            self.model = MultiFidelityProxyModel(
+                regressor, num_dropout_samples, self.n_fid, device=self.device
+            )
 
     def project_oracle_max_fidelity(self, states):
         input_dim = states.ndim
@@ -170,6 +182,19 @@ class MultiFidelityMESOracle(Proxy):
             states = torch.cat([states, max_fid], dim=1)
         return states
 
+    def project_proxy_max_fidelity(self, states):
+        input_dim = states.ndim
+        max_fid = torch.zeros((states.shape[0], self.n_fid), device=self.device).long()
+        max_fid[:, -1] = 1
+        if input_dim == 3:
+            states = states[:, :, : -self.n_fid]
+            max_fid = max_fid.unsqueeze(1)
+            states = torch.cat([states, max_fid], dim=2)
+        elif input_dim == 2:
+            states = states[:, : -self.n_fid]
+            states = torch.cat([states, max_fid], dim=1)
+        return states
+
     def __call__(self, states):
         if isinstance(states, np.ndarray):
             states = torch.FloatTensor(states)
@@ -181,6 +206,6 @@ class MultiFidelityMESOracle(Proxy):
         #     project=self.project,
         #     cost_aware_utility=self.cost_aware_utility,
         # )
-        
+
         mes = self.qMES(states)
         return mes

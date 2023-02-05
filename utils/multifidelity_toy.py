@@ -21,19 +21,15 @@ class ToyOracle(Proxy):
 
     def __call__(self, states):
         true_values = self.oracle(states)
-        # noise = self.noise_distribution.sample(true_values.shape).to(self.device)
-        # noisy_values = true_values + noise
-        # return noisy_values
-        return true_values
+        noise = self.noise_distribution.sample(true_values.shape).to(self.device)
+        noisy_values = true_values + noise
+        return noisy_values
+        # return true_values
 
 
 def make_dataset(env, oracles, n_fid, device, path):
     # get_states return a list right now
-    states = (
-        torch.Tensor(env.env.get_uniform_terminating_states(100, seed=20))
-        .to(device)
-        .long()
-    )
+    states = torch.Tensor(env.env.get_uniform_terminating_states(100)).to(device).long()
     fidelities = torch.randint(0, n_fid, (len(states), 1)).to(device)
     state_fid = torch.cat([states, fidelities], dim=1)
     states_fid_oracle = env.statetorch2oracle(state_fid)

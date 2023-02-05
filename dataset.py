@@ -9,13 +9,12 @@ import pandas as pd
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data, fid):
+    def __init__(self, X_data, y_data):
         self.X_data = X_data
         self.y_data = y_data
-        self.fid = fid
 
     def __getitem__(self, index):
-        return self.X_data[index], self.y_data[index], self.fid[index]
+        return self.X_data[index], self.y_data[index]
 
     def __len__(self):
         return len(self.X_data)
@@ -38,6 +37,8 @@ class DataHandler:
         logger,
         oracle,
         split,
+        dataset_size,
+        device,
     ):
         self.env = env
         self.normalise_data = normalise_data
@@ -49,6 +50,9 @@ class DataHandler:
         self.progress = self.logger.progress
         self.oracle = oracle
         self.logger.set_data_path(self.path.dataset)
+        self.dataset_size = dataset_size
+        self.device = device
+        self.n_fid = self.env.n_fid
         self.initialise_dataset()
 
     def initialise_dataset(self):
@@ -71,12 +75,29 @@ class DataHandler:
             test_targets = test["energies"].values.tolist()
 
         else:
-            dataset = self.env.load_dataset()
+            # for AMP this is the implementation
+            # dataset = self.env.load_dataset()
+            # for grid, I call uniform states. Need to make it uniform
+            states = (
+                torch.Tensor(self.env.env.get_uniform_terminating_states(100))
+                .to(self.device)
+                .long()
+            )
+            fidelities = torch.randint(0, self.n_fid, (len(states), 1)).to(self.device)
+            state_fid = torch.cat([states, fidelities], dim=1)
+            states_fid_oracle = self.env.statetorch2oracle(state_fid)
+            scores = self.env.call_oracle_per_fidelity(states_fid_oracle)
+            samples = state_fid.detach().tolist()
+            targets = scores.detach().tolist()
 
         if self.split == "random":
             # randomly select 10 element from the list train_samples and test_samples
-            samples = train_samples + test_samples
-            targets = train_targets + test_targets
+            if (
+                self.path.oracle_dataset is not None
+                and self.path.oracle_dataset.train is not None
+            ):
+                samples = train_samples + test_samples
+                targets = train_targets + test_targets
             train_samples, test_samples, train_targets, test_targets = train_test_split(
                 samples, targets, train_size=self.train_fraction
             )
@@ -88,12 +109,27 @@ class DataHandler:
             # train_targets = self.oracle(train_samples)
             # test_targets = self.oracle(test_samples)
 
-        self.train_dataset = {"samples": train_samples, "energies": train_targets}
-        self.test_dataset = {"samples": test_samples, "energies": test_targets}
+        readable_train_samples = [
+            self.env.state2readable(sample) for sample in train_samples
+        ]
+        readable_test_samples = [
+            self.env.state2readable(sample) for sample in test_samples
+        ]
+        readable_train_dataset = {
+            "samples": readable_train_samples,
+            "energies": train_targets,
+        }
+        readable_test_dataset = {
+            "samples": readable_test_samples,
+            "energies": test_targets,
+        }
 
         # Save the raw (un-normalised) dataset
-        self.logger.save_dataset(self.train_dataset, "train")
-        self.logger.save_dataset(self.test_dataset, "test")
+        self.logger.save_dataset(readable_train_dataset, "train")
+        self.logger.save_dataset(readable_test_dataset, "test")
+
+        self.train_dataset = {"samples": train_samples, "energies": train_targets}
+        self.test_dataset = {"samples": test_samples, "energies": test_targets}
 
         self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
         self.train_data = Data(
@@ -136,12 +172,16 @@ class DataHandler:
         """
         samples = dataset["samples"]
         targets = dataset["energies"]
-        state_batch = [self.env.readable2state(sample) for sample in samples]
-        samples = torch.FloatTensor(self.env.statebatch2proxy(state_batch))
+        if self.path.oracle_dataset:
+            state_batch = [self.env.readable2state(sample) for sample in samples]
+        else:
+            state_batch = samples
+        state_proxy = self.env.statebatch2proxy(state_batch)
+        samples = torch.FloatTensor(state_proxy)
+        # TODO: delete this keep everything in tensor only, Remove list conversion
         targets = torch.FloatTensor(targets)
-        fidelity = torch.FloatTensor(fidelity)
 
-        dataset = {"samples": samples, "energies": targets, "fidelities": fidelity}
+        dataset = {"samples": samples, "energies": targets}
 
         stats = self.get_statistics(targets)
         if self.normalise_data:
@@ -268,14 +308,12 @@ class DataHandler:
             [],
             [],
         )
-        for (_sequence, _label, _fid) in batch:
+        for (_sequence, _label) in batch:
             y.append(_label)
             x.append(_sequence)
-            fid.append(_fid)
         y = torch.tensor(y, dtype=torch.float)
-        fid = torch.tensor(fid, dtype=torch.long)
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
-        return xPadded, y, fid
+        return xPadded, y
 
     def get_dataloader(self):
         """

@@ -1,7 +1,7 @@
 _target_: model.multi_fidelity_mlp.MultiFidelityMLP
 
 # if True, each fidelity has a separate fully connectred module
-shared_head: False
+shared_head: True
 base_num_hidden: 512
 base_num_layer: 2
 fid_num_hidden: 512

@@ -74,12 +74,15 @@ def main(config):
 
     if N_FID > 1:
         env = MultiFidelityEnvWrapper(
-            env, n_fid=N_FID, oracle=oracles, is_oracle_proxy=config.multifidelity.toy
+            env,
+            n_fid=N_FID,
+            oracle=oracles,
+            is_oracle_proxy=config.multifidelity.is_oracle_proxy,
         )
 
-    if config.multifidelity.toy == False:
+    if config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
-            config.dataset, env=env, logger=logger, oracle=oracle
+            config.dataset, env=env, logger=logger, oracle=oracle, device=config.device
         )
         regressor = hydra.utils.instantiate(
             config.regressor,
@@ -91,7 +94,7 @@ def main(config):
             logger=logger,
         )
     # check if path exists
-    elif config.multifidelity.toy and not os.path.exists(
+    elif config.multifidelity.proxy == False and not os.path.exists(
         config.multifidelity.candidate_set_path
     ):
         make_dataset(
@@ -106,13 +109,17 @@ def main(config):
         print(f"\n Starting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
-        if config.multifidelity.toy == False:
+        if config.multifidelity.proxy == True:
             regressor.fit()
             proxy = hydra.utils.instantiate(
                 config.proxy,
                 regressor=regressor,
                 device=config.device,
                 float_precision=config.float_precision,
+                n_fid=N_FID,
+                logger=logger,
+                oracle=oracles,
+                env=env,
             )
         else:
             # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state

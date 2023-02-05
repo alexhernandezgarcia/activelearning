@@ -52,6 +52,7 @@ class DropoutRegressor:
 
         # Dataset
         self.dataset = dataset
+        self.n_fid = self.dataset.n_fid
 
         # Logger
         self.progress = self.logger.progress
@@ -64,8 +65,10 @@ class DropoutRegressor:
         """
         self.model = hydra.utils.instantiate(
             self.config_model,
+            n_fid=self.n_fid,
             config_env=self.config_env,
             _recursive_=False,
+            device=self.device,
         ).to(self.device)
         self.optimizer = Adam(
             self.model.parameters(),
@@ -150,8 +153,8 @@ class DropoutRegressor:
         """
         err_train = []
         self.model.train(True)
-        for x_batch, y_batch, fid in tqdm(train_loader, leave=False):
-            output = self.model(x_batch.to(self.device), fid.to(self.device))
+        for x_batch, y_batch in tqdm(train_loader, leave=False):
+            output = self.model(x_batch.to(self.device))
             loss = F.mse_loss(output[:, 0], y_batch.to(self.device))
             if self.logger:
                 self.logger.log_metric("proxy_train_mse", loss.item())
@@ -168,8 +171,8 @@ class DropoutRegressor:
         err_test = []
         self.model.eval()
         with torch.no_grad():
-            for x_batch, y_batch, fid in tqdm(test_loader, leave=False):
-                output = self.model(x_batch.to(self.device), fid.to(self.device))
+            for x_batch, y_batch in tqdm(test_loader, leave=False):
+                output = self.model(x_batch.to(self.device))
                 loss = F.mse_loss(output[:, 0], y_batch.to(self.device))
                 if self.logger:
                     self.logger.log_metric("proxy_val_mse", loss.item())
@@ -209,7 +212,5 @@ class DropoutRegressor:
     def forward_with_uncertainty(self, x, num_dropout_samples=10):
         self.model.train()
         with torch.no_grad():
-            outputs = torch.hstack(
-                [self.model(x.to(self.device)) for _ in range(num_dropout_samples)]
-            )
+            outputs = torch.hstack([self.model(x) for _ in range(num_dropout_samples)])
         return outputs
