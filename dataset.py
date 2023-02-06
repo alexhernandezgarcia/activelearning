@@ -239,8 +239,11 @@ class DataHandler:
         #     dataset = np.load(self.data_path, allow_pickle=True)
         #     self.dataset = dataset.item()
         #     # index_col=False
-        dataset = {"samples": states, "energies": energies}
-        self.logger.save_dataset(dataset, "sampled")
+        readable_dataset = {
+            "samples": [self.env.state2readable(state) for state in states],
+            "energies": energies,
+        }
+        self.logger.save_dataset(readable_dataset, "sampled")
 
         states = torch.FloatTensor(np.array(self.env.statebatch2proxy(states)))
         energies = torch.FloatTensor(energies)

@@ -147,8 +147,10 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
-            scores = env.proxy(env.statebatch2proxy(states))
-            idx_pick = torch.argsort(scores, descending=True)[
+            state_proxy = torch.FloatTensor(env.statebatch2proxy(states)).to(config.device)
+            scores = env.proxy(state_proxy)
+            # to change desc/asc wrt higherIsBetter
+            idx_pick = torch.argsort(scores, descending=False)[
                 : config.n_samples
             ].tolist()
             picked_states = [states[i] for i in idx_pick]
@@ -163,6 +165,7 @@ def main(config):
                 # batch, fid, times = gflownet.sample_batch(env, config.n_samples, train=False)
                 # queries = [env.state2oracle[f](b) for f, b in zip(fid, batch)]
                 # energies = [oracles[f](q) for f, q in zip(fid, queries)]
+            if config.multifidelity.proxy == True:
                 data_handler.update_dataset(
                     picked_states, energies.detach().cpu().numpy()
                 )
