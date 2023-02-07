@@ -84,6 +84,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.fid_done = self.state[-1] != -1
         self.done = self.env.done and self.fid_done
         self.id = self.env.id
+        self.n_actions = 0
         return self
 
     def get_mask_invalid_actions_forward(self, state=None, done=None):
@@ -92,6 +93,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         if done is None:
             done = self.done
         if done:
+            assert self.env.done == True
             return [True for _ in range(len(self.action_space))]
         mask = self.env.get_mask_invalid_actions_forward(state[:-1])
         mask = mask + [self.fid_done for _ in range(self.n_fid)]
@@ -164,6 +166,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def step(self, action):
         assert self.state[:-1] == self.env.state
         assert self.done == (self.env.done and self.fid_done)
+        if self.state[-1] == -1:
+            assert self.n_actions == self.env.n_actions
+        else:
+            assert self.n_actions == self.env.n_actions + 1
         if self.done:
             raise ValueError("Action has been sampled despite environment being done")
             # return self.state, action, False
@@ -171,6 +177,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             if self.fid_done == False:
                 self.state[-1] = action[1]
                 self.fid_done = True
+                self.n_actions += 1
             else:
                 raise ValueError("Fidelity has already been chosen.")
             self.done = self.env.done and self.fid_done
@@ -181,6 +188,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             fid = self.state[-1]
             env_action = action[: -self.action_pad_length]
             state, action, valid = self.env.step(env_action)
+            if valid:
+                self.n_actions += 1
             self.state = state + [fid]
             self.done = self.env.done and self.fid_done
             padded_action = tuple(list(action) + [0] * (self.action_pad_length))

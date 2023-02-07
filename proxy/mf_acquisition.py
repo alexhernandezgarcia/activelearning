@@ -39,7 +39,8 @@ class MultiFidelityMES(Proxy):
         self.oracle = oracle
         self.env = env
         self.user_defined_cost = user_defined_cost
-        candidate_set = self.load_candidate_set()
+        # TODO: remove member variable candidate_set as
+        self.candidate_set = self.load_candidate_set()
         self.load_model(regressor, num_dropout_samples)
         self.get_cost_utility()
         if self.is_model_oracle:
@@ -48,7 +49,7 @@ class MultiFidelityMES(Proxy):
             self.project = self.project_proxy_max_fidelity
         self.qMES = qMultiFidelityLowerBoundMaxValueEntropy(
             self.model,
-            candidate_set=candidate_set,
+            candidate_set=self.candidate_set,
             project=self.project,
             cost_aware_utility=self.cost_aware_utility,
         )

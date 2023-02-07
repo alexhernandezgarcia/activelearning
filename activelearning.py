@@ -162,8 +162,8 @@ def main(config):
             if isinstance(state_proxy, list):
                 state_proxy = torch.FloatTensor(state_proxy).to(config.device)
             scores = env.proxy(state_proxy)
-            # to change desc/asc wrt higherIsBetter
-            idx_pick = torch.argsort(scores, descending=False)[
+            # to change desc/asc wrt higherIsBetter, and that should depend on proxy
+            idx_pick = torch.argsort(scores, descending=True)[
                 : config.n_samples
             ].tolist()
             picked_states = [states[i] for i in idx_pick]
