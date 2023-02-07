@@ -57,7 +57,7 @@ class MultiFidelityMES(Proxy):
         if self.user_defined_cost:
             # dict[fidelity] = cost
             self.cost_aware_utility = FidelityCostModel(
-                fidelity_weights={0: 0.5, 1: 0.6, 2: 0.7},
+                fidelity_weights=self.env.fidelity_costs,
                 fixed_cost=0.1,
                 device=self.device,
             )
@@ -72,9 +72,6 @@ class MultiFidelityMES(Proxy):
                 fidelity_weights={-1: 1.0, -2: 0.0, -3: 0.0}, fixed_cost=0.1
             )
             self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
-            # need to chnage subset of fidelity and target fidelity
-            # subset is last three colums
-            # target is [0 0 1] assuming fid=2 is the best fidelity
 
     def load_candidate_set(self):
         if self.is_model_oracle:
@@ -85,7 +82,6 @@ class MultiFidelityMES(Proxy):
             path = self.logger.data_path.parent / Path("data_train.csv")
             data = pd.read_csv(path, index_col=0)
             samples = data["samples"]
-            # state = [self.env.readable2state(sample) for sample in samples]
         state = [self.env.readable2state(sample) for sample in samples]
         state_proxy = self.env.statebatch2proxy(state)
         if isinstance(state_proxy, torch.Tensor):

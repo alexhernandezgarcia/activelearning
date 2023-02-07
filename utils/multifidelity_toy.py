@@ -47,6 +47,7 @@ def make_dataset(env, oracles, n_fid, device, path):
 
 
 def plot_predictions(env, regressor, fid):
+    """Plot the predictions of the regressor for a given fidelity."""
     states = torch.FloatTensor(env.env.get_all_terminating_states()).to("cuda")
     fidelities = torch.ones((len(states), 1)).to("cuda") * fid
     state_fid = torch.cat([states, fidelities], dim=1)
@@ -68,6 +69,7 @@ def plot_predictions(env, regressor, fid):
 
 
 def plot_predictions_oracle(env, fid):
+    """Plot the ground truth for a given fidelity."""
     states = torch.FloatTensor(env.env.get_all_terminating_states()).to("cuda")
     fidelities = torch.ones((len(states), 1)).to("cuda") * fid
     state_fid = torch.cat([states, fidelities], dim=1)

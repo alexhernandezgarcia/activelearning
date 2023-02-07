@@ -37,6 +37,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # self.proxy = self.call_oracle_per_fidelity
         # self.state2oracle = self.env.state2oracle
         self.oracle = oracle
+        # TODO: make dynamic depending on no of fidelities
+        self.fidelity_costs = {0: 0.5, 1: 0.6, 2: 0.7}
         self.reset()
 
     def copy(self):
@@ -216,3 +218,56 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         fid = states[:, -1].unsqueeze(-1)
         state_fid = torch.cat((state_oracle, fid), dim=1)
         return state_fid
+
+    def true_density(self):
+        if self._true_density is not None:
+            return self._true_density
+        # Calculate true density
+        # TODO: fix when get_all_terminaiting states does not exist in env
+        all_states = self.get_all_terminating_states()
+        all_states = [
+            state + [fid] for state in all_states for fid in range(self.n_fid)
+        ]
+        all_states = torch.FloatTensor(all_states).to(self.device)
+        all_oracle = self.env.statetorch2oracle(all_states)
+        rewards = self.proxy(all_oracle).detach().cpu().numpy()
+        # TODO: state mask
+        # state_mask = np.array(
+        # [len(self.get_parents(s, False)[0]) > 0 or sum(s) == 0 for s in all_states]
+        # )
+        self._true_density = (
+            rewards / rewards.sum(),
+            rewards,
+        )
+        return self._true_density
+
+    def get_all_terminating_states(self) -> List[List]:
+        if hasattr(self.env, "get_all_terminating_states"):
+            states = self.env.get_all_terminating_states()
+            states = [state + [fid] for state in states for fid in range(self.n_fid)]
+            return states
+        else:
+            return None
+
+    def get_uniform_terminating_states(self, n_states: int) -> List[List]:
+        if hasattr(self.env, "get_uniform_terminating_states"):
+            return self.env.get_uniform_terminating_states(n_states)
+        else:
+            return None
+
+    def plot_reward_samples(self, samples, **kwargs):
+        if hasattr(self.env, "plot_reward_samples"):
+            return self.env.plot_reward_samples(samples, **kwargs)
+        else:
+            return None
+
+    def plot_samples_frequency(self, samples, **kwargs):
+        if hasattr(self.env, "plot_samples_frequency"):
+            return self.env.plot_samples_frequency(samples, **kwargs)
+        else:
+            return None
+
+    def get_cost(self, samples):
+        fidelities = [sample[-1] for sample in samples]
+        costs = [self.fidelity_costs[fid] for fid in fidelities]
+        return costs

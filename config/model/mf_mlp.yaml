@@ -1,10 +1,10 @@
 _target_: model.multi_fidelity_mlp.MultiFidelityMLP
 
-# if True, each fidelity has a separate fully connectred module
+# if False, each fidelity has a separate fully connected module
 shared_head: True
-base_num_hidden: 512
+base_num_hidden: 2048
 base_num_layer: 2
-fid_num_hidden: 512
+fid_num_hidden: 2048
 fid_num_layer: 2
 activation: 'relu'
 dropout_prob: 0.1
