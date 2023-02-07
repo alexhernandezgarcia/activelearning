@@ -6,6 +6,7 @@ import os
 from torch.optim import Adam
 import hydra
 from tqdm import tqdm
+from utils.multifidelity_toy import plot_predictions
 
 
 class DropoutRegressor:

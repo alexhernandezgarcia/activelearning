@@ -11,8 +11,14 @@ from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
-from utils.multifidelity_toy import ToyOracle, make_dataset
-import operator
+from utils.multifidelity_toy import (
+    ToyOracle,
+    make_dataset,
+    plot_acquisition,
+    plot_context_points,
+)
+from pathlib import Path
+import pandas as pd
 
 
 @hydra.main(config_path="./config", config_name="mf_debug_test")
@@ -131,7 +137,12 @@ def main(config):
                 logger=logger,
                 oracle=oracles,
                 env=env,
+                data_path=config.multifidelity.candidate_set_path,
             )
+            # plot_context_points(env, proxy)
+            # plot_acquisition(env, 0, proxy)
+            # plot_acquisition(env, 1, proxy)
+            # plot_acquisition(env, 2, proxy)
         env.proxy = proxy
         gflownet = hydra.utils.instantiate(
             config.gflownet,
@@ -147,7 +158,9 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
-            state_proxy = torch.FloatTensor(env.statebatch2proxy(states)).to(config.device)
+            state_proxy = env.statebatch2proxy(states)
+            if isinstance(state_proxy, list):
+                state_proxy = torch.FloatTensor(state_proxy).to(config.device)
             scores = env.proxy(state_proxy)
             # to change desc/asc wrt higherIsBetter
             idx_pick = torch.argsort(scores, descending=False)[
@@ -161,6 +174,16 @@ def main(config):
                 gflownet.evaluate(
                     picked_samples, energies, data_handler.train_dataset["samples"]
                 )
+            else:
+                df = pd.DataFrame(
+                    {
+                        "readable": [env.state2readable(s) for s in picked_states],
+                        "energies": energies.cpu().numpy(),
+                    }
+                )
+                df = df.sort_values(by=["energies"])
+                path = logger.logdir / Path("gfn_samples.csv")
+                df.to_csv(path)
                 # dataset will eventually store in proxy-format so states are sent to avoid the readable2state conversion
                 # batch, fid, times = gflownet.sample_batch(env, config.n_samples, train=False)
                 # queries = [env.state2oracle[f](b) for f, b in zip(fid, batch)]

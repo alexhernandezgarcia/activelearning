@@ -2,7 +2,24 @@ import torch
 from botorch.models.model import Model
 from gpytorch.distributions import MultivariateNormal, MultitaskMultivariateNormal
 from botorch.posteriors.gpytorch import GPyTorchPosterior
-import os
+from botorch.acquisition.cost_aware import CostAwareUtility
+
+
+class FidelityCostModel(CostAwareUtility):
+    def __init__(self, fidelity_weights, fixed_cost, device):
+        super().__init__()
+        self.fidelity_weights = fidelity_weights
+        self.device = device
+        self.fixed_cost = torch.FloatTensor([fixed_cost]).to(self.device)
+
+    def forward(self, X, deltas, **kwargs):
+        fidelity = X[:, 0, -1]
+        cost = torch.zeros(X.shape[0]).to(self.device)
+        for fid in range(len(self.fidelity_weights)):
+            idx_fid = torch.where(fidelity == fid)[0]
+            cost_fid = torch.FloatTensor([self.fidelity_weights[fid]]).to(self.device)
+            cost[idx_fid] = (deltas[0, idx_fid] / cost_fid) + self.fixed_cost
+        return deltas
 
 
 class ProxyBotorchUCB(Model):
@@ -78,10 +95,19 @@ class MultifidelityOracleModel(Model):
         Just the cost and the uncertainty depend on the fidelity.
         The mean is the true score, so mean_curr_fidelity = mean_max_fidelity.
         """
+        covar_mm = torch.FloatTensor(
+            [
+                [self.oracle[0].sigma ** 2, (0.015) ** 2, (5e-2) ** 2],
+                [(0.015**2), self.oracle[1].sigma ** 2, (4e-2) ** 2],
+                [(5e-2) ** 2, (4e-2) ** 2, self.oracle[2].sigma ** 2],
+            ]
+        )
         if len(X.shape) == 2:
             fid_tensor = X[:, -1]
             state_tensor = X[:, :-1]
             scores = self.oracle[self.n_fid - 1](state_tensor)
+            # take absolute value of scores
+            scores = scores * (-0.1)
             var = torch.zeros(X.shape[0])
             for fid in range(self.n_fid):
                 idx_fid = torch.where(fid_tensor == fid)[0]
@@ -94,30 +120,24 @@ class MultifidelityOracleModel(Model):
             # combination of target and original fidelity test set
             #  X = 32 x 1 x 2 x 3
             var_curr_fidelity = torch.zeros(X.shape[0], 1)
-            var_joint = torch.zeros(X.shape[0], 1)
             states = X[:, :, 0, :-1].squeeze(-2)
             states = states.squeeze(-2)
             scores = self.oracle[self.n_fid - 1](states)
             scores = scores.unsqueeze(-1)
+            scores = scores * (-0.1)
             fid_tensor = X[:, :, 0, -1]
+            covar = torch.zeros(X.shape[0], 2, 2)
             for fid in range(self.n_fid):
                 idx_fid = torch.where(fid_tensor == fid)[0]
-                var_curr_fidelity[idx_fid] = self.oracle[fid].sigma ** 2
-                var_joint[idx_fid] = (
-                    self.oracle[fid].sigma * self.oracle[self.n_fid - 1].sigma
-                )
-            mean = torch.stack((scores, scores), dim=2)
-            var_max_fidelity = self.oracle[self.n_fid - 1].sigma ** 2
-            covar = [
-                torch.FloatTensor(
+                var_curr_fidelity = self.oracle[fid].sigma ** 2
+                var_max_fidelity = self.oracle[self.n_fid - 1].sigma ** 2
+                covar[idx_fid] = torch.FloatTensor(
                     [
-                        [var_curr_fidelity[i], var_joint[i]],
-                        [var_joint[i], var_max_fidelity],
+                        [var_curr_fidelity, covar_mm[fid][2]],
+                        [covar_mm[fid][2], var_max_fidelity],
                     ]
                 )
-                for i in range(X.shape[0])
-            ]
-            covar = torch.stack(covar, axis=0)
+            mean = torch.stack((scores, scores), dim=2)
             covar = covar.unsqueeze(1)
         # batch
         elif len(X.shape) == 3:
@@ -125,6 +145,7 @@ class MultifidelityOracleModel(Model):
             state_tensor = X[:, :, :-1]
             state_tensor = state_tensor.squeeze(-2)
             scores = self.oracle[self.n_fid - 1](state_tensor)
+            scores = scores * (-0.1)
             mean = scores.unsqueeze(-1)
             var = torch.ones((X.shape[0], 1))
             for fid in range(self.n_fid):

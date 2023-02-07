@@ -15,6 +15,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     """
 
     def __init__(self, env, n_fid, oracle, is_oracle_proxy=False, **kwargs):
+        # TODO: super init kwargs
         self.env = env
         self.n_fid = n_fid
         self.fid = self.env.eos + 1
@@ -148,9 +149,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 tuple(list(action) + [0] * (self.action_pad_length))
                 for action in actions
             ]
-        parents = [parent + [-1] for parent in parents_no_fid]
-        if state[-1] != -1:
+        if state[-1] == -1:
+            parents = [parent + [-1] for parent in parents_no_fid]
+        elif state[-1] != -1:
             fid = state[-1]
+            parents = [parent + [fid] for parent in parents_no_fid]
             parent = state[:-1] + [-1]
             actions.append(tuple([self.fid, fid] + [0] * (self.action_max_length - 2)))
             parents.append(parent)
@@ -158,12 +161,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def step(self, action):
         assert self.state[:-1] == self.env.state
+        assert self.done == (self.env.done and self.fid_done)
+        if self.done:
+            raise ValueError("Action has been sampled despite environment being done")
+            # return self.state, action, False
         if action[0] == self.fid:
             if self.fid_done == False:
                 self.state[-1] = action[1]
                 self.fid_done = True
             else:
-                raise ValueError("Fidelity has been chosen")
+                raise ValueError("Fidelity has already been chosen.")
             self.done = self.env.done and self.fid_done
             # TODO: action or eos in else
             # padded_action = tuple(list(action) + [0]*(self.action_pad_length-len(action)))

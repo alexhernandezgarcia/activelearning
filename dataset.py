@@ -6,6 +6,7 @@ import numpy as np
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 class Data(Dataset):
@@ -87,6 +88,17 @@ class DataHandler:
             state_fid = torch.cat([states, fidelities], dim=1)
             states_fid_oracle = self.env.statetorch2oracle(state_fid)
             scores = self.env.call_oracle_per_fidelity(states_fid_oracle)
+            index = states.long().detach().cpu().numpy()
+            # data_scores = np.reshape(scores.detach().cpu().numpy(), (10, 10))
+            grid_scores = np.ones((20, 20)) * (5.0)
+            grid_scores[index[:, 0], index[:, 1]] = scores.detach().cpu().numpy()
+            plt.imshow(grid_scores)
+            plt.colorbar()
+            plt.title("Train Data")
+            plt.savefig(
+                "/home/mila/n/nikita.saxena/activelearning/storage/grid/train_data.png"
+            )
+            plt.close()
             samples = state_fid.detach().tolist()
             targets = scores.detach().tolist()
 
