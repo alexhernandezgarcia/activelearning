@@ -31,12 +31,21 @@ def main(config):
         yaml.dump(log_config, f, default_flow_style=False)
 
     # Logger
+    # TODO: rmeove debug once we figure out where it goes
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
-
     ## Instantiate objects
-    oracle = hydra.utils.instantiate(config.oracle, device=config.device)
+    oracle = hydra.utils.instantiate(
+        config.oracle,
+        device=config.device,
+        float_precision=config.float_precision,
+    )
     # TODO: Check if initialising env.proxy later breaks anything -- i.e., to check that nothin in the init() depends on the proxy
-    env = hydra.utils.instantiate(config.env, oracle=oracle)
+    env = hydra.utils.instantiate(
+        config.env,
+        oracle=oracle,
+        device=config.device,
+        float_precision=config.float_precision,
+    )
     # Note to Self: DataHandler needs env to make the train data. But DataHandler is required by regressor that's required by proxy that's required by env so we have to initalise env.proxy later on
     data_handler = hydra.utils.instantiate(
         config.dataset, env=env, logger=logger, oracle=oracle
@@ -47,6 +56,7 @@ def main(config):
         config_env=config.env,
         config_model=config.model,
         dataset=data_handler,
+        device=config.device,
         _recursive_=False,
         logger=logger,
     )
@@ -56,7 +66,12 @@ def main(config):
         if logger:
             logger.set_context(iter)
         regressor.fit()
-        proxy = hydra.utils.instantiate(config.proxy, regressor=regressor)
+        proxy = hydra.utils.instantiate(
+            config.proxy,
+            regressor=regressor,
+            device=config.device,
+            float_precision=config.float_precision,
+        )
         env.proxy = proxy
         gflownet = hydra.utils.instantiate(
             config.gflownet,
@@ -64,6 +79,7 @@ def main(config):
             buffer=config.env.buffer,
             logger=logger,
             device=config.device,
+            float_precision=config.float_precision,
         )
         # TODO: rename gflownet to sampler once we have other sampling techniques ready
         gflownet.train()
@@ -71,18 +87,15 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
-            # TODO: Change state2oracle after continous branch merge
-            scores = env.proxy(env.state2proxy(states))
-            idx_pick = np.argsort(scores)[::-1][: config.n_samples].tolist()
+            scores = env.proxy(env.statetorch2proxy(states))
+            idx_pick = torch.argsort(scores, descending= True)[: config.n_samples].tolist()
             picked_states = [states[i] for i in idx_pick]
-            picked_samples = env.state2oracle(picked_states)
+            picked_samples = env.statebatch2oracle(picked_states)
             energies = oracle(picked_samples)
-            # evaluate involves calculting distance between strings hence samples is sent
             gflownet.evaluate(
                 picked_samples, energies, data_handler.train_dataset["samples"]
             )
-            # dataset will eventually store in proxy-format so states are sent to avoid the readable2state conversion
-            data_handler.update_dataset(picked_states, energies)
+            data_handler.update_dataset(picked_states, energies.detach().cpu().numpy())
         del gflownet
         del proxy
 

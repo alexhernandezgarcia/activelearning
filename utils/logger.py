@@ -15,31 +15,15 @@ class AL_Logger(Logger):
     def __init__(
         self,
         config,
-        do,
-        project_name,
-        logdir,
-        sampler,
-        progress,
-        lightweight,
-        debug,
-        proxy,
-        run_name=None,
-        tags=None,
+        ckpts: dict,
+        logdir: dict,
+        **kwargs,
     ):
-        super().__init__(
-            config,
-            do,
-            project_name,
-            logdir,
-            sampler,
-            progress,
-            lightweight,
-            debug,
-            run_name,
-            tags,
-        )
+        super().__init__(config, logdir=logdir, checkpoints=ckpts.policy, **kwargs)
         self.proxy_period = (
-            np.inf if proxy.period == None or proxy.period == -1 else proxy.period
+            np.inf
+            if ckpts.regressor.period == None or ckpts.regressor.period == -1
+            else ckpts.regressor.period
         )
         self.data_dir = self.logdir / logdir.data
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -85,8 +69,8 @@ class AL_Logger(Logger):
     def save_dataset(self, dataset, type):
         if self.data_path is not None:
             data = pd.DataFrame(dataset)
-            if type=="sampled":
-                type = type + "_iter"+ self.context
+            if type == "sampled":
+                type = type + "_iter" + self.context
             name = Path(self.data_path.stem + "_" + type + ".csv")
             path = self.data_path.parent / name
             data.to_csv(path)
