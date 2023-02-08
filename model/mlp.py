@@ -1,20 +1,27 @@
 import torch.nn as nn
-from .regressor import ACTIVATION_KEY
 import torch
 import math
+
+ACTIVATION_KEY = {
+    "tanh": nn.Tanh(),
+    "relu": nn.ReLU(),
+    "sigmoid": nn.Sigmoid(),
+    "leaky_relu": nn.LeakyReLU(),
+}
 
 
 class MLP(nn.Module):
     def __init__(
         self,
-        hidden_dim,
-        num_layer,
+        n_hid,
+        n_layers,
         num_output,
         dropout_prob,
         activation,
         transformerCall=False,
         config_env=None,
         input_dim=None,
+        **kwargs
     ):
         super(MLP, self).__init__()
         """
@@ -27,20 +34,23 @@ class MLP(nn.Module):
                 configuration of env (required for specifying input dimensions of model) is passed
 
         """
+        self.activation = ACTIVATION_KEY[activation]
+
+        # TODO: this is grid specific for now, make it general (for apatamers and torus)
+        self.input_max_length = config_env.max_seq_length  # config_env.n_dim
+        self.input_classes = config_env.n_alphabet  # config_env.length
+        self.out_dim = num_output
 
         if transformerCall == False:
-            # TODO: paramters of config_env used are grid specific for now, make it general (apatamers and torus friendly)
-            input_max_length = config_env.n_dim
-            input_classes = config_env.length
-            self.init_layer_depth = int((input_classes) * (input_max_length))
+            self.hidden_layers = [n_hid] * n_layers
+            self.dropout_prob = dropout_prob
+            self.init_layer_depth = int((self.input_classes) * (self.input_max_length))
+
         else:
             # this clause is entered only when transformer specific config is passed
-            self.init_layer_depth = input_dim
-
-        self.hidden_layers = [hidden_dim] * num_layer
-        self.dropout_prob = dropout_prob
-        self.out_dim = num_output
-        self.activation = ACTIVATION_KEY[activation]
+            self.hidden_layers = [self.mlp.hidden_dim] * self.mlp.num_layer
+            self.dropout_prob = self.mlp.dropout_prob
+            self.init_layer_depth = self.embed_dim
 
         layers = [
             nn.Linear(self.init_layer_depth, self.hidden_layers[0]),
@@ -58,7 +68,7 @@ class MLP(nn.Module):
         layers.append(nn.Linear(self.hidden_layers[-1], self.out_dim))
         self.model = nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         """
         Args:
             tensor of dimension batch x max_seq_length_in_batch x k,
@@ -68,8 +78,6 @@ class MLP(nn.Module):
         # Pads the tensor till maximum length of dataset
         input = torch.zeros(x.shape[0], self.init_layer_depth)
         input[:, : x.shape[1]] = x
-        # TODO: Check if the following is reqd for aptamers. Reshapes the tensor to batch_size x init_layer_depth
-        # x = input.reshape(x.shape[0], -1)
         # Performs a forward call
         return self.model(x)
 

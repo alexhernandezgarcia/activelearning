@@ -3,21 +3,25 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
+from pathlib import Path
+from sklearn.model_selection import train_test_split
 import pandas as pd
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data):
+    def __init__(self, X_data, y_data, fid):
         self.X_data = X_data
         self.y_data = y_data
+        self.fid = fid
 
     def __getitem__(self, index):
-        return self.X_data[index], self.y_data[index]
+        return self.X_data[index], self.y_data[index], self.fid[index]
 
     def __len__(self):
         return len(self.X_data)
 
 
+# TODO: Rename samples to states
 class DataHandler:
     """
     Intialises the train data using env-specific train function
@@ -28,26 +32,23 @@ class DataHandler:
         self,
         env,
         normalise_data,
-        shuffle_data,
         train_fraction,
-        batch_size,
-        n_samples,
-        seed_data,
-        save_data,
-        load_data,
-        data_path,
+        dataloader,
+        path,
+        logger,
+        oracle,
+        split,
     ):
         self.env = env
         self.normalise_data = normalise_data
-        self.shuffle_data = shuffle_data
         self.train_fraction = train_fraction
-        self.batch_size = batch_size
-        self.n_samples = n_samples
-        self.seed_data = seed_data
-        self.save_data = save_data
-        self.load_data = load_data
-        self.data_path = data_path
-
+        self.dataloader = dataloader
+        self.split = split
+        self.path = path
+        self.logger = logger
+        self.progress = self.logger.progress
+        self.oracle = oracle
+        self.logger.set_data_path(self.path.dataset)
         self.initialise_dataset()
 
     def initialise_dataset(self):
@@ -61,49 +62,111 @@ class DataHandler:
 
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
         """
-        if self.load_data:
-            dataset = np.load(self.data_path, allow_pickle=True)
-            self.dataset = dataset.item()
-        else:
-            self.dataset = self.env.make_train_set(ntrain=self.n_samples).to_dict(
-                orient="list"
-            )
-            if self.save_data:
-                np.save(self.data_path, self.dataset)
-        self.preprocess_for_dataloader()
+        if self.path.oracle_dataset:
+            train = pd.read_csv(self.path.oracle_dataset.train)
+            test = pd.read_csv(self.path.oracle_dataset.test)
+            train_samples = train["samples"].values.tolist()
+            train_targets = train["energies"].values.tolist()
+            test_samples = test["samples"].values.tolist()
+            test_targets = test["energies"].values.tolist()
 
-    def preprocess_for_dataloader(self):
+        else:
+            dataset = self.env.load_dataset()
+
+        if self.split == "random":
+            # randomly select 10 element from the list train_samples and test_samples
+            samples = train_samples + test_samples
+            targets = train_targets + test_targets
+            train_samples, test_samples, train_targets, test_targets = train_test_split(
+                samples, targets, train_size=self.train_fraction
+            )
+            # else:
+            # train_samples, test_samples = (
+            #     dataset[0],
+            #     dataset[1],
+            # )
+            # train_targets = self.oracle(train_samples)
+            # test_targets = self.oracle(test_samples)
+
+        self.train_dataset = {"samples": train_samples, "energies": train_targets}
+        self.test_dataset = {"samples": test_samples, "energies": test_targets}
+
+        # Save the raw (un-normalised) dataset
+        self.logger.save_dataset(self.train_dataset, "train")
+        self.logger.save_dataset(self.test_dataset, "test")
+
+        self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
+        self.train_data = Data(
+            self.train_dataset["samples"], self.train_dataset["energies"]
+        )
+
+        self.test_dataset, self.test_stats = self.preprocess(self.test_dataset)
+        self.test_data = Data(
+            self.test_dataset["samples"], self.test_dataset["energies"]
+        )
+
+        # Log the dataset statistics
+        self.logger.log_dataset_stats(self.train_stats, self.test_stats)
+        if self.progress:
+            prefix = "Normalised " if self.normalise_data else ""
+            print(prefix + "Dataset Statistics")
+            print(
+                "Train Data \n \t Mean Score:{:.2f} \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                    self.train_stats["mean"],
+                    self.train_stats["std"],
+                    self.train_stats["min"],
+                    self.train_stats["max"],
+                )
+            )
+            print(
+                "Test Data \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                    self.test_stats["mean"],
+                    self.test_stats["std"],
+                    self.test_stats["min"],
+                    self.test_stats["max"],
+                )
+            )
+
+    def preprocess(self, dataset):
         """
         - converts samples to proxy space
         - normalises the energies
         - shuffles the data
         - splits the data into train and test
         """
-        self.samples = torch.FloatTensor(
-            list(map(self.env.state2proxy, self.dataset["samples"]))
+        samples = dataset["samples"]
+        targets = dataset["energies"]
+
+        samples = torch.FloatTensor(
+            np.array(
+                self.env.state2proxy(
+                    self.env.readable2state(sample) for sample in samples
+                )
+            )
         )
-        self.targets = torch.FloatTensor(self.dataset["energies"])
+        targets = torch.FloatTensor(targets)
+        fidelity = torch.FloatTensor(fidelity)
 
+        dataset = {"samples": samples, "energies": targets, "fidelities": fidelity}
+
+        stats = self.get_statistics(targets)
         if self.normalise_data:
-            self.targets = self.normalise_dataset()
-        if self.shuffle_data:
-            self.reshuffle()
+            dataset["energies"] = self.normalise(dataset["energies"], stats)
 
-        # total number of samples is updated with each AL iteration so fraction is multiplied by number of samples at the current iteration
-        train_size = int(self.train_fraction * self.samples.shape[0])
+        return dataset, stats
 
-        self.train_data = Data(self.samples[:train_size], self.targets[:train_size])
-        self.test_data = Data(self.samples[train_size:], self.targets[train_size:])
-
-    def get_statistics(self):
+    def get_statistics(self, y):
         """
         called each time the dataset is updated so has the most recent metrics
         """
-        self.mean = torch.mean(self.targets)
-        self.std = torch.std(self.targets)
-        return self.mean, self.std
+        dict = {}
+        dict["mean"] = torch.mean(y)
+        dict["std"] = torch.std(y)
+        dict["max"] = torch.max(y)
+        dict["min"] = torch.min(y)
+        return dict
 
-    def normalise_dataset(self, y=None, mean=None, std=None):
+    def normalise(self, y, stats):
         """
         Args:
             y: targets to normalise (tensor)
@@ -112,14 +175,22 @@ class DataHandler:
         Returns:
             y: normalised targets (tensor)
         """
-        if y == None:
-            y = self.targets
-        if mean == None or std == None:
-            mean, std = self.get_statistics()
-        y = (y - mean) / std
+        y = (y - stats["mean"]) / stats["std"]
         return y
 
-    def update_dataset(self, queries, energies):
+    def denormalise(self, y, stats):
+        """
+        Args:
+            y: targets to denormalise (tensor)
+            mean: mean of targets (tensor)
+            std: std of targets (tensor)
+        Returns:
+            y: denormalised targets (tensor)
+        """
+        y = y * stats["std"] + stats["mean"]
+        return y
+
+    def update_dataset(self, states, energies):
         """
         Args:
             queries: list of queries [[0, 0], [1, 1], ...]
@@ -128,39 +199,89 @@ class DataHandler:
         Updates the dataset stats
         Saves the updated dataset if save_data=True
         """
-        if self.save_data:
-            # load the saved dataset
-            dataset = np.load(self.data_path, allow_pickle=True)
-            self.dataset = dataset.item()
-            # index_col=False
-        self.dataset["samples"] += queries
-        self.dataset["energies"] += energies
-        self.preprocess_for_dataloader()
-        if self.save_data:
-            np.save(self.data_path, self.dataset)
+        # TODO: Deprecate the "if" statement
+        # if self.save_data:
+        #     # load the saved dataset
+        #     dataset = np.load(self.data_path, allow_pickle=True)
+        #     self.dataset = dataset.item()
+        #     # index_col=False
+        dataset = {"samples": states, "energies": energies}
+        self.logger.save_dataset(dataset, "sampled")
+
+        states = torch.FloatTensor(np.array(self.env.state2proxy(states)))
+        energies = torch.FloatTensor(energies)
+
+        if self.normalise_data:
+            self.train_dataset["energies"] = self.denormalise(
+                self.train_dataset["energies"], stats=self.train_stats
+            )
+
+        self.train_dataset["energies"] = torch.cat(
+            (self.train_dataset["energies"], energies), dim=0
+        )
+        self.train_dataset["samples"] = torch.cat(
+            (self.train_dataset["samples"], states), dim=0
+        )
+
+        self.train_stats = self.get_statistics(self.train_dataset["energies"])
+        if self.normalise_data:
+            self.train_dataset["energies"] = self.normalise(
+                self.train_dataset["energies"], self.train_stats
+            )
+        self.train_data = Data(
+            self.train_dataset["samples"], self.train_dataset["energies"]
+        )
+
+        self.logger.log_dataset_stats(self.train_stats, self.test_stats)
+        if self.progress:
+            prefix = "Normalised " if self.normalise_data else ""
+            print(prefix + "Updated Dataset Statistics")
+            print(
+                "Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                    self.train_stats["mean"],
+                    self.train_stats["std"],
+                    self.train_stats["min"],
+                    self.train_stats["max"],
+                )
+            )
+            print(
+                "Test \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                    self.test_stats["mean"],
+                    self.test_stats["std"],
+                    self.test_stats["min"],
+                    self.test_stats["max"],
+                )
+            )
 
     def reshuffle(self):
+        # TODO: Deprecated. Remove once sure it's not used.
         """
         Reshuffle the entire dataset (called before creating train and test subsets)
         """
-        self.samples, self.targets = shuffle(
-            self.samples.numpy(), self.targets.numpy(), random_state=self.seed_data
+        self.samples, self.targets, self.fidelity = shuffle(
+            self.samples.numpy(),
+            self.targets.numpy(),
+            self.fidelity.numpy(),
+            random_state=self.seed_data,
         )
 
     def collate_batch(self, batch):
         """
         Pads till maximum length in the batch
         """
-        y, x, = (
+        y, x, fid = (
+            [],
             [],
             [],
         )
-        for (_sequence, _label) in batch:
+        for (_sequence, _label, _fid) in batch:
             y.append(_label)
-            x.append(torch.tensor(_sequence))
+            x.append(_sequence)
+            fid.append(_fid)
         y = torch.tensor(y, dtype=torch.float)
+        fid = torch.tensor(fid, dtype=torch.long)
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
-        return xPadded, y
+        return xPadded, y, fid
 
     def get_dataloader(self):
         """
@@ -169,23 +290,22 @@ class DataHandler:
             x: self.env.state2proxy(input)
             y: normalised (if need be) energies
         """
-        # TODO: Add parameter to config for batch based shuffling (while creating the dataloader) if need be
-        tr = DataLoader(
+        train_loader = DataLoader(
             self.train_data,
-            batch_size=self.batch_size,
-            shuffle=True,
+            batch_size=self.dataloader.train.batch_size,
+            shuffle=self.dataloader.train.shuffle,
             num_workers=0,
             pin_memory=False,
             collate_fn=self.collate_batch,
         )
 
-        te = DataLoader(
+        test_loader = DataLoader(
             self.test_data,
-            batch_size=self.batch_size,
-            shuffle=True,
+            batch_size=self.dataloader.test.batch_size,
+            shuffle=self.dataloader.test.shuffle,
             num_workers=0,
             pin_memory=False,
             collate_fn=self.collate_batch,
         )
 
-        return tr, te
+        return train_loader, test_loader
