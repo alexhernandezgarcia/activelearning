@@ -5,7 +5,7 @@ defaults:
   - oracle: grid_corners
   - dataset: dataset
   - model: dropout_regressor
-  - network: transformer
+  - network: mlp
 
 n_samples: 100
 al_n_rounds: 10
