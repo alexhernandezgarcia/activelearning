@@ -45,5 +45,6 @@ class BotorchUCB(UCB):
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler
         )
+        inputs = inputs.unsqueeze(-2)
         acq_values = UCB(inputs)
         return acq_values.detach().cpu().numpy()
