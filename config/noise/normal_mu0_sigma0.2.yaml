@@ -1,2 +1,9 @@
-mu: 0
-sigma: 0.7
+noise:
+  mu: 0
+  sigma: 0.1
+valid:
+  xmin: 0
+  xmax: 10
+  ymin: 0
+  ymax: 10
+cost: 0.008

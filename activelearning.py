@@ -16,6 +16,7 @@ from utils.multifidelity_toy import (
     make_dataset,
     plot_acquisition,
     plot_context_points,
+    plot_predictions_oracle,
 )
 from pathlib import Path
 import pandas as pd
@@ -52,16 +53,24 @@ def main(config):
         oracle = hydra.utils.instantiate(
             config.oracle, device=config.device, float_precision=config.float_precision
         )
+        env_arg = hydra.utils.instantiate(
+            config.env,
+            oracle=oracle,
+            device=config.device,
+            float_precision=config.float_precision,
+        )
         # target fidelity must be the last fidelity
         # config._noise_dict = dict( sorted(config._noise_dict.items(), key=operator.itemgetter(1),reverse=True))
         for fid in range(1, N_FID + 1):
             toy = ToyOracle(
                 oracle,
                 config._noise_dict[str(fid)],
+                env_arg,
                 config.device,
                 config.float_precision,
             )
             oracles.append(toy)
+        del env_arg
     else:
         for fid in range(1, N_FID + 1):
             oracle = hydra.utils.instantiate(
@@ -138,11 +147,16 @@ def main(config):
                 oracle=oracles,
                 env=env,
                 data_path=config.multifidelity.candidate_set_path,
+                fixed_cost=config.multifidelity.fixed_cost,
             )
-            # plot_context_points(env, proxy)
-            # plot_acquisition(env, 0, proxy)
-            # plot_acquisition(env, 1, proxy)
-            # plot_acquisition(env, 2, proxy)
+            plot_context_points(env, proxy)
+            plot_acquisition(env, 0, proxy)
+            plot_acquisition(env, 1, proxy)
+            plot_acquisition(env, 2, proxy)
+            plot_predictions_oracle(env, 0)
+            plot_predictions_oracle(env, 1)
+            plot_predictions_oracle(env, 2)
+
         env.proxy = proxy
         gflownet = hydra.utils.instantiate(
             config.gflownet,

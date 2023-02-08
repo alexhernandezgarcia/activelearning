@@ -14,12 +14,13 @@ class FidelityCostModel(CostAwareUtility):
 
     def forward(self, X, deltas, **kwargs):
         fidelity = X[:, 0, -1]
-        cost = torch.zeros(X.shape[0]).to(self.device)
+        scaled_deltas = torch.zeros(X.shape[0]).to(self.device)
         for fid in range(len(self.fidelity_weights)):
             idx_fid = torch.where(fidelity == fid)[0]
             cost_fid = torch.FloatTensor([self.fidelity_weights[fid]]).to(self.device)
-            cost[idx_fid] = (deltas[0, idx_fid] / cost_fid) + self.fixed_cost
-        return deltas
+            scaled_deltas[idx_fid] = (deltas[0, idx_fid] / cost_fid) + self.fixed_cost
+        scaled_deltas = scaled_deltas.unsqueeze(0)
+        return scaled_deltas
 
 
 class ProxyBotorchUCB(Model):
@@ -109,23 +110,22 @@ class MultifidelityOracleModel(Model):
         """
         covar_mm = torch.FloatTensor(
             [
-                [self.oracle[0].sigma ** 2, (0.015) ** 2, (5e-2) ** 2],
-                [(0.015**2), self.oracle[1].sigma ** 2, (4e-2) ** 2],
-                [(5e-2) ** 2, (4e-2) ** 2, self.oracle[2].sigma ** 2],
+                [self.oracle[0].sigma ** 2, (0.015) ** 2, (5e-3) ** 2],
+                [(0.015**2), self.oracle[1].sigma ** 2, (4e-3) ** 2],
+                [(5e-3) ** 2, (4e-3) ** 2, self.oracle[2].sigma ** 2],
             ]
         )
         if len(X.shape) == 2:
             fid_tensor = X[:, -1]
             state_tensor = X[:, :-1]
-            scores = self.oracle[self.n_fid - 1](state_tensor)
-            # take absolute value of scores
-            scores = scores * (-0.1)
-            var = torch.zeros(X.shape[0])
+            var = torch.zeros(X.shape[0]).to(self.device)
+            mean = torch.zeros(X.shape[0]).to(self.device)
             for fid in range(self.n_fid):
                 idx_fid = torch.where(fid_tensor == fid)[0]
                 var[idx_fid] = self.oracle[fid].sigma ** 2
+                mean[idx_fid] = self.oracle[fid](state_tensor[idx_fid])
             # candidate set
-            mean = scores
+            mean = mean * (-0.1)
             covar = torch.diag(var)
         # batch and projected batch
         elif len(X.shape) == 4:
@@ -134,36 +134,40 @@ class MultifidelityOracleModel(Model):
             var_curr_fidelity = torch.zeros(X.shape[0], 1)
             states = X[:, :, 0, :-1].squeeze(-2)
             states = states.squeeze(-2)
-            scores = self.oracle[self.n_fid - 1](states)
-            scores = scores.unsqueeze(-1)
-            scores = scores * (-0.1)
+            mean_max_fidelity = self.oracle[self.n_fid - 1](states)
+            mean_curr_fidelity = torch.ones(mean_max_fidelity.shape).to(self.device)
             fid_tensor = X[:, :, 0, -1]
+            var_max_fidelity = self.oracle[self.n_fid - 1].sigma ** 2
             covar = torch.zeros(X.shape[0], 2, 2)
             for fid in range(self.n_fid):
                 idx_fid = torch.where(fid_tensor == fid)[0]
                 var_curr_fidelity = self.oracle[fid].sigma ** 2
-                var_max_fidelity = self.oracle[self.n_fid - 1].sigma ** 2
+                mean_curr_fidelity[idx_fid] = self.oracle[fid](states[idx_fid])
                 covar[idx_fid] = torch.FloatTensor(
                     [
-                        [var_curr_fidelity, covar_mm[fid][2]],
-                        [covar_mm[fid][2], var_max_fidelity],
+                        [var_curr_fidelity, covar_mm[fid][self.n_fid - 1]],
+                        [covar_mm[fid][self.n_fid - 1], var_max_fidelity],
                     ]
                 )
-            mean = torch.stack((scores, scores), dim=2)
-            covar = covar.unsqueeze(1)
+            mean_curr_fidelity = mean_curr_fidelity.unsqueeze(-1)
+            mean_max_fidelity = mean_max_fidelity.unsqueeze(-1)
+            mean = torch.stack((mean_curr_fidelity, mean_max_fidelity), dim=2)
+            mean = mean * (-0.1)
+            covar = covar.unsqueeze(1).to(self.device)
         # batch
         elif len(X.shape) == 3:
             fid_tensor = X[:, :, -1]
             state_tensor = X[:, :, :-1]
             state_tensor = state_tensor.squeeze(-2)
-            scores = self.oracle[self.n_fid - 1](state_tensor)
-            scores = scores * (-0.1)
-            mean = scores.unsqueeze(-1)
-            var = torch.ones((X.shape[0], 1))
+            mean = torch.zeros((X.shape[0])).to(self.device)
+            var = torch.ones((X.shape[0], 1)).to(self.device)
             for fid in range(self.n_fid):
                 idx_fid = torch.where(fid_tensor == fid)[0]
                 var[idx_fid] = self.oracle[fid].sigma ** 2
+                mean[idx_fid] = self.oracle[fid](state_tensor[idx_fid])
             # posterior of max samples
+            mean = mean.unsqueeze(-1)
+            mean = mean * (-0.1)
             covar = [torch.diag(var[i]) for i in range(X.shape[0])]
             covar = torch.stack(covar, axis=0)
 

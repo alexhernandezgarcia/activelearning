@@ -5,6 +5,7 @@ from torchtyping import TensorType
 from gflownet.envs.base import GFlowNetEnv
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
 
 
 class MultiFidelityEnvWrapper(GFlowNetEnv):
@@ -37,9 +38,14 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # self.proxy = self.call_oracle_per_fidelity
         # self.state2oracle = self.env.state2oracle
         self.oracle = oracle
-        # TODO: make dynamic depending on no of fidelities
-        self.fidelity_costs = {0: 0.5, 1: 0.6, 2: 0.7}
+        self.fidelity_costs = self.set_fidelity_costs()
         self.reset()
+
+    def set_fidelity_costs(self):
+        fidelity_costs = {}
+        for idx in range(self.n_fid):
+            fidelity_costs[float(idx)] = self.oracle[idx].cost
+        return fidelity_costs
 
     def copy(self):
         env_copy = self.env.copy()
@@ -271,10 +277,23 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             return None
 
     def plot_samples_frequency(self, samples, **kwargs):
-        if hasattr(self.env, "plot_samples_frequency"):
-            return self.env.plot_samples_frequency(samples, **kwargs)
-        else:
-            return None
+        width = (self.n_fid) * 5
+        fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        # TODO: optimize
+        # sample_only = [sample[:-1] for sample in samples]
+        # axs[0] = self.env.plot_samples_frequency(sample_only, axs[0], "All Fidelities")
+        for fid in range(0, self.n_fid):
+            samples_fid = [sample[:-1] for sample in samples if sample[-1] == fid]
+            if hasattr(self.env, "plot_samples_frequency"):
+                axs[fid] = self.env.plot_samples_frequency(
+                    samples_fid, axs[fid], "Fidelity {}".format(fid)
+                )
+            else:
+                return None
+        fig.suptitle("Frequency of Coordinates Sampled")
+        plt.tight_layout()
+        plt.show()
+        return fig
 
     def get_cost(self, samples):
         fidelities = [sample[-1] for sample in samples]

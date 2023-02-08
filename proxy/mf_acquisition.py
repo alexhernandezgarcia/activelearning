@@ -25,6 +25,7 @@ class MultiFidelityMES(Proxy):
         env,
         is_model_oracle,
         n_fid,
+        fixed_cost,
         regressor=None,
         oracle=None,
         data_path=None,
@@ -39,6 +40,7 @@ class MultiFidelityMES(Proxy):
         self.oracle = oracle
         self.env = env
         self.user_defined_cost = user_defined_cost
+        self.fixed_cost = 1e-6
         # TODO: remove member variable candidate_set as
         self.candidate_set = self.load_candidate_set()
         self.load_model(regressor, num_dropout_samples)
@@ -59,18 +61,18 @@ class MultiFidelityMES(Proxy):
             # dict[fidelity] = cost
             self.cost_aware_utility = FidelityCostModel(
                 fidelity_weights=self.env.fidelity_costs,
-                fixed_cost=0.1,
+                fixed_cost=self.fixed_cost,
                 device=self.device,
             )
         elif self.is_model_oracle:
             # target fidelity is 2.0
             cost_model = AffineFidelityCostModel(
-                fidelity_weights={-1: 2.0}, fixed_cost=0.1
+                fidelity_weights={-1: 2.0}, fixed_cost=self.fixed_cost
             )
             self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
         else:
             cost_model = AffineFidelityCostModel(
-                fidelity_weights={-1: 1.0, -2: 0.0, -3: 0.0}, fixed_cost=0.1
+                fidelity_weights={-1: 1.0, -2: 0.0, -3: 0.0}, fixed_cost=self.fixed_cost
             )
             self.cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
 

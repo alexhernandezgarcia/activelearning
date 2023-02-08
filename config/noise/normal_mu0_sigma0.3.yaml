@@ -1,2 +1,12 @@
-mu: 0
-sigma: 0.8
+noise:
+  mu: 0
+  sigma: 0.15
+valid:
+  xmin: 10
+  xmax: 19
+  ymin: 0
+  ymax: 19
+cost: 0.005
+
+# the parameters within active are specific to grid right now
+# might want to rename to toy grid oracle
