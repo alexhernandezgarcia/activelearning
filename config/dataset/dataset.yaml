@@ -1,8 +1,17 @@
 _target_: dataset.DataHandler
 
-normalise_data: True
-shuffle_data: True
+normalise_data: False
 train_fraction: 0.8
-batch_size: 32
-seed_data: 0
-n_samples: 1000
+dataloader: 
+  train: 
+    batch_size: 32
+    shuffle: True
+  test:
+    batch_size: 32
+    shuffle: True
+split: null
+path: 
+  # to load the initial dataset from this path
+  oracle_dataset: null
+  # to store the dataset
+  dataset: data

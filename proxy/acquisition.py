@@ -1,66 +1,52 @@
-from gflownet.proxy.base import Proxy
-import numpy as np
-import os
 import torch
 from .botorch_models import ProxyBotorchUCB
 from botorch.acquisition.monte_carlo import qUpperConfidenceBound
 from botorch.sampling import SobolQMCNormalSampler
+from .dropout_regressor import DropoutRegressor
+import numpy as np
 
-
-class DropoutRegressor(Proxy):
-    def __init__(self, regressor, num_dropout_samples, model_path) -> None:
-        super().__init__()
-        self.regressor = regressor
-        self.num_dropout_samples = num_dropout_samples
-        if os.path.exists(model_path):
-            regressor.load_model(model_path)
-        else:
+class UCB(DropoutRegressor):
+    def __init__(self, kappa, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.kappa = kappa
+        if not self.regressor.load_model():
             raise FileNotFoundError
 
     def __call__(self, inputs):
         """
-        Args:
-            inputs: proxy-compatible input tensor
+        Args
+            inputs: batch x obs_dim
         Returns:
-            vanilla rewards (with no power/boltzmann) transformation
-
-        """
-        self.regressor.model.train()
-        with torch.no_grad():
-            mean, std, var = self.regressor.model(inputs)
-        return mean, std, var
-
-
-class UCB(DropoutRegressor):
-    def __init__(self, regressor, num_dropout_samples, model_path, kappa) -> None:
-        super().__init__(regressor, model_path, num_dropout_samples)
-        self.kappa = kappa
-
-    def __call__(self, inputs):
-        self.regressor.model.train()
+            score of dim (n_samples,), i.e, ndim=1"""
+        if isinstance(inputs, np.ndarray):
+            inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
             inputs, self.num_dropout_samples
         )
         mean, std = torch.mean(outputs, dim=1), torch.std(outputs, dim=1)
         score = mean + self.kappa * std
-        score = torch.Tensor(score)
-        score = score.unsqueeze(1)
+        score = torch.Tensor(score).detach().cpu().numpy()
         return score
 
 
 class BotorchUCB(UCB):
-    def __init__(self, regressor, num_dropout_samples, model_path, sampler, kappa):
-        super().__init__(regressor, num_dropout_samples, model_path, kappa)
-        self.model = ProxyBotorchUCB(regressor, self.num_dropout_samples)
+    def __init__(self, sampler, **kwargs):
+        super().__init__(**kwargs)
+        self.sampler_config = sampler
+        if not self.regressor.load_model():
+            raise FileNotFoundError
+        self.model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
         self.sampler = SobolQMCNormalSampler(
-            num_samples=sampler.num_samples,
-            seed=sampler.seed,
-            resample=sampler.resample,
+            sample_shape=torch.Size([self.sampler_config.num_samples]),
+            seed=self.sampler_config.seed,
         )
 
     def __call__(self, inputs):
+        if isinstance(inputs, np.ndarray):
+            inputs = torch.FloatTensor(inputs).to(self.device)
+        inputs = inputs.unsqueeze(-2)
         UCB = qUpperConfidenceBound(
             model=self.model, beta=self.kappa, sampler=self.sampler
         )
         acq_values = UCB(inputs)
-        return acq_values
+        return acq_values.detach().cpu().numpy()

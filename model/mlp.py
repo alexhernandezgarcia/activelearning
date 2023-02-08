@@ -1,13 +1,19 @@
 import torch.nn as nn
-from .regressor import ACTIVATION_KEY
 import torch
+
+ACTIVATION_KEY = {
+    "tanh": nn.Tanh(),
+    "relu": nn.ReLU(),
+    "sigmoid": nn.Sigmoid(),
+    "leaky_relu": nn.LeakyReLU(),
+}
 
 
 class MLP(nn.Module):
     def __init__(
         self,
-        hidden_dim,
-        num_layer,
+        n_hid,
+        n_layers,
         num_output,
         dropout_prob,
         activation,
@@ -25,12 +31,12 @@ class MLP(nn.Module):
         self.activation = ACTIVATION_KEY[activation]
 
         # TODO: this is grid specific for now, make it general (for apatamers and torus)
-        self.input_max_length = config_env.n_dim
-        self.input_classes = config_env.length
+        self.input_max_length = config_env.max_seq_length  # config_env.n_dim
+        self.input_classes = config_env.n_alphabet  # config_env.length
         self.out_dim = num_output
 
         if transformerCall == False:
-            self.hidden_layers = [hidden_dim] * num_layer
+            self.hidden_layers = [n_hid] * n_layers
             self.dropout_prob = dropout_prob
             self.init_layer_depth = int((self.input_classes) * (self.input_max_length))
 
@@ -64,9 +70,7 @@ class MLP(nn.Module):
 
         """
         # Pads the tensor till maximum length of dataset
-        input = torch.zeros(x.shape[0], self.input_max_length, self.input_classes)
-        input[:, : x.shape[1], :] = x
-        # Reshapes the tensor to batch_size x init_layer_depth
-        x = input.reshape(x.shape[0], -1)
+        input = torch.zeros(x.shape[0], self.input_max_length * self.input_classes)
+        input[:, : x.shape[1]] = x
         # Performs a forward call
         return self.model(x)

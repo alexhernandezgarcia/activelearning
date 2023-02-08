@@ -13,3 +13,7 @@ sh/
 !requirements.txt
 *.out
 wandb/
+logs/
+*.dat
+config/experiment/
+storage/amp/

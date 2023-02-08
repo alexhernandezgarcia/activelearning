@@ -1,5 +1,3 @@
-_target_: proxy.acquisition.DropoutRegressor
-# TODO: add a base init config file
-
-num_dropout_samples: 20
-model_path: "./storage/model_proxy/proxy"
+defaults:
+  - base
+_target_: proxy.dropout_regressor.DropoutRegressor
