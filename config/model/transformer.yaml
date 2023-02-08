@@ -1,9 +1,19 @@
+<<<<<<< HEAD:config/model/transformer.yaml
 _target_: model.transformer.Transformer
 # Incomplete. Need to add transofmer specific parameters like embedding_dim
 activation: 'relu'
+=======
+_target_: model.mlp.Transformer
+
+hidden_dim: 256
+num_layer: 2
+dropout_prob: 0.0
+>>>>>>> b862df731e62bdde1f0e7b12b16b50c5846d3d66:config/network/transformer.yaml
 num_output: 1
-embed_dim: 256
+num_head: 8
+pre_ln: True
+factor: 2
+activation: 'relu'
 mlp:
-  hidden_dim: 128
   num_layer: 2
   dropout_prob: 0.1
