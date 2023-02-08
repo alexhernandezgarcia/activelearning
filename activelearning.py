@@ -149,13 +149,15 @@ def main(config):
                 data_path=config.multifidelity.candidate_set_path,
                 fixed_cost=config.multifidelity.fixed_cost,
             )
-            plot_context_points(env, proxy)
-            plot_acquisition(env, 0, proxy)
-            plot_acquisition(env, 1, proxy)
-            plot_acquisition(env, 2, proxy)
-            plot_predictions_oracle(env, 0)
-            plot_predictions_oracle(env, 1)
-            plot_predictions_oracle(env, 2)
+            # fig = proxy.plot_context_points()
+            # logger.log_figure("context_points", fig, True)
+            # plot_context_points(env, proxy)
+            # plot_acquisition(env, 0, proxy)
+            # plot_acquisition(env, 1, proxy)
+            # plot_acquisition(env, 2, proxy)
+            # plot_predictions_oracle(env, 0)
+            # plot_predictions_oracle(env, 1)
+            # plot_predictions_oracle(env, 2)
 
         env.proxy = proxy
         gflownet = hydra.utils.instantiate(

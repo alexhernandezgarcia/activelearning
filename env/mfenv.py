@@ -270,18 +270,15 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         else:
             return None
 
-    def plot_reward_samples(self, samples, **kwargs):
-        if hasattr(self.env, "plot_reward_samples"):
-            return self.env.plot_reward_samples(samples, **kwargs)
-        else:
-            return None
+    # def plot_reward_samples(self, samples, rewards = None, **kwargs):
+    #     if hasattr(self.env, "plot_reward_samples"):
+    #         return self.env.plot_reward_samples(samples, **kwargs)
+    #     else:
+    #         return None
 
     def plot_samples_frequency(self, samples, **kwargs):
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
-        # TODO: optimize
-        # sample_only = [sample[:-1] for sample in samples]
-        # axs[0] = self.env.plot_samples_frequency(sample_only, axs[0], "All Fidelities")
         for fid in range(0, self.n_fid):
             samples_fid = [sample[:-1] for sample in samples if sample[-1] == fid]
             if hasattr(self.env, "plot_samples_frequency"):

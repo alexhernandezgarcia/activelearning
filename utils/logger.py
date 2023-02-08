@@ -3,6 +3,7 @@ import torch
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 class AL_Logger(Logger):
@@ -74,3 +75,14 @@ class AL_Logger(Logger):
             name = Path(self.data_path.stem + "_" + type + ".csv")
             path = self.data_path.parent / name
             data.to_csv(path)
+
+    def log_figure(self, key, fig, use_context):
+        if not self.do.online and fig is not None:
+            plt.close(fig)
+            return
+        if use_context:
+            key = self.context + "/" + key
+        if fig is not None:
+            figimg = self.wandb.Image(fig)
+            self.wandb.log({key: figimg})
+            plt.close(fig)

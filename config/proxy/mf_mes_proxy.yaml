@@ -1,0 +1,4 @@
+defaults:
+  - base
+_target_: proxy.mes.ProxyMultiFidelityMES
+cost_type: user

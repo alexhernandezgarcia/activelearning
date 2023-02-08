@@ -1,5 +1,5 @@
 defaults:
   - base
-_target_: proxy.mf_acquisition.MultiFidelityMES
+_target_: proxy.mes.GaussianProcessMultiFidelityMES
 data_path: /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
-is_model_oracle: False
+cost_type: user

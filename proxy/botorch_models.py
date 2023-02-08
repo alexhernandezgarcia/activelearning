@@ -102,12 +102,6 @@ class MultifidelityOracleModel(Model):
 
     def posterior(self, X, observation_noise=False, posterior_transform=None):
         super().posterior(X, observation_noise, posterior_transform)
-
-        """
-        In this implemenntation, the mean is the same irrespective of the fidelity.
-        Just the cost and the uncertainty depend on the fidelity.
-        The mean is the true score, so mean_curr_fidelity = mean_max_fidelity.
-        """
         covar_mm = torch.FloatTensor(
             [
                 [self.oracle[0].sigma ** 2, (0.015) ** 2, (5e-3) ** 2],
