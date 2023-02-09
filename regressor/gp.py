@@ -2,7 +2,10 @@ import torch
 import gpytorch
 from tqdm import tqdm
 import hydra
-from botorch.models.gp_regression_fidelity import SingleTaskMultiFidelityGP
+from botorch.models.gp_regression_fidelity import (
+    SingleTaskMultiFidelityGP,
+    FixedNoiseMultiFidelityGP,
+)
 from botorch.models.transforms.outcome import Standardize
 from botorch.fit import fit_gpytorch_mll
 
@@ -42,7 +45,7 @@ class MultitaskGPRegressor:
         self.model = SingleTaskMultiFidelityGP(
             train_x,
             train_y,
-            outcome_transform=Standardize(m=1),
+            # outcome_transform=Standardize(m=1),
             # fid column
             data_fidelity=self.n_fid - 1,
         )

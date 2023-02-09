@@ -290,6 +290,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         fig.suptitle("Frequency of Coordinates Sampled")
         plt.tight_layout()
         plt.show()
+        plt.close()
         return fig
 
     def get_cost(self, samples):

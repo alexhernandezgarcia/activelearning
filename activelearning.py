@@ -17,6 +17,7 @@ from utils.multifidelity_toy import (
     plot_acquisition,
     plot_context_points,
     plot_predictions_oracle,
+    plot_gp_predictions,
 )
 from pathlib import Path
 import pandas as pd
@@ -60,6 +61,7 @@ def main(config):
             float_precision=config.float_precision,
         )
         # target fidelity must be the last fidelity
+        # env_arg needed to find the bounds and mask them
         # config._noise_dict = dict( sorted(config._noise_dict.items(), key=operator.itemgetter(1),reverse=True))
         for fid in range(1, N_FID + 1):
             toy = ToyOracle(
@@ -131,6 +133,11 @@ def main(config):
             logger.set_context(iter)
         if config.multifidelity.proxy == True:
             regressor.fit()
+            fig = plot_gp_predictions(env, regressor)
+            logger.log_figure("gp_predictions", fig, use_context=True)
+            # plot_gp_predictions(env, regressor, 0)
+            # plot_gp_predictions(env, regressor, 1)
+            # plot_gp_predictions(env, regressor, 2)
             # TODO: remove if condition and check if proxy initialisation works with both oracle and proxy
             proxy = hydra.utils.instantiate(
                 config.proxy,

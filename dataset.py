@@ -105,7 +105,7 @@ class DataHandler:
                     fidelities[i * len(states) : (i + 1) * len(states), 0] = i
                 states = states.repeat(self.n_fid, 1)
 
-            state_fid = torch.cat([states, fidelities], dim=1).long()
+            state_fid = torch.cat([states, fidelities], dim=1)
             states_fid_oracle = self.env.statetorch2oracle(state_fid)
             scores = self.env.call_oracle_per_fidelity(states_fid_oracle)
 
@@ -113,19 +113,6 @@ class DataHandler:
                 fig = self.env.env.plot_samples_frequency(states, title="Train Dataset")
                 self.logger.log_figure("train_dataset", fig, use_context=True)
 
-            # fig = self.env.plot_reward_samples(states, scores, "Train Dataset")
-            # self.logger.log_figure(fig, "train_dataset")
-            # index = states.long().detach().cpu().numpy()
-            # # data_scores = np.reshape(scores.detach().cpu().numpy(), (10, 10))
-            # grid_scores = np.ones((20, 20)) * (5.0)
-            # grid_scores[index[:, 0], index[:, 1]] = scores.detach().cpu().numpy()
-            # plt.imshow(grid_scores)
-            # plt.colorbar()
-            # plt.title("Train Data")
-            # plt.savefig(
-            #     "/home/mila/n/nikita.saxena/activelearning/storage/grid/train_data.png"
-            # )
-            # plt.close()
             samples = state_fid.tolist()
             targets = scores.tolist()
 
@@ -306,7 +293,7 @@ class DataHandler:
 
         states = self.env.statebatch2proxy(states)
         if isinstance(states, list):
-            states = torch.FloatTensor(np.array(states))
+            states = torch.tensor(np.array(states), dtype=self.float)
         energies = torch.tensor(energies, dtype=self.float)
 
         if self.normalise_data:
