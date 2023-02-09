@@ -43,20 +43,22 @@ class MultitaskGPRegressor:
             train_x,
             train_y,
             outcome_transform=Standardize(m=1),
+            # fid column
             data_fidelity=self.n_fid - 1,
         )
         # self.model = hydra.utils.instantiate(
         #     self.config_model,
         #     n_fid=self.n_fid, train_x = train_x, train_y = train_y, likelihood = self.likelihood, _recursive_=False).to(self.device)
-        self.optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        )
+        # self.optimizer = torch.optim.Adam(
+        #     self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay
+        # )
 
     def fit(self):
 
         train = self.dataset.train_dataset
         train_x = train["samples"]
-        train_y = train["energies"].unsqueeze(-1)
+        # HACK: we want to maximise the energy, so we multiply by -1
+        train_y = train["energies"].unsqueeze(-1) * (-1)
         # samples, energies = self.dataset.shuffle(samples, energies)
         # train_x = samples[:self.n_samples, :-1].to(self.device)
         # targets = energies.to(self.device)
@@ -67,12 +69,12 @@ class MultitaskGPRegressor:
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(
             self.model.likelihood, self.model
         )
-        fit_gpytorch_mll(mll)
+        mll = fit_gpytorch_mll(mll)
 
-        print("Completed training of GP model")
+        # print("Completed training of GP model? ", not mll.training)
 
         # self.model.train()
-        # self.likelihood.train()
+        # self.model.likelihood.train()
 
         # pbar = tqdm(range(1, self.max_iter + 1), disable=not self.progress)
 
@@ -80,10 +82,10 @@ class MultitaskGPRegressor:
         #     self.optimizer.zero_grad()
         #     output = self.model(train_x)
         #     loss = -mll(output, train_y)
-        #     loss.backward()
+        #     loss.mean().backward()
         #     if self.progress:
         #         description = "Iter:{} | Train MLL: {:.4f}".format(
-        #             training_iter, loss.item()
+        #             training_iter, loss.mean().item()
         #         )
         #         pbar.set_description(description)
         #     self.optimizer.step()

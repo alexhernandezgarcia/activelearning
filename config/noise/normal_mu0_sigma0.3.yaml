@@ -6,7 +6,7 @@ valid:
   xmax: 19
   ymin: 0
   ymax: 19
-cost: 0.005
+cost: 0.5
 
 # the parameters within active are specific to grid right now
 # might want to rename to toy grid oracle

@@ -3,21 +3,27 @@ from botorch.models.model import Model
 from gpytorch.distributions import MultivariateNormal, MultitaskMultivariateNormal
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from botorch.acquisition.cost_aware import CostAwareUtility
+from gflownet.utils.common import set_device, set_float_precision
 
 
 class FidelityCostModel(CostAwareUtility):
-    def __init__(self, fidelity_weights, fixed_cost, device):
+    def __init__(self, fidelity_weights, fixed_cost, device, float_precision):
         super().__init__()
         self.fidelity_weights = fidelity_weights
         self.device = device
-        self.fixed_cost = torch.FloatTensor([fixed_cost]).to(self.device)
+        self.fixed_cost = torch.tensor([fixed_cost], dtype=float_precision).to(
+            self.device
+        )
+        self.float = float_precision
 
     def forward(self, X, deltas, **kwargs):
         fidelity = X[:, 0, -1]
-        scaled_deltas = torch.zeros(X.shape[0]).to(self.device)
+        scaled_deltas = torch.zeros(X.shape[0], dtype=self.float).to(self.device)
         for fid in range(len(self.fidelity_weights)):
             idx_fid = torch.where(fidelity == fid)[0]
-            cost_fid = torch.FloatTensor([self.fidelity_weights[fid]]).to(self.device)
+            cost_fid = torch.tensor([self.fidelity_weights[fid]], dtype=self.float).to(
+                self.device
+            )
             scaled_deltas[idx_fid] = (deltas[0, idx_fid] / cost_fid) + self.fixed_cost
         scaled_deltas = scaled_deltas.unsqueeze(0)
         return scaled_deltas

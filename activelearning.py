@@ -97,7 +97,12 @@ def main(config):
 
     if config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
-            config.dataset, env=env, logger=logger, oracle=oracle, device=config.device
+            config.dataset,
+            env=env,
+            logger=logger,
+            oracle=oracle,
+            device=config.device,
+            float_precision=config.float_precision,
         )
         regressor = hydra.utils.instantiate(
             config.regressor,
@@ -152,13 +157,13 @@ def main(config):
             )
             # fig = proxy.plot_context_points()
             # logger.log_figure("context_points", fig, True)
-            # plot_context_points(env, proxy)
-            # plot_acquisition(env, 0, proxy)
-            # plot_acquisition(env, 1, proxy)
-            # plot_acquisition(env, 2, proxy)
-            # plot_predictions_oracle(env, 0)
-            # plot_predictions_oracle(env, 1)
-            # plot_predictions_oracle(env, 2)
+        # plot_context_points(env, proxy)
+        # plot_acquisition(env, 0, proxy)
+        # plot_acquisition(env, 1, proxy)
+        # plot_acquisition(env, 2, proxy)
+        # plot_predictions_oracle(env, 0)
+        # plot_predictions_oracle(env, 1)
+        # plot_predictions_oracle(env, 2)
 
         env.proxy = proxy
         gflownet = hydra.utils.instantiate(

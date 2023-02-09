@@ -11,11 +11,14 @@ from botorch.models.cost import AffineFidelityCostModel
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 
 from gpytorch.functions import inv_quad
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 CLAMP_LB = 1.0e-8
 from botorch.models.utils import check_no_nans
 from .botorch_models import FidelityCostModel
 from abc import abstractmethod
+import matplotlib.pyplot as plt
 
 # class MultiFidelityMES(Proxy):
 #     def __init__(
@@ -153,12 +156,12 @@ class MultiFidelityMES(Proxy):
         self.fixed_cost = fixed_cost
         self.logger = logger
         self.n_fid = len(self.env.fidelity_costs)
-        candidate_set = self.load_candidate_set()
+        self.candidate_set = self.load_candidate_set()
         cost_aware_utility = self.get_cost_utility()
         model = self.load_model()
         self.qMES = qMultiFidelityLowerBoundMaxValueEntropy(
             model,
-            candidate_set=candidate_set,
+            candidate_set=self.candidate_set,
             project=self.project,
             cost_aware_utility=cost_aware_utility,
         )
@@ -181,6 +184,7 @@ class MultiFidelityMES(Proxy):
                 fidelity_weights=self.env.fidelity_costs,
                 fixed_cost=self.fixed_cost,
                 device=self.device,
+                float_precision=self.float,
             )
         elif self.cost_type == "botorch":
             cost_model = AffineFidelityCostModel(
@@ -298,6 +302,8 @@ class GaussianProcessMultiFidelityMES(MultiFidelityMES):
     def __init__(self, regressor, **kwargs):
         self.regressor = regressor
         super().__init__(**kwargs)
+        fig = self.plot_acquisition_rewards()
+        self.logger.log_figure("acquisition_rewards", fig, use_context=True)
 
     def load_model(self):
         return self.regressor.model
@@ -325,3 +331,40 @@ class GaussianProcessMultiFidelityMES(MultiFidelityMES):
             states = states[:, :-1]
             states = torch.cat([states, max_fid], dim=1)
         return states
+
+    def plot_acquisition_rewards(self, **kwargs):
+        states = torch.tensor(
+            self.env.env.get_all_terminating_states(), dtype=self.float
+        ).to(self.device)
+        n_states = states.shape[0]
+        fidelities = torch.zeros((len(states) * self.n_fid, 1), dtype=self.float).to(
+            self.device
+        )
+        for i in range(self.n_fid):
+            fidelities[i * len(states) : (i + 1) * len(states), 0] = i
+        states = states.repeat(self.n_fid, 1)
+        state_fid = torch.cat([states, fidelities], dim=1)
+        states_fid_oracle = self.env.statetorch2oracle(state_fid)
+        states = states[:n_states]
+
+        scores = self(states_fid_oracle).detach().cpu().numpy()
+        width = (self.n_fid) * 5
+        fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        for fid in range(0, self.n_fid):
+            index = states.long().detach().cpu().numpy()
+            grid_scores = np.zeros((self.env.env.length, self.env.env.length))
+            grid_scores[index[:, 0], index[:, 1]] = scores[
+                fid * len(states) : (fid + 1) * len(states)
+            ]
+            axs[fid].set_xticks(np.arange(self.env.env.length))
+            axs[fid].set_yticks(np.arange(self.env.env.length))
+            axs[fid].imshow(grid_scores)
+            axs[fid].set_title("GP-Mes Reward with fid {}".format(fid))
+            im = axs[fid].imshow(grid_scores)
+            divider = make_axes_locatable(axs[fid])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+            plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig

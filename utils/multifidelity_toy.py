@@ -114,7 +114,7 @@ def plot_predictions_oracle(env, fid):
     plt.colorbar()
     plt.title("Ground Truth for fid {}".format(fid))
     plt.savefig(
-        "/home/mila/n/nikita.saxena/activelearning/storage/grid/round2/final_ground_truth_{}.png".format(
+        "/home/mila/n/nikita.saxena/activelearning/storage/grid/gp/final_ground_truth_{}.png".format(
             fid
         )
     )
@@ -134,7 +134,7 @@ def plot_acquisition(env, fid, mf_mes_oracle):
     plt.colorbar()
     plt.title("Reward with fid {}".format(fid))
     plt.savefig(
-        "/home/mila/n/nikita.saxena/activelearning/storage/grid/round2/final_diff_mean_fid{}.png".format(
+        "/home/mila/n/nikita.saxena/activelearning/storage/grid/gp/updated_cost_fid{}.png".format(
             fid
         )
     )
@@ -158,7 +158,7 @@ def plot_context_points(env, mf_mes_oracle):
     plt.colorbar()
     plt.title("Context points Lower Quadrant")
     plt.savefig(
-        "/home/mila/n/nikita.saxena/activelearning/storage/grid/final_diff_mean_context.png"
+        "/home/mila/n/nikita.saxena/activelearning/storage/grid/gp/updated_cost_context.png"
     )
     plt.close()
 

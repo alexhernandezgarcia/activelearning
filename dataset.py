@@ -7,6 +7,7 @@ from pathlib import Path
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import matplotlib.pyplot as plt
+from gflownet.utils.common import set_device, set_float_precision
 
 
 class Data(Dataset):
@@ -42,6 +43,7 @@ class DataHandler:
         device,
         n_samples,
         mixed_fidelity,
+        float_precision,
     ):
         self.env = env
         self.normalise_data = normalise_data
@@ -58,6 +60,7 @@ class DataHandler:
         self.dataset_size = dataset_size
         self.device = device
         self.n_fid = self.env.n_fid
+        self.float = set_float_precision(float_precision)
         self.initialise_dataset()
 
     def initialise_dataset(self):
@@ -92,7 +95,7 @@ class DataHandler:
                 .to(self.device)
                 .long()
             )
-            if self.mixed_fidelity == False:
+            if self.mixed_fidelity == True:
                 fidelities = torch.randint(0, self.n_fid, (len(states), 1)).to(
                     self.device
                 )
@@ -105,6 +108,10 @@ class DataHandler:
             state_fid = torch.cat([states, fidelities], dim=1).long()
             states_fid_oracle = self.env.statetorch2oracle(state_fid)
             scores = self.env.call_oracle_per_fidelity(states_fid_oracle)
+
+            if hasattr(self.env.env, "plot_samples_frequency"):
+                fig = self.env.env.plot_samples_frequency(states, title="Train Dataset")
+                self.logger.log_figure("train_dataset", fig, use_context=True)
 
             # fig = self.env.plot_reward_samples(states, scores, "Train Dataset")
             # self.logger.log_figure(fig, "train_dataset")
@@ -224,7 +231,7 @@ class DataHandler:
         else:
             samples = state_proxy
         # TODO: delete this keep everything in tensor only, Remove list conversion
-        targets = torch.FloatTensor(targets)
+        targets = torch.tensor(targets, dtype=self.float)
 
         dataset = {"samples": samples, "energies": targets}
 
@@ -290,8 +297,17 @@ class DataHandler:
         }
         self.logger.save_dataset(readable_dataset, "sampled")
 
-        states = torch.FloatTensor(np.array(self.env.statebatch2proxy(states)))
-        energies = torch.FloatTensor(energies)
+        # plot the frequency of sampled dataset
+        if hasattr(self.env.env, "plot_samples_frequency"):
+            fig = self.env.env.plot_samples_frequency(states, title="Sampled Dataset")
+            self.logger.log_figure(
+                "post_al_iter_sampled_dataset", fig, use_context=True
+            )
+
+        states = self.env.statebatch2proxy(states)
+        if isinstance(states, list):
+            states = torch.FloatTensor(np.array(states))
+        energies = torch.tensor(energies, dtype=self.float)
 
         if self.normalise_data:
             self.train_dataset["energies"] = self.denormalise(
@@ -326,14 +342,21 @@ class DataHandler:
                     self.train_stats["max"],
                 )
             )
-            print(
-                "Test \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
-                    self.test_stats["mean"],
-                    self.test_stats["std"],
-                    self.test_stats["min"],
-                    self.test_stats["max"],
+            if self.test_stats is not None:
+                print(
+                    "Test \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                        self.test_stats["mean"],
+                        self.test_stats["std"],
+                        self.test_stats["min"],
+                        self.test_stats["max"],
+                    )
                 )
-            )
+
+        # Update data_train.csv
+        path = self.logger.data_path.parent / Path("data_train.csv")
+        dataset = pd.read_csv(path, index_col=0)
+        dataset = pd.concat([dataset, pd.DataFrame(readable_dataset)])
+        self.logger.save_dataset(dataset, "train")
 
     def reshuffle(self):
         # TODO: Deprecated. Remove once sure it's not used.

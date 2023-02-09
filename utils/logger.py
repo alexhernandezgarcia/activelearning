@@ -86,4 +86,4 @@ class AL_Logger(Logger):
         if fig is not None:
             figimg = self.wandb.Image(fig)
             self.wandb.log({key: figimg})
-            plt.close(fig)
+            plt.close()
