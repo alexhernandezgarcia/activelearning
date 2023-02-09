@@ -1,1 +1,5 @@
-_target_: regressor.gp.MultiTaskGP
+_target_: regressor.gp.MultitaskGPRegressor
+
+max_iter: 500
+lr: 1e-2
+weight_decay: 1e-4
