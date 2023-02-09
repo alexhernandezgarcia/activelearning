@@ -60,7 +60,7 @@ class DropoutRegressor:
         if checkpoint:
             self.logger.set_proxy_path(checkpoint)
 
-    def init_model(self):
+    def initialize_model(self):
         """
         Initialize the network (MLP, Transformer, RNN)
         """
@@ -87,7 +87,7 @@ class DropoutRegressor:
         )
         path = self.logger.proxy_ckpt_path.parent / name
 
-        self.init_model()
+        self.initialize_model()
         if os.path.exists(path):
             checkpoint = torch.load(path, map_location="cuda:0")
             self.model.load_state_dict(checkpoint["model_state_dict"])
@@ -107,7 +107,7 @@ class DropoutRegressor:
         Trains the model and saves it once convergence is attained.
         """
         # we reset the model, cf primacy bias, here we train on more and more data
-        self.init_model()
+        self.initialize_model()
 
         # for statistics we save the tr and te errors
         [self.err_train_hist, self.err_test_hist] = [[], []]

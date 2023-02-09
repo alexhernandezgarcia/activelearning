@@ -151,11 +151,11 @@ class MultiFidelityMES(Proxy):
         self.env = env
         self.cost_type = cost_type
         self.fixed_cost = fixed_cost
-        self.n_fid = len(env.fidelity_costs)
+        self.logger = logger
+        self.n_fid = len(self.env.fidelity_costs)
         candidate_set = self.load_candidate_set()
         cost_aware_utility = self.get_cost_utility()
         model = self.load_model()
-        self.logger = logger
         self.qMES = qMultiFidelityLowerBoundMaxValueEntropy(
             model,
             candidate_set=candidate_set,
@@ -237,6 +237,16 @@ class ProxyMultiFidelityMES(MultiFidelityMES):
             states = torch.cat([states, max_fid], dim=1)
         return states
 
+    def load_candidate_set(self):
+        path = self.logger.data_path.parent / Path("data_train.csv")
+        data = pd.read_csv(path, index_col=0)
+        samples = data["samples"]
+        state = [self.env.readable2state(sample) for sample in samples]
+        state_proxy = self.env.statebatch2proxy(state)
+        if isinstance(state_proxy, torch.Tensor):
+            return state_proxy.to(self.device)
+        return torch.FloatTensor(state_proxy).to(self.device)
+
 
 class OracleMultiFidelityMES(MultiFidelityMES):
     def __init__(self, data_path, oracle, **kwargs):
@@ -284,6 +294,34 @@ class OracleMultiFidelityMES(MultiFidelityMES):
         )
 
 
-# class GaussianProcessMultiFidelityMES():
-#     def __init__()
-#         self.load
+class GaussianProcessMultiFidelityMES(MultiFidelityMES):
+    def __init__(self, regressor, **kwargs):
+        self.regressor = regressor
+        super().__init__(**kwargs)
+
+    def load_model(self):
+        return self.regressor.model
+
+    def load_candidate_set(self):
+        path = self.logger.data_path.parent / Path("data_train.csv")
+        data = pd.read_csv(path, index_col=0)
+        samples = data["samples"]
+        state = [self.env.readable2state(sample) for sample in samples]
+        state_proxy = self.env.statebatch2proxy(state)[: self.regressor.n_samples]
+        if isinstance(state_proxy, torch.Tensor):
+            return state_proxy.to(self.device)
+        return torch.FloatTensor(state_proxy).to(self.device)
+
+    def project(self, states):
+        input_dim = states.ndim
+        max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
+            self.n_fid - 1
+        )
+        if input_dim == 3:
+            states = states[:, :, :-1]
+            max_fid = max_fid.unsqueeze(1)
+            states = torch.cat([states, max_fid], dim=2)
+        elif input_dim == 2:
+            states = states[:, :-1]
+            states = torch.cat([states, max_fid], dim=1)
+        return states

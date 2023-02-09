@@ -1,5 +1,4 @@
 defaults:
   - base
 _target_: proxy.mes.GaussianProcessMultiFidelityMES
-data_path: /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
 cost_type: user

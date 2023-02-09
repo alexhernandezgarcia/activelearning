@@ -59,7 +59,8 @@ class AL_Logger(Logger):
             return
         for key in train_stats.keys():
             self.log_metric("train_" + key, train_stats[key], use_context=False)
-            self.log_metric("test_" + key, test_stats[key], use_context=False)
+            if test_stats is not None:
+                self.log_metric("test_" + key, test_stats[key], use_context=False)
 
     def set_data_path(self, data_path: str = None):
         if data_path is None:

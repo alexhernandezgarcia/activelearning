@@ -40,14 +40,18 @@ class DataHandler:
         split,
         dataset_size,
         device,
+        n_samples,
+        mixed_fidelity,
     ):
         self.env = env
         self.normalise_data = normalise_data
         self.train_fraction = train_fraction
+        self.n_samples = n_samples
         self.dataloader = dataloader
         self.split = split
         self.path = path
         self.logger = logger
+        self.mixed_fidelity = mixed_fidelity
         self.progress = self.logger.progress
         self.oracle = oracle
         self.logger.set_data_path(self.path.dataset)
@@ -79,28 +83,44 @@ class DataHandler:
             # for AMP this is the implementation
             # dataset = self.env.load_dataset()
             # for grid, I call uniform states. Need to make it uniform
+            if self.progress:
+                print("Creating dataset of size: ", self.n_samples)
             states = (
-                torch.Tensor(self.env.env.get_uniform_terminating_states(100))
+                torch.Tensor(
+                    self.env.env.get_uniform_terminating_states(self.n_samples)
+                )
                 .to(self.device)
                 .long()
             )
-            fidelities = torch.randint(0, self.n_fid, (len(states), 1)).to(self.device)
-            state_fid = torch.cat([states, fidelities], dim=1)
+            if self.mixed_fidelity == False:
+                fidelities = torch.randint(0, self.n_fid, (len(states), 1)).to(
+                    self.device
+                )
+            else:
+                fidelities = torch.zeros((len(states) * self.n_fid, 1)).to(self.device)
+                for i in range(self.n_fid):
+                    fidelities[i * len(states) : (i + 1) * len(states), 0] = i
+                states = states.repeat(self.n_fid, 1)
+
+            state_fid = torch.cat([states, fidelities], dim=1).long()
             states_fid_oracle = self.env.statetorch2oracle(state_fid)
             scores = self.env.call_oracle_per_fidelity(states_fid_oracle)
-            index = states.long().detach().cpu().numpy()
-            # data_scores = np.reshape(scores.detach().cpu().numpy(), (10, 10))
-            grid_scores = np.ones((20, 20)) * (5.0)
-            grid_scores[index[:, 0], index[:, 1]] = scores.detach().cpu().numpy()
-            plt.imshow(grid_scores)
-            plt.colorbar()
-            plt.title("Train Data")
-            plt.savefig(
-                "/home/mila/n/nikita.saxena/activelearning/storage/grid/train_data.png"
-            )
-            plt.close()
-            samples = state_fid.detach().tolist()
-            targets = scores.detach().tolist()
+
+            # fig = self.env.plot_reward_samples(states, scores, "Train Dataset")
+            # self.logger.log_figure(fig, "train_dataset")
+            # index = states.long().detach().cpu().numpy()
+            # # data_scores = np.reshape(scores.detach().cpu().numpy(), (10, 10))
+            # grid_scores = np.ones((20, 20)) * (5.0)
+            # grid_scores[index[:, 0], index[:, 1]] = scores.detach().cpu().numpy()
+            # plt.imshow(grid_scores)
+            # plt.colorbar()
+            # plt.title("Train Data")
+            # plt.savefig(
+            #     "/home/mila/n/nikita.saxena/activelearning/storage/grid/train_data.png"
+            # )
+            # plt.close()
+            samples = state_fid.tolist()
+            targets = scores.tolist()
 
         if self.split == "random":
             # randomly select 10 element from the list train_samples and test_samples
@@ -113,6 +133,11 @@ class DataHandler:
             train_samples, test_samples, train_targets, test_targets = train_test_split(
                 samples, targets, train_size=self.train_fraction
             )
+        elif self.split == "all_train":
+            train_samples = samples
+            train_targets = targets
+            test_samples = []
+            test_targets = []
             # else:
             # train_samples, test_samples = (
             #     dataset[0],
@@ -124,34 +149,38 @@ class DataHandler:
         readable_train_samples = [
             self.env.state2readable(sample) for sample in train_samples
         ]
-        readable_test_samples = [
-            self.env.state2readable(sample) for sample in test_samples
-        ]
         readable_train_dataset = {
             "samples": readable_train_samples,
             "energies": train_targets,
         }
-        readable_test_dataset = {
-            "samples": readable_test_samples,
-            "energies": test_targets,
-        }
-
         # Save the raw (un-normalised) dataset
         self.logger.save_dataset(readable_train_dataset, "train")
-        self.logger.save_dataset(readable_test_dataset, "test")
-
         self.train_dataset = {"samples": train_samples, "energies": train_targets}
-        self.test_dataset = {"samples": test_samples, "energies": test_targets}
 
         self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
         self.train_data = Data(
             self.train_dataset["samples"], self.train_dataset["energies"]
         )
 
-        self.test_dataset, self.test_stats = self.preprocess(self.test_dataset)
-        self.test_data = Data(
-            self.test_dataset["samples"], self.test_dataset["energies"]
-        )
+        if len(test_samples) > 0:
+            readable_test_samples = [
+                self.env.state2readable(sample) for sample in test_samples
+            ]
+            readable_test_dataset = {
+                "samples": readable_test_samples,
+                "energies": test_targets,
+            }
+            self.logger.save_dataset(readable_test_dataset, "test")
+            self.test_dataset = {"samples": test_samples, "energies": test_targets}
+
+            self.test_dataset, self.test_stats = self.preprocess(self.test_dataset)
+            self.test_data = Data(
+                self.test_dataset["samples"], self.test_dataset["energies"]
+            )
+        else:
+            self.test_dataset = None
+            self.test_data = None
+            self.test_stats = None
 
         # Log the dataset statistics
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
@@ -166,14 +195,15 @@ class DataHandler:
                     self.train_stats["max"],
                 )
             )
-            print(
-                "Test Data \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
-                    self.test_stats["mean"],
-                    self.test_stats["std"],
-                    self.test_stats["min"],
-                    self.test_stats["max"],
+            if self.test_stats is not None:
+                print(
+                    "Test Data \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                        self.test_stats["mean"],
+                        self.test_stats["std"],
+                        self.test_stats["min"],
+                        self.test_stats["max"],
+                    )
                 )
-            )
 
     def preprocess(self, dataset):
         """
@@ -189,7 +219,10 @@ class DataHandler:
         else:
             state_batch = samples
         state_proxy = self.env.statebatch2proxy(state_batch)
-        samples = torch.FloatTensor(state_proxy)
+        if isinstance(state_proxy, list):
+            samples = torch.FloatTensor(state_proxy)
+        else:
+            samples = state_proxy
         # TODO: delete this keep everything in tensor only, Remove list conversion
         targets = torch.FloatTensor(targets)
 
@@ -307,11 +340,9 @@ class DataHandler:
         """
         Reshuffle the entire dataset (called before creating train and test subsets)
         """
-        self.samples, self.targets, self.fidelity = shuffle(
+        self.samples, self.targets = shuffle(
             self.samples.numpy(),
             self.targets.numpy(),
-            self.fidelity.numpy(),
-            random_state=self.seed_data,
         )
 
     def collate_batch(self, batch):

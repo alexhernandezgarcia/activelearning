@@ -22,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="mf_debug_test")
+@hydra.main(config_path="./config", config_name="mf_gp_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -126,15 +126,16 @@ def main(config):
             logger.set_context(iter)
         if config.multifidelity.proxy == True:
             regressor.fit()
+            # TODO: remove if condition and check if proxy initialisation works with both oracle and proxy
             proxy = hydra.utils.instantiate(
                 config.proxy,
                 regressor=regressor,
                 device=config.device,
                 float_precision=config.float_precision,
-                n_fid=N_FID,
                 logger=logger,
                 oracle=oracles,
                 env=env,
+                fixed_cost=config.multifidelity.fixed_cost,
             )
         else:
             # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state
