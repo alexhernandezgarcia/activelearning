@@ -46,22 +46,30 @@ def main(config):
 
     N_FID = len(config._oracle_dict)
 
+    true_oracle = hydra.utils.instantiate(
+        config.true_oracle,
+        device=config.device,
+        float_precision=config.float_precision,
+    )
+
+    env = hydra.utils.instantiate(
+        config.env,
+        oracle=true_oracle,
+        device=config.device,
+        float_precision=config.float_precision,
+    )
+
     if N_FID > 1:
         oracles = []
         for fid in range(1, N_FID + 1):
             oracle = hydra.utils.instantiate(
                 config._oracle_dict[str(fid)],
+                oracle=true_oracle,
+                env=env,
                 device=config.device,
                 float_precision=config.float_precision,
             )
             oracles.append(oracle)
-
-    env = hydra.utils.instantiate(
-        config.env,
-        oracle=oracle,
-        device=config.device,
-        float_precision=config.float_precision,
-    )
 
     if N_FID > 1:
         env = MultiFidelityEnvWrapper(

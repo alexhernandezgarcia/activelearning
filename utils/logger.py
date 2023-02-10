@@ -79,7 +79,7 @@ class AL_Logger(Logger):
 
     def log_figure(self, key, fig, use_context):
         if not self.do.online and fig is not None:
-            plt.close(fig)
+            plt.close()
             return
         if use_context:
             key = self.context + "/" + key

@@ -8,30 +8,15 @@ from botorch.fit import fit_gpytorch_mll
 
 
 class MultitaskGPRegressor:
-    def __init__(
-        self,
-        logger,
-        device,
-        lr,
-        weight_decay,
-        max_iter,
-        dataset,
-        config_model,
-        **kwargs
-    ):
+    def __init__(self, logger, device, dataset, **kwargs):
 
         self.logger = logger
         self.device = device
-        self.config_model = config_model
 
         # Dataset
         self.dataset = dataset
         self.n_fid = dataset.n_fid
         self.n_samples = dataset.n_samples
-
-        self.max_iter = max_iter
-        self.lr = lr
-        self.weight_decay = weight_decay
 
         # Logger
         self.progress = self.logger.progress
@@ -46,12 +31,6 @@ class MultitaskGPRegressor:
             # fid column
             data_fidelity=self.n_fid - 1,
         )
-        # self.model = hydra.utils.instantiate(
-        #     self.config_model,
-        #     n_fid=self.n_fid, train_x = train_x, train_y = train_y, likelihood = self.likelihood, _recursive_=False).to(self.device)
-        # self.optimizer = torch.optim.Adam(
-        #     self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        # )
 
     def fit(self):
 
