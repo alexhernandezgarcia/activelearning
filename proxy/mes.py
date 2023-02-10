@@ -19,6 +19,7 @@ from botorch.models.utils import check_no_nans
 from .botorch_models import FidelityCostModel
 from abc import abstractmethod
 import matplotlib.pyplot as plt
+from torch.nn.utils.rnn import pad_sequence
 
 # class MultiFidelityMES(Proxy):
 #     def __init__(
@@ -246,10 +247,17 @@ class ProxyMultiFidelityMES(MultiFidelityMES):
         data = pd.read_csv(path, index_col=0)
         samples = data["samples"]
         state = [self.env.readable2state(sample) for sample in samples]
+        # states = pad_sequence(
+        #         states,
+        #         batch_first=True,
+        #         padding_value=self.env.env.invalid_state_element,
+        #     )
         state_proxy = self.env.statebatch2proxy(state)
         if isinstance(state_proxy, torch.Tensor):
             return state_proxy.to(self.device)
-        return torch.FloatTensor(state_proxy).to(self.device)
+        else:
+            state_proxy = torch.FloatTensor(state_proxy).to(self.device)
+        return state_proxy
 
 
 class OracleMultiFidelityMES(MultiFidelityMES):

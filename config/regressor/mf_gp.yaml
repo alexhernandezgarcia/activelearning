@@ -1,1 +1,1 @@
-_target_: regressor.gp.MultiTaskGP
+_target_: regressor.gp.MultitaskGPRegressor

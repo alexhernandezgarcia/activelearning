@@ -21,8 +21,8 @@ class MultiFidelityMLP(nn.Module):
     ):
         super(MultiFidelityMLP, self).__init__()
 
-        input_classes = config_env.length
-        input_max_length = config_env.n_dim
+        input_max_length = config_env.max_seq_length  # config_env.n_dim
+        input_classes = config_env.n_alphabet  # config_env.length
         self.num_output = num_output
         self.init_layer_depth = int((input_classes) * (input_max_length))
 

@@ -46,11 +46,15 @@ def main(config):
 
     N_FID = len(config._oracle_dict)
 
-    true_oracle = hydra.utils.instantiate(
-        config.true_oracle,
-        device=config.device,
-        float_precision=config.float_precision,
-    )
+    # check if key true_oracle is in config
+    if "true_oracle" in config:
+        true_oracle = hydra.utils.instantiate(
+            config.true_oracle,
+            device=config.device,
+            float_precision=config.float_precision,
+        )
+    else:
+        true_oracle = None
 
     env = hydra.utils.instantiate(
         config.env,
@@ -64,6 +68,7 @@ def main(config):
         for fid in range(1, N_FID + 1):
             oracle = hydra.utils.instantiate(
                 config._oracle_dict[str(fid)],
+                # required for toy oracle setups
                 oracle=true_oracle,
                 env=env,
                 device=config.device,
@@ -76,7 +81,7 @@ def main(config):
             env,
             n_fid=N_FID,
             oracle=oracles,
-            is_oracle_proxy=config.multifidelity.is_oracle_proxy,
+            proxy_state_format=config.multifidelity.proxy_state_format,
         )
 
     if config.multifidelity.proxy == True:

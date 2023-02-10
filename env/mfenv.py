@@ -6,6 +6,7 @@ from gflownet.envs.base import GFlowNetEnv
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import itertools
 
 
 class MultiFidelityEnvWrapper(GFlowNetEnv):
@@ -15,7 +16,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Does not require the different oracles as scoring is performed by GFN not env
     """
 
-    def __init__(self, env, n_fid, oracle, is_oracle_proxy=False, **kwargs):
+    def __init__(self, env, n_fid, oracle, proxy_state_format=False, **kwargs):
         # TODO: super init kwargs
         self.env = env
         self.n_fid = n_fid
@@ -28,7 +29,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.fixed_policy_output = self.get_fixed_policy_output()
         self.policy_input_dim = len(self.state2policy())
         self.random_policy_output = self.fixed_policy_output
-        if is_oracle_proxy:
+        if proxy_state_format == "oracle":
             # Assumes that all oracles required the same kind of transformed dtata
             self.statebatch2proxy = self.statebatch2oracle
             self.statetorch2proxy = self.statetorch2oracle
@@ -53,13 +54,14 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         class_var.pop("env", None)
         return MultiFidelityEnvWrapper(**class_var, env=env_copy)
 
-    def call_oracle_per_fidelity(self, state: TensorType["batch", "state_dim"]):
-        fidelities = state[:, -1].long()
-        scores = torch.zeros((state.shape[0]), dtype=self.float, device=self.device)
-        state_oracle = state[:, :-1]
+    def call_oracle_per_fidelity(self, state_oracle, fidelities):
+        scores = torch.zeros(
+            (fidelities.shape[0]), dtype=self.float, device=self.device
+        )
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
-            scores[idx_fid] = self.oracle[fid](state_oracle[idx_fid])
+            states = list(itertools.compress(state_oracle, idx_fid))
+            scores[idx_fid] = self.oracle[fid](states)
         return scores
 
     def get_actions_space(self):
@@ -110,7 +112,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             state = self.state.copy()
         state_policy = self.env.state2policy(state[:-1])
         fid_policy = np.zeros((self.n_fid), dtype=np.float32)
-        if state[-1] != -1:
+        if len(state) > 0 and state[-1] != -1:
             fid_policy[state[-1]] = 1
         state_fid_policy = np.concatenate((state_policy, fid_policy), axis=0)
         return state_fid_policy
@@ -138,6 +140,14 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def state2readable(self, state=None):
         readable_state = self.env.state2readable(state[:-1])
         fid = str(state[-1])
+        return readable_state + ";" + fid
+
+    def statetorch2readable(self, state=None):
+        readable_state = self.env.statetorch2readable(state[:-1])
+        fid = str(state[-1].detach().cpu().numpy())
+        # if isinstance(readable_state, list):
+        #     # convert list to a string
+        #     readable_state = str(readable_state)
         return readable_state + ";" + fid
 
     def readable2state(self, readable):
@@ -217,7 +227,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def statebatch2oracle(self, states: List[List]):
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
-        # TODO: state_oracle is tensor in grid but list of strings in AMP. How to make this code compatible with both?
         state_oracle = self.env.statebatch2oracle(states)
         fid_torch = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
         # TODO: fix assertion -- runs into tuple error
@@ -231,8 +240,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         state_oracle = states[:, :-1]
         state_oracle = self.env.statetorch2oracle(state_oracle)
         fid = states[:, -1].unsqueeze(-1)
-        state_fid = torch.cat((state_oracle, fid), dim=1)
-        return state_fid
+        # state_fid = torch.cat((state_oracle, fid), dim=1)
+        return state_oracle, fid
 
     def true_density(self):
         if self._true_density is not None:
