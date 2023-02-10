@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import matplotlib.pyplot as plt
 from gflownet.utils.common import set_device, set_float_precision
+from torch.nn.utils.rnn import pad_sequence
 
 
 class Data(Dataset):
@@ -42,7 +43,7 @@ class DataHandler:
         dataset_size,
         device,
         n_samples,
-        mixed_fidelity,
+        fidelity,
         float_precision,
     ):
         self.env = env
@@ -53,15 +54,34 @@ class DataHandler:
         self.split = split
         self.path = path
         self.logger = logger
-        self.mixed_fidelity = mixed_fidelity
+        self.fidelity = fidelity
         self.progress = self.logger.progress
         self.oracle = oracle
         self.logger.set_data_path(self.path.dataset)
         self.dataset_size = dataset_size
         self.device = device
-        self.n_fid = self.env.n_fid
+        if hasattr(env, "n_fid"):
+            self.n_fid = env.n_fid
+        else:
+            self.n_fid = 1
         self.float = set_float_precision(float_precision)
         self.initialise_dataset()
+
+    def generate_fidelities(self, states):
+        """
+        Generates a list of fidelities for the dataset
+        """
+        n_samples = len(states)
+        if self.fidelity.mixed:
+            fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1))
+        else:
+            # One for each sample
+            fidelities = torch.zeros((n_samples * self.n_fid, 1)).to(self.device)
+            for i in range(self.n_fid):
+                fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
+            states = [states for _ in range(self.n_fid)]
+
+        return states, fidelities
 
     def initialise_dataset(self):
         """
@@ -75,13 +95,26 @@ class DataHandler:
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
         """
         if self.path.oracle_dataset:
+            # when one dataset without fidelity is given
+            # load dataset and convert to states
             train = pd.read_csv(self.path.oracle_dataset.train)
             test = pd.read_csv(self.path.oracle_dataset.test)
-            train_samples = train["samples"].values.tolist()
-            train_targets = train["energies"].values.tolist()
-            test_samples = test["samples"].values.tolist()
-            test_targets = test["energies"].values.tolist()
-
+            train_states = train["samples"].values.tolist()
+            train_scores = train["energies"].values.tolist()
+            test_states = test["samples"].values.tolist()
+            test_scores = test["energies"].values.tolist()
+            states = train_states + test_states
+            scores = train_scores + test_scores
+            states = [
+                torch.LongTensor(self.env.env.readable2state(sample))
+                for sample in states
+            ]
+            # pad states and create a tensor
+            states = pad_sequence(
+                states,
+                batch_first=True,
+                padding_value=self.env.env.invalid_state_element,
+            )
         else:
             # for AMP this is the implementation
             # dataset = self.env.load_dataset()
@@ -94,40 +127,26 @@ class DataHandler:
                 )
                 .to(self.device)
                 .long()
-            )
-            if self.mixed_fidelity == True:
-                fidelities = torch.randint(0, self.n_fid, (len(states), 1)).to(
-                    self.device
-                )
-            else:
-                fidelities = torch.zeros((len(states) * self.n_fid, 1)).to(self.device)
-                for i in range(self.n_fid):
-                    fidelities[i * len(states) : (i + 1) * len(states), 0] = i
-                states = states.repeat(self.n_fid, 1)
+            ).tolist()
+            # TODO: Implement scoring for single fidelity setup
 
+        if self.n_fid > 1 and self.fidelity.do == True:
+            states, fidelities = self.generate_fidelities(states)
             state_fid = torch.cat([states, fidelities], dim=1).long()
-            states_fid_oracle = self.env.statetorch2oracle(state_fid)
-            scores = self.env.call_oracle_per_fidelity(states_fid_oracle)
+            # state_fid = [state + [fidelity] for state, fidelity in zip(states, fidelities)]
+            state_oracle, fid = self.env.statetorch2oracle(state_fid)
+            # TODO: Comment this and uncomment following
+            scores = torch.tensor(scores, dtype=self.float)
+            # scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
 
             if hasattr(self.env.env, "plot_samples_frequency"):
                 fig = self.env.env.plot_samples_frequency(states, title="Train Dataset")
                 self.logger.log_figure("train_dataset", fig, use_context=True)
-
-            # fig = self.env.plot_reward_samples(states, scores, "Train Dataset")
-            # self.logger.log_figure(fig, "train_dataset")
-            # index = states.long().detach().cpu().numpy()
-            # # data_scores = np.reshape(scores.detach().cpu().numpy(), (10, 10))
-            # grid_scores = np.ones((20, 20)) * (5.0)
-            # grid_scores[index[:, 0], index[:, 1]] = scores.detach().cpu().numpy()
-            # plt.imshow(grid_scores)
-            # plt.colorbar()
-            # plt.title("Train Data")
-            # plt.savefig(
-            #     "/home/mila/n/nikita.saxena/activelearning/storage/grid/train_data.png"
-            # )
-            # plt.close()
-            samples = state_fid.tolist()
-            targets = scores.tolist()
+            # samples = state_fid.tolist()
+            # if isinstance(scores, list) == False:
+            #     targets = scores.tolist()
+            # else:
+            #     targets = scores
 
         if self.split == "random":
             # randomly select 10 element from the list train_samples and test_samples
@@ -135,16 +154,22 @@ class DataHandler:
                 self.path.oracle_dataset is not None
                 and self.path.oracle_dataset.train is not None
             ):
-                samples = train_samples + test_samples
-                targets = train_targets + test_targets
-            train_samples, test_samples, train_targets, test_targets = train_test_split(
-                samples, targets, train_size=self.train_fraction
-            )
+                states = state_fid.tolist()
+                scores = scores.tolist()
+                # TODO: figure out for single fidelity
+                train_states, test_states, train_scores, test_scores = train_test_split(
+                    states, scores, train_size=self.train_fraction
+                )
+                train_states = torch.tensor(train_states).long()
+                test_states = torch.tensor(test_states).long()
+                train_scores = torch.tensor(train_scores, dtype=self.float)
+                test_scores = torch.tensor(test_scores, dtype=self.float)
+
         elif self.split == "all_train":
-            train_samples = samples
-            train_targets = targets
-            test_samples = []
-            test_targets = []
+            train_states = state_fid
+            train_scores = scores
+            test_states = torch.Tensor([])
+            test_scores = torch.Tensor([])
             # else:
             # train_samples, test_samples = (
             #     dataset[0],
@@ -152,33 +177,51 @@ class DataHandler:
             # )
             # train_targets = self.oracle(train_samples)
             # test_targets = self.oracle(test_samples)
-
-        readable_train_samples = [
-            self.env.state2readable(sample) for sample in train_samples
-        ]
-        readable_train_dataset = {
-            "samples": readable_train_samples,
-            "energies": train_targets,
-        }
+        # TODO: make general to sf
+        if hasattr(self.env.env, "statetorch2readable"):
+            readable_train_samples = [
+                self.env.statetorch2readable(sample) for sample in train_states
+            ]
+            readable_train_dataset = {
+                "samples": readable_train_samples,
+                "energies": train_scores,
+            }
+        else:
+            readable_train_samples = [
+                self.env.state2readable(sample) for sample in train_states
+            ]
+            readable_train_dataset = {
+                "samples": readable_train_samples,
+                "energies": train_scores,
+            }
         # Save the raw (un-normalised) dataset
         self.logger.save_dataset(readable_train_dataset, "train")
-        self.train_dataset = {"samples": train_samples, "energies": train_targets}
+        self.train_dataset = {"samples": train_states, "energies": train_scores}
 
         self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
         self.train_data = Data(
             self.train_dataset["samples"], self.train_dataset["energies"]
         )
 
-        if len(test_samples) > 0:
-            readable_test_samples = [
-                self.env.state2readable(sample) for sample in test_samples
-            ]
-            readable_test_dataset = {
-                "samples": readable_test_samples,
-                "energies": test_targets,
-            }
+        if len(test_states) > 0:
+            if hasattr(self.env.env, "statetorch2readable"):
+                readable_test_samples = [
+                    self.env.statetorch2readable(sample) for sample in test_states
+                ]
+                readable_test_dataset = {
+                    "samples": readable_test_samples,
+                    "energies": test_scores,
+                }
+            else:
+                readable_test_samples = [
+                    self.env.state2readable(sample) for sample in test_states
+                ]
+                readable_test_dataset = {
+                    "samples": readable_test_samples,
+                    "energies": test_scores,
+                }
             self.logger.save_dataset(readable_test_dataset, "test")
-            self.test_dataset = {"samples": test_samples, "energies": test_targets}
+            self.test_dataset = {"samples": test_states, "energies": test_scores}
 
             self.test_dataset, self.test_stats = self.preprocess(self.test_dataset)
             self.test_data = Data(
@@ -220,22 +263,22 @@ class DataHandler:
         - splits the data into train and test
         """
         samples = dataset["samples"]
-        targets = dataset["energies"]
-        if self.path.oracle_dataset:
+        scores = dataset["energies"]
+        if self.n_fid == 1 and self.path.oracle_dataset:
             state_batch = [self.env.readable2state(sample) for sample in samples]
         else:
             state_batch = samples
-        state_proxy = self.env.statebatch2proxy(state_batch)
+        state_proxy = self.env.statetorch2proxy(state_batch)
         if isinstance(state_proxy, list):
             samples = torch.FloatTensor(state_proxy)
         else:
             samples = state_proxy
         # TODO: delete this keep everything in tensor only, Remove list conversion
-        targets = torch.tensor(targets, dtype=self.float)
+        # targets = torch.tensor(targets, dtype=self.float)
 
-        dataset = {"samples": samples, "energies": targets}
+        dataset = {"samples": samples, "energies": scores}
 
-        stats = self.get_statistics(targets)
+        stats = self.get_statistics(scores)
         if self.normalise_data:
             dataset["energies"] = self.normalise(dataset["energies"], stats)
 
