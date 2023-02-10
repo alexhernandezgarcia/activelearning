@@ -11,18 +11,19 @@ from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
-from utils.multifidelity_toy import (
-    ToyOracle,
-    make_dataset,
-    plot_acquisition,
-    plot_context_points,
-    plot_predictions_oracle,
-)
+from utils.multifidelity_toy import make_dataset
+
+# ToyOracle,
+# ,
+#     plot_acquisition,
+#     plot_context_points,
+#     plot_predictions_oracle,
+# )
 from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="mf_gp_test")
+@hydra.main(config_path="./config", config_name="mf_amp_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -43,35 +44,10 @@ def main(config):
     # Logger
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
-    if config.multifidelity.toy:
-        N_FID = config.multifidelity.n_fid
-    else:
-        N_FID = len(config._oracle_dict)
+    N_FID = len(config._oracle_dict)
 
-    oracles = []
-    if config.multifidelity.toy:
-        oracle = hydra.utils.instantiate(
-            config.oracle, device=config.device, float_precision=config.float_precision
-        )
-        env_arg = hydra.utils.instantiate(
-            config.env,
-            oracle=oracle,
-            device=config.device,
-            float_precision=config.float_precision,
-        )
-        # target fidelity must be the last fidelity
-        # config._noise_dict = dict( sorted(config._noise_dict.items(), key=operator.itemgetter(1),reverse=True))
-        for fid in range(1, N_FID + 1):
-            toy = ToyOracle(
-                oracle,
-                config._noise_dict[str(fid)],
-                env_arg,
-                config.device,
-                config.float_precision,
-            )
-            oracles.append(toy)
-        del env_arg
-    else:
+    if N_FID > 1:
+        oracles = []
         for fid in range(1, N_FID + 1):
             oracle = hydra.utils.instantiate(
                 config._oracle_dict[str(fid)],
@@ -117,6 +93,7 @@ def main(config):
     elif config.multifidelity.proxy == False and not os.path.exists(
         config.multifidelity.candidate_set_path
     ):
+        # makes context set for acquisition function
         make_dataset(
             env,
             oracles,
@@ -131,7 +108,7 @@ def main(config):
             logger.set_context(iter)
         if config.multifidelity.proxy == True:
             regressor.fit()
-            # TODO: remove if condition and check if proxy initialisation works with both oracle and proxy
+            # TODO: remove if condition and check if proxy initialisation works with both proxy (below) and oracle (second clause)
             proxy = hydra.utils.instantiate(
                 config.proxy,
                 regressor=regressor,
