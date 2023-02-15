@@ -5,6 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
+import gpytorch
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def make_dataset(env, oracles, n_fid, device, path):
@@ -109,6 +111,72 @@ def plot_context_points(env, mf_mes_oracle):
         "/home/mila/n/nikita.saxena/activelearning/storage/grid/gp/updated_cost_context.png"
     )
     plt.close()
+
+
+def plot_gp_predictions(env, regressor):
+    """Plot the predictions of the regressor for a given fidelity."""
+    states = torch.FloatTensor(env.env.get_all_terminating_states()).to("cuda")
+    n_states = states.shape[0]
+    n_fid = 3
+    model = regressor.model
+    model.eval()
+    model.likelihood.eval()
+    fidelities = torch.zeros((len(states) * 3, 1)).to("cuda")
+    for i in range(n_fid):
+        fidelities[i * len(states) : (i + 1) * len(states), 0] = i
+    states = states.repeat(n_fid, 1)
+    state_fid = torch.cat([states, fidelities], dim=1)
+    state_fid_proxy = env.statetorch2oracle(state_fid)
+    states = states[:n_states]
+
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        predictions = model.likelihood(model(state_fid_proxy))
+        mean = predictions.mean
+    scores = mean.detach().cpu().numpy()
+    width = (n_fid) * 5
+    fig, axs = plt.subplots(1, n_fid, figsize=(width, 5))
+    for fid in range(0, n_fid):
+        index = states.long().detach().cpu().numpy()
+        grid_scores = np.zeros((env.env.length, env.env.length))
+        grid_scores[index[:, 0], index[:, 1]] = scores[
+            fid * len(states) : (fid + 1) * len(states)
+        ]
+        axs[fid].set_xticks(np.arange(env.env.length))
+        axs[fid].set_yticks(np.arange(env.env.length))
+        axs[fid].imshow(grid_scores)
+        axs[fid].set_title("GP Predictions with fid {}".format(fid))
+        im = axs[fid].imshow(grid_scores)
+        divider = make_axes_locatable(axs[fid])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        plt.show()
+    plt.tight_layout()
+    plt.close()
+    return fig
+    # fidelities = torch.ones((len(states), 1)).to("cuda") * fid
+    # state_fid = torch.cat([states, fidelities], dim=1)
+    # state_fid_proxy = env.statetorch2proxy(state_fid)
+    # model = regressor.model
+    # model.eval()
+    # model.likelihood.eval()
+
+    # # Make predictions
+    # with torch.no_grad(), gpytorch.settings.fast_pred_var():
+    #     predictions = model.likelihood(model(state_fid_proxy))
+    #     mean = predictions.mean
+    # mean = mean.detach().cpu().numpy()
+    # index = states.long().detach().cpu().numpy()
+    # grid_scores = np.zeros((env.env.length, env.env.length))
+    # grid_scores[index[:, 0], index[:, 1]] = mean
+    # plt.imshow(grid_scores)
+    # plt.colorbar()
+    # plt.title("GP Predictions for fid {}".format(fid))
+    # plt.savefig(
+    #     "/home/mila/n/nikita.saxena/activelearning/storage/grid/gp/no_norm_gp_prediction_{}.png".format(
+    #         fid
+    #     )
+    # )
+    # plt.close()
 
     # scores = mf_mes_oracle(states_fid_oracle).detach().cpu().numpy()
     # for fid in range(3):
