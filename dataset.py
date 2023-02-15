@@ -81,7 +81,7 @@ class DataHandler:
             for i in range(self.n_fid):
                 fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
             states = [states for _ in range(self.n_fid)]
-
+            # TODO: return tensor states here instead of list
         return states, fidelities
 
     def initialise_dataset(self):
@@ -121,22 +121,17 @@ class DataHandler:
             # for grid, I call uniform states. Need to make it uniform
             if self.progress:
                 print("Creating dataset of size: ", self.n_samples)
-            states = (
-                torch.Tensor(
-                    self.env.env.get_uniform_terminating_states(self.n_samples)
-                )
-                .to(self.device)
-                .long()
-            ).tolist()
-            # TODO: Implement scoring for single fidelity setup
+            states = torch.Tensor(
+                self.env.env.get_uniform_terminating_states(self.n_samples)
+            ).long()
 
         if self.n_fid > 1 and self.fidelity.do == True:
             states, fidelities = self.generate_fidelities(states)
             states = torch.cat([states, fidelities], dim=1).long()
-            # states = [torch.cat([state , fidelity], dim=0) for state, fidelity in zip(states, fidelities)]
             state_oracle, fid = self.env.statetorch2oracle(states)
-            # TODO: Comment this and uncomment following
+            # for AMP practice
             scores = torch.tensor(scores, dtype=self.float, device=self.device)
+            # for grid
             # scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
 
             if hasattr(self.env.env, "plot_samples_frequency"):
@@ -145,14 +140,8 @@ class DataHandler:
             if hasattr(self.env.env, "plot_reward_distribution"):
                 fig = self.env.env.plot_reward_distribution(scores, title="Dataset")
                 self.logger.log_figure("initial_dataset", fig, use_context=True)
-            # samples = state_fid.tolist()
-            # if isinstance(scores, list) == False:
-            #     targets = scores.tolist()
-            # else:
-            #     targets = scores
 
         if self.split == "random":
-            # randomly select 10 element from the list train_samples and test_samples
             if (
                 self.path.oracle_dataset is not None
                 and self.path.oracle_dataset.train is not None
@@ -163,6 +152,7 @@ class DataHandler:
                 train_states, test_states, train_scores, test_scores = train_test_split(
                     states, scores, train_size=self.train_fraction
                 )
+                # TODO: can we change this to dtype = self.float and device = cuda
                 train_states = torch.tensor(train_states).long()
                 test_states = torch.tensor(test_states).long()
                 train_scores = torch.tensor(
@@ -173,8 +163,8 @@ class DataHandler:
                 )
 
         elif self.split == "all_train":
-            train_states = states
-            train_scores = scores
+            train_states = states.to(self.device)
+            train_scores = scores.to(self.device)
             test_states = torch.Tensor([])
             test_scores = torch.Tensor([])
             # else:
@@ -276,6 +266,9 @@ class DataHandler:
         else:
             state_batch = samples
         state_proxy = self.env.statetorch2proxy(state_batch)
+        # for when oracle is proxy and grid setup when oracle state is tensor
+        if isinstance(state_proxy, tuple):
+            state_proxy = torch.concat((state_proxy[0], state_proxy[1]), dim=1)
         if isinstance(state_proxy, list):
             samples = torch.tensor(state_proxy, device=self.device, dtype=self.float)
         else:

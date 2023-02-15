@@ -63,12 +63,18 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             (fidelities.shape[0]), dtype=self.float, device=self.device
         )
         for fid in range(self.n_fid):
-            chosen_state_index = torch.zeros(
-                scores.shape, dtype=self.float, device=self.device
-            )
             idx_fid = torch.where(fidelities == fid)[0]
-            chosen_state_index[idx_fid] = 1
-            states = list(itertools.compress(state_oracle, chosen_state_index.tolist()))
+            if isinstance(state_oracle, torch.Tensor):
+                states = state_oracle[idx_fid]
+                states = states.to(self.oracle[fid].device)
+            else:
+                chosen_state_index = torch.zeros(
+                    scores.shape, dtype=self.float, device=self.device
+                )
+                chosen_state_index[idx_fid] = 1
+                states = list(
+                    itertools.compress(state_oracle, chosen_state_index.tolist())
+                )
             scores[idx_fid] = self.oracle[fid](states)
         return scores
 

@@ -81,7 +81,7 @@ def main(config):
             env,
             n_fid=N_FID,
             oracle=oracles,
-            proxy_state_format=config.multifidelity.proxy_state_format,
+            proxy_state_format=config.env.proxy_state_format,
         )
 
     if config.multifidelity.proxy == True:
@@ -204,10 +204,6 @@ def main(config):
                 df = df.sort_values(by=["energies"])
                 path = logger.logdir / Path("gfn_samples.csv")
                 df.to_csv(path)
-                # dataset will eventually store in proxy-format so states are sent to avoid the readable2state conversion
-                # batch, fid, times = gflownet.sample_batch(env, config.n_samples, train=False)
-                # queries = [env.state2oracle[f](b) for f, b in zip(fid, batch)]
-                # energies = [oracles[f](q) for f, q in zip(fid, queries)]
             if config.multifidelity.proxy == True:
                 data_handler.update_dataset(
                     list(picked_states), energies.tolist(), picked_fidelity

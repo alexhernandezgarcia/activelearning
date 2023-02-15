@@ -206,6 +206,8 @@ class MultiFidelityMES(Proxy):
         return cost_aware_utility
 
     def __call__(self, states):
+        if isinstance(states, tuple):
+            states = torch.cat((states[0], states[1]), dim=1)
         if isinstance(states, np.ndarray):
             # for the case when buffer test states are input
             states = torch.tensor(states, dtype=self.float, device=self.device)
@@ -357,7 +359,10 @@ class GaussianProcessMultiFidelityMES(MultiFidelityMES):
             fidelities[i * len(states) : (i + 1) * len(states), 0] = i
         states = states.repeat(self.n_fid, 1)
         state_fid = torch.cat([states, fidelities], dim=1)
-        states_fid_oracle = self.env.statetorch2oracle(state_fid)
+        states_oracle, fid = self.env.statetorch2oracle(state_fid)
+        # Specific to grid as the states are transformed to oracle space on feeding to MES
+        if isinstance(states_oracle, torch.Tensor):
+            states_fid_oracle = torch.cat([states_oracle, fid], dim=1)
         states = states[:n_states]
 
         scores = self(states_fid_oracle).detach().cpu().numpy()
