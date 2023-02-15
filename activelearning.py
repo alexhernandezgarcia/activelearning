@@ -23,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="mf_amp_test")
+@hydra.main(config_path="./config", config_name="mf_gp_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -190,7 +190,7 @@ def main(config):
                 picked_samples = env.statebatch2oracle(picked_states)
 
             energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
-            if config.multifidelity.proxy_state_format != "oracle":
+            if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
                     picked_samples, energies, data_handler.train_dataset["samples"]
                 )
