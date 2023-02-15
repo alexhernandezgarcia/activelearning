@@ -7,12 +7,14 @@ from torch.optim import Adam
 import hydra
 from tqdm import tqdm
 from utils.multifidelity_toy import plot_predictions
+from gflownet.utils.common import set_device, set_float_precision
 
 
 class DropoutRegressor:
     def __init__(
         self,
         device,
+        float_precision,
         checkpoint,
         eps,
         max_epochs,
@@ -38,7 +40,10 @@ class DropoutRegressor:
         self.config_model = config_model
         self.config_env = config_env
 
-        self.device = device
+        # Device
+        self.device = set_device(device)
+        # Float precision
+        self.float = set_float_precision(float_precision)
 
         # Training Parameters
         self.eps = eps
@@ -64,13 +69,17 @@ class DropoutRegressor:
         """
         Initialize the network (MLP, Transformer, RNN)
         """
-        self.model = hydra.utils.instantiate(
-            self.config_model,
-            n_fid=self.n_fid,
-            config_env=self.config_env,
-            _recursive_=False,
-            device=self.device,
-        ).to(self.device)
+        self.model = (
+            hydra.utils.instantiate(
+                self.config_model,
+                n_fid=self.n_fid,
+                config_env=self.config_env,
+                _recursive_=False,
+                device=self.device,
+            )
+            .to(self.device)
+            .to(self.float)
+        )
         self.optimizer = Adam(
             self.model.parameters(),
             lr=self.lr,
@@ -89,10 +98,11 @@ class DropoutRegressor:
 
         self.initialize_model()
         if os.path.exists(path):
+            # make the following line cpu compatible
             checkpoint = torch.load(path, map_location="cuda:0")
             self.model.load_state_dict(checkpoint["model_state_dict"])
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-            self.model.to(self.device)
+            self.model.to(self.device).to(self.float)
             for state in self.optimizer.state.values():  # move optimizer to GPU
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
@@ -155,6 +165,7 @@ class DropoutRegressor:
         err_train = []
         self.model.train(True)
         for x_batch, y_batch in tqdm(train_loader, disable=True):
+            # Move self.device to class dataset instead
             output = self.model(x_batch.to(self.device))
             loss = F.mse_loss(output[:, 0], y_batch.to(self.device))
             if self.logger:

@@ -9,6 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from gflownet.utils.common import set_device, set_float_precision
 from torch.nn.utils.rnn import pad_sequence
+from torchtyping import TensorType
 
 
 class Data(Dataset):
@@ -109,11 +110,10 @@ class DataHandler:
                 torch.LongTensor(self.env.env.readable2state(sample))
                 for sample in states
             ]
-            # pad states and create a tensor
             states = pad_sequence(
                 states,
                 batch_first=True,
-                padding_value=self.env.env.invalid_state_element,
+                padding_value=self.env.invalid_state_element,
             )
         else:
             # for AMP this is the implementation
@@ -132,16 +132,19 @@ class DataHandler:
 
         if self.n_fid > 1 and self.fidelity.do == True:
             states, fidelities = self.generate_fidelities(states)
-            state_fid = torch.cat([states, fidelities], dim=1).long()
-            # state_fid = [state + [fidelity] for state, fidelity in zip(states, fidelities)]
-            state_oracle, fid = self.env.statetorch2oracle(state_fid)
+            states = torch.cat([states, fidelities], dim=1).long()
+            # states = [torch.cat([state , fidelity], dim=0) for state, fidelity in zip(states, fidelities)]
+            state_oracle, fid = self.env.statetorch2oracle(states)
             # TODO: Comment this and uncomment following
-            scores = torch.tensor(scores, dtype=self.float)
+            scores = torch.tensor(scores, dtype=self.float, device=self.device)
             # scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
 
             if hasattr(self.env.env, "plot_samples_frequency"):
                 fig = self.env.env.plot_samples_frequency(states, title="Train Dataset")
                 self.logger.log_figure("train_dataset", fig, use_context=True)
+            if hasattr(self.env.env, "plot_reward_distribution"):
+                fig = self.env.env.plot_reward_distribution(scores, title="Dataset")
+                self.logger.log_figure("initial_dataset", fig, use_context=True)
             # samples = state_fid.tolist()
             # if isinstance(scores, list) == False:
             #     targets = scores.tolist()
@@ -154,7 +157,7 @@ class DataHandler:
                 self.path.oracle_dataset is not None
                 and self.path.oracle_dataset.train is not None
             ):
-                states = state_fid.tolist()
+                states = states.tolist()
                 scores = scores.tolist()
                 # TODO: figure out for single fidelity
                 train_states, test_states, train_scores, test_scores = train_test_split(
@@ -162,11 +165,15 @@ class DataHandler:
                 )
                 train_states = torch.tensor(train_states).long()
                 test_states = torch.tensor(test_states).long()
-                train_scores = torch.tensor(train_scores, dtype=self.float)
-                test_scores = torch.tensor(test_scores, dtype=self.float)
+                train_scores = torch.tensor(
+                    train_scores, dtype=self.float, device=self.device
+                )
+                test_scores = torch.tensor(
+                    test_scores, dtype=self.float, device=self.device
+                )
 
         elif self.split == "all_train":
-            train_states = state_fid
+            train_states = states
             train_scores = scores
             test_states = torch.Tensor([])
             test_scores = torch.Tensor([])
@@ -184,7 +191,7 @@ class DataHandler:
             ]
             readable_train_dataset = {
                 "samples": readable_train_samples,
-                "energies": train_scores,
+                "energies": train_scores.tolist(),
             }
         else:
             readable_train_samples = [
@@ -192,7 +199,7 @@ class DataHandler:
             ]
             readable_train_dataset = {
                 "samples": readable_train_samples,
-                "energies": train_scores,
+                "energies": train_scores.tolist(),
             }
         # Save the raw (un-normalised) dataset
         self.logger.save_dataset(readable_train_dataset, "train")
@@ -210,7 +217,7 @@ class DataHandler:
                 ]
                 readable_test_dataset = {
                     "samples": readable_test_samples,
-                    "energies": test_scores,
+                    "energies": test_scores.tolist(),
                 }
             else:
                 readable_test_samples = [
@@ -218,7 +225,7 @@ class DataHandler:
                 ]
                 readable_test_dataset = {
                     "samples": readable_test_samples,
-                    "energies": test_scores,
+                    "energies": test_scores.tolist(),
                 }
             self.logger.save_dataset(readable_test_dataset, "test")
             self.test_dataset = {"samples": test_states, "energies": test_scores}
@@ -270,7 +277,7 @@ class DataHandler:
             state_batch = samples
         state_proxy = self.env.statetorch2proxy(state_batch)
         if isinstance(state_proxy, list):
-            samples = torch.FloatTensor(state_proxy)
+            samples = torch.tensor(state_proxy, device=self.device, dtype=self.float)
         else:
             samples = state_proxy
         # TODO: delete this keep everything in tensor only, Remove list conversion
@@ -319,7 +326,7 @@ class DataHandler:
         y = y * stats["std"] + stats["mean"]
         return y
 
-    def update_dataset(self, states, energies):
+    def update_dataset(self, states, energies, fidelity):
         """
         Args:
             queries: list of queries [[0, 0], [1, 1], ...]
@@ -334,6 +341,8 @@ class DataHandler:
         #     dataset = np.load(self.data_path, allow_pickle=True)
         #     self.dataset = dataset.item()
         #     # index_col=False
+        if self.n_fid > 1:
+            states = [state + [fid.tolist()] for state, fid in zip(states, fidelity)]
         readable_dataset = {
             "samples": [self.env.state2readable(state) for state in states],
             "energies": energies,
@@ -346,11 +355,20 @@ class DataHandler:
             self.logger.log_figure(
                 "post_al_iter_sampled_dataset", fig, use_context=True
             )
+        if hasattr(self.env.env, "plot_reward_distribution"):
+            fig = self.env.env.plot_reward_distribution(
+                energies, title="Sampled Dataset"
+            )
+            self.logger.log_figure(
+                "post_al_iter_sampled_dataset", fig, use_context=True
+            )
 
         states = self.env.statebatch2proxy(states)
-        if isinstance(states, list):
-            states = torch.FloatTensor(np.array(states))
-        energies = torch.tensor(energies, dtype=self.float)
+        if isinstance(states, TensorType) == False:
+            states = torch.tensor(
+                np.array(states), dtype=self.float, device=self.device
+            )
+        energies = torch.tensor(energies, dtype=self.float, device=self.device)
 
         if self.normalise_data:
             self.train_dataset["energies"] = self.denormalise(
@@ -423,7 +441,7 @@ class DataHandler:
         for (_sequence, _label) in batch:
             y.append(_label)
             x.append(_sequence)
-        y = torch.tensor(y, dtype=torch.float)
+        y = torch.tensor(y, dtype=self.float)
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
         return xPadded, y
 

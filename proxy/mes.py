@@ -207,7 +207,8 @@ class MultiFidelityMES(Proxy):
 
     def __call__(self, states):
         if isinstance(states, np.ndarray):
-            states = torch.FloatTensor(states)
+            # for the case when buffer test states are input
+            states = torch.tensor(states, dtype=self.float, device=self.device)
         # add extra dimension for q
         states = states.unsqueeze(-2)
         mes = self.qMES(states)
@@ -221,6 +222,8 @@ class ProxyMultiFidelityMES(MultiFidelityMES):
     def __init__(self, regressor, num_dropout_samples, **kwargs):
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
+        if not self.regressor.load_model():
+            raise FileNotFoundError
         super().__init__(**kwargs)
 
     def load_model(self):
@@ -256,7 +259,9 @@ class ProxyMultiFidelityMES(MultiFidelityMES):
         if isinstance(state_proxy, torch.Tensor):
             return state_proxy.to(self.device)
         else:
-            state_proxy = torch.FloatTensor(state_proxy).to(self.device)
+            state_proxy = torch.tensor(
+                state_proxy, device=self.device, dtype=self.float
+            )
         return state_proxy
 
 

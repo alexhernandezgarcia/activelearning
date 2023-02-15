@@ -1,7 +1,7 @@
 _target_: model.regressive.RegressiveMLP
 
 #Choose between full (BMBO-DARN) or seq (DNN-MFBO) implementation
-regressive_mode: "full" 
+regressive_mode: "seq" 
 base_num_hidden: 512
 base_num_layer: 2
 fid_num_hidden: 512

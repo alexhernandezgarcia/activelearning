@@ -99,6 +99,7 @@ def main(config):
             config_model=config.model,
             dataset=data_handler,
             device=config.device,
+            float_precision=config.float_precision,
             _recursive_=False,
             logger=logger,
         )
@@ -179,10 +180,17 @@ def main(config):
                 : config.n_samples
             ].tolist()
             picked_states = [states[i] for i in idx_pick]
-            picked_samples = env.statebatch2oracle(picked_states)
+            if N_FID > 1:
+                picked_states, picked_fidelity = zip(
+                    *[(state[:-1], state[-1]) for state in picked_states]
+                )
+                picked_fidelity = torch.LongTensor(picked_fidelity).to(config.device)
+                picked_samples = env.env.statebatch2oracle(picked_states)
+            else:
+                picked_samples = env.statebatch2oracle(picked_states)
 
-            energies = env.call_oracle_per_fidelity(picked_samples)
-            if config.multifidelity.toy == False:
+            energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
+            if config.multifidelity.proxy_state_format != "oracle":
                 gflownet.evaluate(
                     picked_samples, energies, data_handler.train_dataset["samples"]
                 )
@@ -202,7 +210,7 @@ def main(config):
                 # energies = [oracles[f](q) for f, q in zip(fid, queries)]
             if config.multifidelity.proxy == True:
                 data_handler.update_dataset(
-                    picked_states, energies.detach().cpu().numpy()
+                    list(picked_states), energies.tolist(), picked_fidelity
                 )
         del gflownet
         del proxy
