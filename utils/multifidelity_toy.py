@@ -9,63 +9,6 @@ import gpytorch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
-class ToyOracle(Proxy):
-    # TODO: resolve the kwargs error here
-    def __init__(self, oracle, config, env, device, float_precision):
-        super().__init__(device, float_precision)
-        self.oracle = oracle
-        if config.noise.sigma != 0.0:
-            self.noise_distribution = torch.distributions.Normal(
-                config.noise.mu, config.noise.sigma
-            )
-        else:
-            self.noise_distribution = None
-        # self.mu =  noise.mu
-        self.sigma = config.noise.sigma
-        self.valid = config.valid
-        self.env = env
-        self.cost = config.cost
-        # states = env.get_all_terminating_states()
-        # noise = self.noise_distribution.sample(states.shape).to(self.device)
-        # self.state_noise_dict = {
-        # "state": states,
-        # "noise": noise,
-        # }
-
-    def __call__(self, states):
-        true_values = self.oracle(states)
-        if self.valid is not None:
-            bounds = torch.FloatTensor(
-                [[self.valid.xmin, self.valid.ymin], [self.valid.xmax, self.valid.ymax]]
-            ).to(self.device)
-            bounds = self.env.statetorch2oracle(bounds)
-            mask = (states >= bounds[0]) & (states <= bounds[1])
-            mask = mask[:, 0] & mask[:, 1]
-            true_values[~mask] = 0
-        if self.noise_distribution is not None:
-            noise = self.noise_distribution.sample(true_values.shape).to(self.device)
-            noisy_values = true_values + noise
-            return noisy_values
-        else:
-            return true_values
-
-    def plot_scores(self):
-        states = torch.FloatTensor(self.env.get_all_terminating_states()).to("cuda")
-        scores = self(states)
-        index = states.long().detach().cpu().numpy()
-        grid_scores = np.ones((self.env.ndim, self.env.ndim)) * (0.2)
-        grid_scores[index[:, 0], index[:, 1]] = scores
-        plt.imshow(grid_scores)
-        plt.colorbar()
-        plt.title("Ground Truth (with Noise Stddev {})".format(self.sigma))
-        plt.savefig(
-            "/home/mila/n/nikita.saxena/activelearning/storage/grid/round2/ground_truth_noise{}.png".format(
-                self.sigma
-            )
-        )
-        plt.close()
-
-
 def make_dataset(env, oracles, n_fid, device, path):
     # get_states return a list right now
     # states = torch.Tensor(env.env.get_uniform_terminating_states(200)).to(device).long()

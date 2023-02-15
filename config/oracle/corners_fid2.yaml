@@ -1,0 +1,22 @@
+_target_: proxy.toy_oracle.ToyOracle
+
+oracle:
+  _target_: gflownet.proxy.corners.Corners
+  device: cuda
+  float_precision: 64
+
+env:
+  _target_: gflownet.envs.grid.Grid
+  device: cuda
+  float_precision: 64
+  length: 10
+
+noise:
+  mu: 0
+  sigma: 0.1
+valid:
+  xmin: 0
+  xmax: 9
+  ymin: 0
+  ymax: 9
+cost: 0.8

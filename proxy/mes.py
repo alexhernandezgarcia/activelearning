@@ -19,6 +19,7 @@ from botorch.models.utils import check_no_nans
 from .botorch_models import FidelityCostModel
 from abc import abstractmethod
 import matplotlib.pyplot as plt
+from torch.nn.utils.rnn import pad_sequence
 
 # class MultiFidelityMES(Proxy):
 #     def __init__(
@@ -205,8 +206,11 @@ class MultiFidelityMES(Proxy):
         return cost_aware_utility
 
     def __call__(self, states):
+        if isinstance(states, tuple):
+            states = torch.cat((states[0], states[1]), dim=1)
         if isinstance(states, np.ndarray):
-            states = torch.FloatTensor(states)
+            # for the case when buffer test states are input
+            states = torch.tensor(states, dtype=self.float, device=self.device)
         # add extra dimension for q
         states = states.unsqueeze(-2)
         mes = self.qMES(states)
@@ -220,6 +224,8 @@ class ProxyMultiFidelityMES(MultiFidelityMES):
     def __init__(self, regressor, num_dropout_samples, **kwargs):
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
+        if not self.regressor.load_model():
+            raise FileNotFoundError
         super().__init__(**kwargs)
 
     def load_model(self):
@@ -246,10 +252,19 @@ class ProxyMultiFidelityMES(MultiFidelityMES):
         data = pd.read_csv(path, index_col=0)
         samples = data["samples"]
         state = [self.env.readable2state(sample) for sample in samples]
+        # states = pad_sequence(
+        #         states,
+        #         batch_first=True,
+        #         padding_value=self.env.env.invalid_state_element,
+        #     )
         state_proxy = self.env.statebatch2proxy(state)
         if isinstance(state_proxy, torch.Tensor):
             return state_proxy.to(self.device)
-        return torch.FloatTensor(state_proxy).to(self.device)
+        else:
+            state_proxy = torch.tensor(
+                state_proxy, device=self.device, dtype=self.float
+            )
+        return state_proxy
 
 
 class OracleMultiFidelityMES(MultiFidelityMES):
@@ -344,7 +359,10 @@ class GaussianProcessMultiFidelityMES(MultiFidelityMES):
             fidelities[i * len(states) : (i + 1) * len(states), 0] = i
         states = states.repeat(self.n_fid, 1)
         state_fid = torch.cat([states, fidelities], dim=1)
-        states_fid_oracle = self.env.statetorch2oracle(state_fid)
+        states_oracle, fid = self.env.statetorch2oracle(state_fid)
+        # Specific to grid as the states are transformed to oracle space on feeding to MES
+        if isinstance(states_oracle, torch.Tensor):
+            states_fid_oracle = torch.cat([states_oracle, fid], dim=1)
         states = states[:n_states]
 
         scores = self(states_fid_oracle).detach().cpu().numpy()

@@ -6,6 +6,8 @@ from gflownet.envs.base import GFlowNetEnv
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import itertools
+import copy
 
 
 class MultiFidelityEnvWrapper(GFlowNetEnv):
@@ -15,8 +17,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Does not require the different oracles as scoring is performed by GFN not env
     """
 
-    def __init__(self, env, n_fid, oracle, is_oracle_proxy=False, **kwargs):
+    def __init__(self, env, n_fid, oracle, proxy_state_format=False, **kwargs):
         # TODO: super init kwargs
+        super().__init__(**kwargs)
         self.env = env
         self.n_fid = n_fid
         self.fid = self.env.eos + 1
@@ -28,7 +31,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.fixed_policy_output = self.get_fixed_policy_output()
         self.policy_input_dim = len(self.state2policy())
         self.random_policy_output = self.fixed_policy_output
-        if is_oracle_proxy:
+        if proxy_state_format == "oracle":
             # Assumes that all oracles required the same kind of transformed dtata
             self.statebatch2proxy = self.statebatch2oracle
             self.statetorch2proxy = self.statetorch2oracle
@@ -39,6 +42,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # self.state2oracle = self.env.state2oracle
         self.oracle = oracle
         self.fidelity_costs = self.set_fidelity_costs()
+        self._test_traj_list = []
+        self._test_traj_actions_list = []
         self.reset()
 
     def set_fidelity_costs(self):
@@ -53,13 +58,24 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         class_var.pop("env", None)
         return MultiFidelityEnvWrapper(**class_var, env=env_copy)
 
-    def call_oracle_per_fidelity(self, state: TensorType["batch", "state_dim"]):
-        fidelities = state[:, -1].long()
-        scores = torch.zeros((state.shape[0]), dtype=self.float, device=self.device)
-        state_oracle = state[:, :-1]
+    def call_oracle_per_fidelity(self, state_oracle, fidelities):
+        scores = torch.zeros(
+            (fidelities.shape[0]), dtype=self.float, device=self.device
+        )
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
-            scores[idx_fid] = self.oracle[fid](state_oracle[idx_fid])
+            if isinstance(state_oracle, torch.Tensor):
+                states = state_oracle[idx_fid]
+                states = states.to(self.oracle[fid].device)
+            else:
+                chosen_state_index = torch.zeros(
+                    scores.shape, dtype=self.float, device=self.device
+                )
+                chosen_state_index[idx_fid] = 1
+                states = list(
+                    itertools.compress(state_oracle, chosen_state_index.tolist())
+                )
+            scores[idx_fid] = self.oracle[fid](states)
         return scores
 
     def get_actions_space(self):
@@ -110,7 +126,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             state = self.state.copy()
         state_policy = self.env.state2policy(state[:-1])
         fid_policy = np.zeros((self.n_fid), dtype=np.float32)
-        if state[-1] != -1:
+        if len(state) > 0 and state[-1] != -1:
             fid_policy[state[-1]] = 1
         state_fid_policy = np.concatenate((state_policy, fid_policy), axis=0)
         return state_fid_policy
@@ -140,6 +156,14 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         fid = str(state[-1])
         return readable_state + ";" + fid
 
+    def statetorch2readable(self, state=None):
+        readable_state = self.env.statetorch2readable(state[:-1])
+        fid = str(state[-1].detach().cpu().numpy())
+        # if isinstance(readable_state, list):
+        #     # convert list to a string
+        #     readable_state = str(readable_state)
+        return readable_state + ";" + fid
+
     def readable2state(self, readable):
         fid = readable.split(";")[-1]
         readable_state = ";".join(readable.split(";")[:-1])
@@ -167,6 +191,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             parent = state[:-1] + [-1]
             actions.append(tuple([self.fid, fid] + [0] * (self.action_max_length - 2)))
             parents.append(parent)
+        # each parent must be of the same length for self.tfloat to work
+        # Can we have getparents return tensor instead of list?
+        if len(parents) > 0:
+            max_parent_length = max([len(parent) for parent in parents])
+            parents = [
+                parent[:-1]
+                + [self.env.invalid_state_element] * (max_parent_length - len(parent))
+                + [parent[-1]]
+                for parent in parents
+            ]
         return parents, actions
 
     def step(self, action):
@@ -207,17 +241,22 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         state_policy = states[:, :-1]
         state_policy = self.env.statetorch2policy(state_policy)
         fid_policy = torch.zeros(
-            (states.shape[0], self.n_fid), dtype=torch.float32, device=self.device
+            (states.shape[0], self.n_fid), dtype=self.float, device=self.device
         )
-        index = torch.where(states[:, -1] != -1)[0]
+        # check if the last element of state is in the range of fidelity
+        condition = torch.logical_and(
+            states[:, -1] >= 0, states[:, -1] < self.n_fid
+        ).unsqueeze(-1)
+        index = torch.where(condition)[0]
         if index.size:
             fid_policy[index, states[index, -1].long()] = 1
         state_fid_policy = torch.cat((state_policy, fid_policy), dim=1)
         return state_fid_policy
 
     def statebatch2oracle(self, states: List[List]):
+        # Simply call env.statebatch2oracle
+        # No need to input fidelity because fid given as separate input to call_per_fidelity
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
-        # TODO: state_oracle is tensor in grid but list of strings in AMP. How to make this code compatible with both?
         state_oracle = self.env.statebatch2oracle(states)
         fid_torch = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
         # TODO: fix assertion -- runs into tuple error
@@ -231,8 +270,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         state_oracle = states[:, :-1]
         state_oracle = self.env.statetorch2oracle(state_oracle)
         fid = states[:, -1].unsqueeze(-1)
-        state_fid = torch.cat((state_oracle, fid), dim=1)
-        return state_fid
+        # state_fid = torch.cat((state_oracle, fid), dim=1)
+        return state_oracle, fid
 
     def true_density(self):
         if self._true_density is not None:
@@ -297,3 +336,54 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         fidelities = [sample[-1] for sample in samples]
         costs = [self.fidelity_costs[fid] for fid in fidelities]
         return costs
+
+    def get_pairwise_distance(self, samples):
+        if hasattr(self.env, "get_pairwise_distance"):
+            return self.env.get_pairwise_distance(samples)
+        else:
+            return None
+
+    def get_distance_from_D0(self, samples, dataset_obs):
+        if hasattr(self.env, "get_distance_from_D0"):
+            return self.env.get_distance_from_D0(samples, dataset_obs)
+        else:
+            return None
+
+    def get_trajectories(
+        self, traj_list, traj_actions_list, current_traj, current_actions
+    ):
+        mf_traj_list = []
+        mf_traj_actions_list = []
+        traj_with_fidelity = current_traj[0]
+        fidelity = traj_with_fidelity[-1]
+        action_fidelity = self.fid + fidelity
+        current_traj = traj_with_fidelity[:-1]
+        single_fid_traj_list, single_fid_traj_actions_list = self.env.get_trajectories(
+            [], [], [current_traj], current_actions
+        )
+        for idx in range(len(single_fid_traj_actions_list[0])):
+            action = single_fid_traj_actions_list[0][idx]
+            if isinstance(action, int):
+                action = (action,)
+            action = tuple(list(action) + [0] * (self.action_pad_length))
+            # search for action in list of actions
+            action_idx = self.action_space.index(action)
+            single_fid_traj_actions_list[0][idx] = action_idx
+        for traj_idx in range(len(single_fid_traj_list)):
+            mf_traj_list = []
+            mf_traj_actions_list = []
+            num_traj_states = len(single_fid_traj_list[traj_idx])
+            for idx in range(num_traj_states):
+                trajs = copy.deepcopy(single_fid_traj_list[traj_idx])
+                traj_actions = single_fid_traj_actions_list[traj_idx].copy()
+                trajs[idx].append(fidelity)
+                traj_actions.insert(idx, action_fidelity)
+                for j in range(idx):
+                    trajs[j].append(fidelity)
+                for k in range(idx + 1, len(trajs)):
+                    trajs[k].append(-1)
+                mf_traj_list.append(trajs)
+                mf_traj_actions_list.append(traj_actions)
+        self._test_traj_list.append(mf_traj_list)
+        self._test_traj_actions_list.append(mf_traj_actions_list)
+        return mf_traj_list, mf_traj_actions_list

@@ -11,14 +11,14 @@ from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
-from utils.multifidelity_toy import (
-    ToyOracle,
-    make_dataset,
-    plot_acquisition,
-    plot_context_points,
-    plot_predictions_oracle,
-    plot_gp_predictions,
-)
+from utils.multifidelity_toy import make_dataset
+
+# ToyOracle,
+# ,
+#     plot_acquisition,
+#     plot_context_points,
+#     plot_predictions_oracle,
+# )
 from pathlib import Path
 import pandas as pd
 
@@ -44,57 +44,44 @@ def main(config):
     # Logger
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
-    if config.multifidelity.toy:
-        N_FID = config.multifidelity.n_fid
-    else:
-        N_FID = len(config._oracle_dict)
+    N_FID = len(config._oracle_dict)
 
-    oracles = []
-    if config.multifidelity.toy:
-        oracle = hydra.utils.instantiate(
-            config.oracle, device=config.device, float_precision=config.float_precision
-        )
-        env_arg = hydra.utils.instantiate(
-            config.env,
-            oracle=oracle,
+    # check if key true_oracle is in config
+    if "true_oracle" in config:
+        true_oracle = hydra.utils.instantiate(
+            config.true_oracle,
             device=config.device,
             float_precision=config.float_precision,
         )
-        # target fidelity must be the last fidelity
-        # env_arg needed to find the bounds and mask them
-        # config._noise_dict = dict( sorted(config._noise_dict.items(), key=operator.itemgetter(1),reverse=True))
-        for fid in range(1, N_FID + 1):
-            toy = ToyOracle(
-                oracle,
-                config._noise_dict[str(fid)],
-                env_arg,
-                config.device,
-                config.float_precision,
-            )
-            oracles.append(toy)
-        del env_arg
     else:
+        true_oracle = None
+
+    env = hydra.utils.instantiate(
+        config.env,
+        oracle=true_oracle,
+        device=config.device,
+        float_precision=config.float_precision,
+    )
+
+    if N_FID > 1:
+        oracles = []
         for fid in range(1, N_FID + 1):
             oracle = hydra.utils.instantiate(
                 config._oracle_dict[str(fid)],
+                # required for toy oracle setups
+                oracle=true_oracle,
+                env=env,
                 device=config.device,
                 float_precision=config.float_precision,
             )
             oracles.append(oracle)
-
-    env = hydra.utils.instantiate(
-        config.env,
-        oracle=oracle,
-        device=config.device,
-        float_precision=config.float_precision,
-    )
 
     if N_FID > 1:
         env = MultiFidelityEnvWrapper(
             env,
             n_fid=N_FID,
             oracle=oracles,
-            is_oracle_proxy=config.multifidelity.is_oracle_proxy,
+            proxy_state_format=config.env.proxy_state_format,
         )
 
     if config.multifidelity.proxy == True:
@@ -112,6 +99,7 @@ def main(config):
             config_model=config.model,
             dataset=data_handler,
             device=config.device,
+            float_precision=config.float_precision,
             _recursive_=False,
             logger=logger,
         )
@@ -119,6 +107,7 @@ def main(config):
     elif config.multifidelity.proxy == False and not os.path.exists(
         config.multifidelity.candidate_set_path
     ):
+        # makes context set for acquisition function
         make_dataset(
             env,
             oracles,
@@ -133,12 +122,7 @@ def main(config):
             logger.set_context(iter)
         if config.multifidelity.proxy == True:
             regressor.fit()
-            fig = plot_gp_predictions(env, regressor)
-            logger.log_figure("gp_predictions", fig, use_context=True)
-            # plot_gp_predictions(env, regressor, 0)
-            # plot_gp_predictions(env, regressor, 1)
-            # plot_gp_predictions(env, regressor, 2)
-            # TODO: remove if condition and check if proxy initialisation works with both oracle and proxy
+            # TODO: remove if condition and check if proxy initialisation works with both proxy (below) and oracle (second clause)
             proxy = hydra.utils.instantiate(
                 config.proxy,
                 regressor=regressor,
@@ -196,10 +180,17 @@ def main(config):
                 : config.n_samples
             ].tolist()
             picked_states = [states[i] for i in idx_pick]
-            picked_samples = env.statebatch2oracle(picked_states)
+            if N_FID > 1:
+                picked_states, picked_fidelity = zip(
+                    *[(state[:-1], state[-1]) for state in picked_states]
+                )
+                picked_fidelity = torch.LongTensor(picked_fidelity).to(config.device)
+                picked_samples = env.env.statebatch2oracle(picked_states)
+            else:
+                picked_samples = env.statebatch2oracle(picked_states)
 
-            energies = env.call_oracle_per_fidelity(picked_samples)
-            if config.multifidelity.toy == False:
+            energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
+            if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
                     picked_samples, energies, data_handler.train_dataset["samples"]
                 )
@@ -213,13 +204,9 @@ def main(config):
                 df = df.sort_values(by=["energies"])
                 path = logger.logdir / Path("gfn_samples.csv")
                 df.to_csv(path)
-                # dataset will eventually store in proxy-format so states are sent to avoid the readable2state conversion
-                # batch, fid, times = gflownet.sample_batch(env, config.n_samples, train=False)
-                # queries = [env.state2oracle[f](b) for f, b in zip(fid, batch)]
-                # energies = [oracles[f](q) for f, q in zip(fid, queries)]
             if config.multifidelity.proxy == True:
                 data_handler.update_dataset(
-                    picked_states, energies.detach().cpu().numpy()
+                    list(picked_states), energies.tolist(), picked_fidelity
                 )
         del gflownet
         del proxy

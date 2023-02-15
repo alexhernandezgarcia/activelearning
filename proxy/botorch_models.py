@@ -179,6 +179,10 @@ class MultifidelityOracleModel(Model):
 
 
 class MultiFidelityProxyModel(Model):
+    """
+    Has been tested only with AMP so no mean = mean * (-0.1) over here.
+    """
+
     def __init__(self, regressor, num_dropout_samples, n_fid, device):
         super().__init__()
         self.regressor = regressor

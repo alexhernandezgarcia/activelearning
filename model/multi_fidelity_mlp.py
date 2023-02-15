@@ -21,8 +21,8 @@ class MultiFidelityMLP(nn.Module):
     ):
         super(MultiFidelityMLP, self).__init__()
 
-        input_classes = config_env.length
-        input_max_length = config_env.n_dim
+        input_max_length = config_env.max_seq_length  # config_env.n_dim
+        input_classes = config_env.n_alphabet  # config_env.length
         self.num_output = num_output
         self.init_layer_depth = int((input_classes) * (input_max_length))
 
@@ -69,8 +69,10 @@ class MultiFidelityMLP(nn.Module):
 
         if shared_head == False:
             self.forward = self.forward_multiple_head
+            self.fidelity_modules = []
             for i in range(self.n_fid):
                 setattr(self, f"fid_{i}_module", nn.Sequential(*fid_layers))
+                self.fidelity_modules.append(getattr(self, f"fid_{i}_module"))
         else:
             self.fid_module = nn.Sequential(*fid_layers)
             self.forward = self.forward_shared_head
@@ -82,8 +84,12 @@ class MultiFidelityMLP(nn.Module):
     #     return input.to(x.device), fid_ohe
 
     def forward_shared_head(self, input):
-        x, fid = input[:, : self.n_fid], input[:, -self.n_fid :]
-        state = torch.zeros(x.shape[0], self.init_layer_depth).to(self.device)
+        x, fid = input[:, : -self.n_fid], input[:, -self.n_fid :]
+        state = (
+            torch.zeros(x.shape[0], self.init_layer_depth)
+            .to(self.device)
+            .to(input.dtype)
+        )
         state[:, : x.shape[1]] = x
         # self.preprocess(input, fid)
         embed = self.embed_module(state)
@@ -96,13 +102,18 @@ class MultiFidelityMLP(nn.Module):
         Currently compatible with at max two fidelities.
         Need to extend functionality to more fidelities if need be.
         """
-        x, fid_ohe = input[:, : self.n_fid], input[:, self.n_fid :]
-        state = torch.zeros(x.shape[0], self.init_layer_depth).to(self.device)
+        x, fid = input[:, : -self.n_fid], input[:, -self.n_fid :]
+        state = (
+            torch.zeros(x.shape[0], self.init_layer_depth)
+            .to(self.device)
+            .to(input.dtype)
+        )
         state[:, : x.shape[1]] = x
-        # x, fid_ohe = self.preprocess(inputs, fid)
         embed = self.embed_module(state)
-        output_fid_1 = self.fid_0_module(embed)
-        output_fid_2 = self.fid_1_module(embed)
-        out = torch.stack([output_fid_1, output_fid_2], dim=-1).squeeze(-2)
-        output = out[fid_ohe == 1].unsqueeze(dim=-1)
+        output_fidelity_modules = []
+        for i in range(len(self.fidelity_modules)):
+            setattr(self, f"output_fid_{i}", self.fidelity_modules[i](embed))
+            output_fidelity_modules.append(getattr(self, f"output_fid_{i}"))
+        out = torch.stack(output_fidelity_modules, dim=-1).squeeze(-2)
+        output = out[fid == 1].unsqueeze(dim=-1)
         return output
