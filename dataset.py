@@ -124,15 +124,17 @@ class DataHandler:
             states = torch.Tensor(
                 self.env.env.get_uniform_terminating_states(self.n_samples)
             ).long()
+            scores = None
 
         if self.n_fid > 1 and self.fidelity.do == True:
             states, fidelities = self.generate_fidelities(states)
             states = torch.cat([states, fidelities], dim=1).long()
             state_oracle, fid = self.env.statetorch2oracle(states)
-            # for AMP practice
-            scores = torch.tensor(scores, dtype=self.float, device=self.device)
-            # for grid
-            # scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
+            if scores is None:
+                # for AMP practice
+                # scores = torch.tensor(scores, dtype=self.float, device=self.device)
+                # for grid
+                scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
 
             if hasattr(self.env.env, "plot_samples_frequency"):
                 fig = self.env.env.plot_samples_frequency(states, title="Train Dataset")
@@ -273,8 +275,6 @@ class DataHandler:
             samples = torch.tensor(state_proxy, device=self.device, dtype=self.float)
         else:
             samples = state_proxy
-        # TODO: delete this keep everything in tensor only, Remove list conversion
-        # targets = torch.tensor(targets, dtype=self.float)
 
         dataset = {"samples": samples, "energies": scores}
 
@@ -340,6 +340,7 @@ class DataHandler:
             "samples": [self.env.state2readable(state) for state in states],
             "energies": energies,
         }
+        readable_dataset = readable_dataset.sort_values(by=["energies"])
         self.logger.save_dataset(readable_dataset, "sampled")
 
         # plot the frequency of sampled dataset

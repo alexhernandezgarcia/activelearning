@@ -114,7 +114,6 @@ def plot_context_points(env, mf_mes_oracle):
 
 
 def plot_gp_predictions(env, regressor):
-    """Plot the predictions of the regressor for a given fidelity."""
     states = torch.FloatTensor(env.env.get_all_terminating_states()).to("cuda")
     n_states = states.shape[0]
     n_fid = 3
@@ -123,10 +122,12 @@ def plot_gp_predictions(env, regressor):
     model.likelihood.eval()
     fidelities = torch.zeros((len(states) * 3, 1)).to("cuda")
     for i in range(n_fid):
-        fidelities[i * len(states) : (i + 1) * len(states), 0] = i
+        fidelities[i * len(states) : (i + 1) * len(states), 0] = env.oracle[i].fid
     states = states.repeat(n_fid, 1)
     state_fid = torch.cat([states, fidelities], dim=1)
-    state_fid_proxy = env.statetorch2oracle(state_fid)
+    state_fid_proxy = env.statetorch2proxy(state_fid)
+    if isinstance(state_fid_proxy, tuple):
+        state_fid_proxy = torch.concat((state_fid_proxy[0], state_fid_proxy[1]), dim=1)
     states = states[:n_states]
 
     with torch.no_grad(), gpytorch.settings.fast_pred_var():

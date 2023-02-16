@@ -35,9 +35,14 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # Assumes that all oracles required the same kind of transformed dtata
             self.statebatch2proxy = self.statebatch2oracle
             self.statetorch2proxy = self.statetorch2oracle
-        else:
+        elif proxy_state_format == "ohe":
             self.statebatch2proxy = self.statebatch2policy
             self.statetorch2proxy = self.statetorch2policy
+        elif proxy_state_format == "raw":
+            self.statebatch2proxy = self.state_tensor_from_list
+            self.statetorch2proxy = self.state_only
+            self.statetorch2oracle = self.state_from_statefid
+            self.statebatch2oracle = self.state_from_statefid
             # self.proxy = self.call_oracle_per_fidelity
         # self.state2oracle = self.env.state2oracle
         self.oracle = oracle
@@ -45,6 +50,18 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self._test_traj_list = []
         self._test_traj_actions_list = []
         self.reset()
+
+    def state_from_statefid(self, state):
+        return state[:, :-1], state[:, -1].unsqueeze(-1)
+
+    def state_only_from_tensor(self, state):
+        return state[:, :-1].to(self.float)
+
+    def state_only(self, state):
+        return state.to(self.float)
+
+    def state_tensor_from_list(self, state):
+        return torch.tensor(state, dtype=self.float, device=self.device)
 
     def set_fidelity_costs(self):
         fidelity_costs = {}

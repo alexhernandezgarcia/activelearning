@@ -1,5 +1,6 @@
 from botorch.acquisition.max_value_entropy_search import (
     qMultiFidelityLowerBoundMaxValueEntropy,
+    qMultiFidelityMaxValueEntropy,
 )
 from gflownet.proxy.base import Proxy
 from pathlib import Path
@@ -150,7 +151,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 
 class MultiFidelityMES(Proxy):
-    def __init__(self, env, cost_type, fixed_cost, logger, **kwargs):
+    def __init__(self, env, cost_type, fixed_cost, logger, gibbon=True, **kwargs):
         super().__init__(**kwargs)
         self.env = env
         self.cost_type = cost_type
@@ -160,12 +161,21 @@ class MultiFidelityMES(Proxy):
         self.candidate_set = self.load_candidate_set()
         cost_aware_utility = self.get_cost_utility()
         model = self.load_model()
-        self.qMES = qMultiFidelityLowerBoundMaxValueEntropy(
-            model,
-            candidate_set=self.candidate_set,
-            project=self.project,
-            cost_aware_utility=cost_aware_utility,
-        )
+        if gibbon == True:
+            self.qMES = qMultiFidelityLowerBoundMaxValueEntropy(
+                model,
+                candidate_set=self.candidate_set,
+                project=self.project,
+                cost_aware_utility=cost_aware_utility,
+            )
+        else:
+            self.qMES = qMultiFidelityMaxValueEntropy(
+                model,
+                candidate_set=self.candidate_set,
+                project=self.project,
+                cost_aware_utility=cost_aware_utility,
+                gibbon=False,
+            )
 
     @abstractmethod
     def project(self, states):
