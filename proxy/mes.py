@@ -366,7 +366,9 @@ class GaussianProcessMultiFidelityMES(MultiFidelityMES):
             self.device
         )
         for i in range(self.n_fid):
-            fidelities[i * len(states) : (i + 1) * len(states), 0] = i
+            fidelities[i * len(states) : (i + 1) * len(states), 0] = self.env.oracle[
+                i
+            ].fid
         states = states.repeat(self.n_fid, 1)
         state_fid = torch.cat([states, fidelities], dim=1)
         states_oracle, fid = self.env.statetorch2oracle(state_fid)
@@ -387,7 +389,9 @@ class GaussianProcessMultiFidelityMES(MultiFidelityMES):
             axs[fid].set_xticks(np.arange(self.env.env.length))
             axs[fid].set_yticks(np.arange(self.env.env.length))
             axs[fid].imshow(grid_scores)
-            axs[fid].set_title("GP-Mes Reward with fid {}".format(fid))
+            axs[fid].set_title(
+                "GP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+            )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])
             cax = divider.append_axes("right", size="5%", pad=0.05)

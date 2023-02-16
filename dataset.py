@@ -79,7 +79,9 @@ class DataHandler:
             # One for each sample
             fidelities = torch.zeros((n_samples * self.n_fid, 1)).to(self.device)
             for i in range(self.n_fid):
-                fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
+                fidelities[i * n_samples : (i + 1) * n_samples, 0] = self.env.oracle[
+                    i
+                ].fid
             states = [states for _ in range(self.n_fid)]
             # TODO: return tensor states here instead of list
         return states, fidelities
@@ -334,6 +336,8 @@ class DataHandler:
         #     dataset = np.load(self.data_path, allow_pickle=True)
         #     self.dataset = dataset.item()
         #     # index_col=False
+        for fid in range(self.n_fid):
+            fidelity[fidelity == fid] = self.env.oracle[fid].fid
         if self.n_fid > 1:
             states = [state + [fid.tolist()] for state, fid in zip(states, fidelity)]
         readable_dataset = {

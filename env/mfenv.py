@@ -57,11 +57,18 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def state_only_from_tensor(self, state):
         return state[:, :-1].to(self.float)
 
-    def state_only(self, state):
-        return state.to(self.float)
+    def state_only(self, states):
+        states = states.to(self.float)
+        for fid in range(self.n_fid):
+            states[states[:, -1] == fid, -1] = self.oracle[fid].fid
+        return states
 
     def state_tensor_from_list(self, state):
-        return torch.tensor(state, dtype=self.float, device=self.device)
+        states = torch.tensor(state, dtype=self.float, device=self.device)
+        # replace all ones in the last column of tensor state with 0.75
+        for fid in range(self.n_fid):
+            states[states[:, -1] == fid, -1] = self.oracle[fid].fid
+        return states
 
     def set_fidelity_costs(self):
         fidelity_costs = {}
