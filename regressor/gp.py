@@ -30,7 +30,7 @@ class MultitaskGPRegressor:
         self.model = SingleTaskMultiFidelityGP(
             train_x,
             train_y,
-            # outcome_transform=Standardize(m=1),
+            outcome_transform=Standardize(m=1),
             # fid column
             data_fidelity=self.n_fid - 1,
         )

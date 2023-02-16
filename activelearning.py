@@ -11,7 +11,8 @@ from gflownet.utils.common import flatten_config
 import numpy as np
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
-from utils.multifidelity_toy import make_dataset
+from utils.multifidelity_toy import make_dataset, plot_gp_predictions
+import matplotlib.pyplot as plt
 
 # ToyOracle,
 # ,
@@ -65,6 +66,8 @@ def main(config):
 
     if N_FID > 1:
         oracles = []
+        width = (N_FID) * 5
+        fig, axs = plt.subplots(1, N_FID, figsize=(width, 5))
         for fid in range(1, N_FID + 1):
             oracle = hydra.utils.instantiate(
                 config._oracle_dict[str(fid)],
@@ -75,6 +78,12 @@ def main(config):
                 float_precision=config.float_precision,
             )
             oracles.append(oracle)
+            if hasattr(oracle, "plot_true_rewards"):
+                axs[fid - 1] = oracle.plot_true_rewards(env, axs[fid - 1])
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+        logger.log_figure("ground_truth_rewards", fig, use_context=False)
 
     if N_FID > 1:
         env = MultiFidelityEnvWrapper(
@@ -133,6 +142,11 @@ def main(config):
                 env=env,
                 fixed_cost=config.multifidelity.fixed_cost,
             )
+            fig = plot_gp_predictions(env, regressor)
+            plt.tight_layout()
+            plt.show()
+            plt.close()
+            logger.log_figure("gp_predictions", fig, use_context=True)
         else:
             # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state
             proxy = hydra.utils.instantiate(
@@ -190,7 +204,7 @@ def main(config):
                 picked_samples = env.statebatch2oracle(picked_states)
 
             energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
-            if config.env.proxy_state_format != "oracle":
+            if config.env.proxy_state_format == "ohe":
                 gflownet.evaluate(
                     picked_samples, energies, data_handler.train_dataset["samples"]
                 )

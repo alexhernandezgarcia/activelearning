@@ -3,11 +3,12 @@ import torch
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 class ToyOracle(Proxy):
     # TODO: resolve the kwargs error here
-    def __init__(self, oracle, noise, env, valid, cost, device, float_precision):
+    def __init__(self, oracle, noise, env, valid, cost, fid, device, float_precision):
         super().__init__(device, float_precision)
         self.oracle = oracle
         self.noise_distribution = torch.distributions.Normal(noise.mu, noise.sigma)
@@ -15,6 +16,7 @@ class ToyOracle(Proxy):
         self.valid = valid
         self.env = env
         self.cost = cost
+        self.fid = fid
 
     def __call__(self, states):
         true_values = self.oracle(states)
@@ -30,19 +32,21 @@ class ToyOracle(Proxy):
         noisy_values = true_values + noise
         return noisy_values
 
-    def plot_scores(self):
-        states = torch.FloatTensor(self.env.get_all_terminating_states()).to("cuda")
-        scores = self(states)
+    def plot_true_rewards(self, env, ax):
+        states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
+        states_oracle = env.statetorch2oracle(states)
+        scores = self(states_oracle).detach().cpu().numpy()
         index = states.long().detach().cpu().numpy()
-        grid_scores = np.ones((self.env.ndim, self.env.ndim)) * (0.2)
+        grid_scores = np.ones((env.length, env.length))
         grid_scores[index[:, 0], index[:, 1]] = scores
-        plt.imshow(grid_scores)
-        plt.colorbar()
-        # TODO: fix to save to log directory/wandb logger
-        plt.title("Ground Truth (with Noise Stddev {})".format(self.sigma))
-        plt.savefig(
-            "/home/mila/n/nikita.saxena/activelearning/storage/grid/round2/ground_truth_noise{}.png".format(
-                self.sigma
-            )
-        )
+        ax.set_xticks(np.arange(env.length))
+        ax.set_yticks(np.arange(env.length))
+        ax.imshow(grid_scores)
+        ax.set_title("True Reward with fid {}".format(self.fid))
+        im = ax.imshow(grid_scores)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        plt.show()
         plt.close()
+        return ax

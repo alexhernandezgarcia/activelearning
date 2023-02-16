@@ -15,3 +15,4 @@ noise:
   sigma: 0.01
 valid: null
 cost: 10
+fid: 2
