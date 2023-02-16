@@ -340,7 +340,7 @@ class DataHandler:
             "samples": [self.env.state2readable(state) for state in states],
             "energies": energies,
         }
-        readable_dataset = readable_dataset.sort_values(by=["energies"])
+        # readable_dataset = readable_dataset.sort_values(by=["energies"])
         self.logger.save_dataset(readable_dataset, "sampled")
 
         # plot the frequency of sampled dataset
