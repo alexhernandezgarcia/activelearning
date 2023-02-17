@@ -131,6 +131,11 @@ def main(config):
             logger.set_context(iter)
         if config.multifidelity.proxy == True:
             regressor.fit()
+            fig = plot_gp_predictions(env, regressor)
+            plt.tight_layout()
+            plt.show()
+            plt.close()
+            logger.log_figure("gp_predictions", fig, use_context=True)
             # TODO: remove if condition and check if proxy initialisation works with both proxy (below) and oracle (second clause)
             proxy = hydra.utils.instantiate(
                 config.proxy,
@@ -142,11 +147,6 @@ def main(config):
                 env=env,
                 fixed_cost=config.multifidelity.fixed_cost,
             )
-            fig = plot_gp_predictions(env, regressor)
-            plt.tight_layout()
-            plt.show()
-            plt.close()
-            logger.log_figure("gp_predictions", fig, use_context=True)
         else:
             # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state
             proxy = hydra.utils.instantiate(
@@ -203,21 +203,24 @@ def main(config):
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
 
-            energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
+            if config.env.proxy_state_format == "raw":
+                energies = env.call_oracle_per_fidelity(picked_states, picked_fidelity)
+            else:
+                energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
             if config.env.proxy_state_format == "ohe":
                 gflownet.evaluate(
                     picked_samples, energies, data_handler.train_dataset["samples"]
                 )
-            else:
-                df = pd.DataFrame(
-                    {
-                        "readable": [env.state2readable(s) for s in picked_states],
-                        "energies": energies.cpu().numpy(),
-                    }
-                )
-                df = df.sort_values(by=["energies"])
-                path = logger.logdir / Path("gfn_samples.csv")
-                df.to_csv(path)
+
+            df = pd.DataFrame(
+                {
+                    "readable": [env.state2readable(s) for s in picked_states],
+                    "energies": energies.cpu().numpy(),
+                }
+            )
+            df = df.sort_values(by=["energies"])
+            path = logger.logdir / Path("gfn_samples.csv")
+            df.to_csv(path)
             if config.multifidelity.proxy == True:
                 data_handler.update_dataset(
                     list(picked_states), energies.tolist(), picked_fidelity

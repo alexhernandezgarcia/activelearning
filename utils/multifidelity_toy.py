@@ -116,13 +116,10 @@ def plot_context_points(env, mf_mes_oracle):
 def plot_gp_predictions(env, regressor):
     states = torch.FloatTensor(env.env.get_all_terminating_states()).to("cuda")
     n_states = states.shape[0]
-    n_fid = 3
-    model = regressor.model
-    model.eval()
-    model.likelihood.eval()
+    n_fid = env.n_fid
     fidelities = torch.zeros((len(states) * 3, 1)).to("cuda")
     for i in range(n_fid):
-        fidelities[i * len(states) : (i + 1) * len(states), 0] = env.oracle[i].fid
+        fidelities[i * len(states) : (i + 1) * len(states), 0] = i  # env.oracle[i].fid
     states = states.repeat(n_fid, 1)
     state_fid = torch.cat([states, fidelities], dim=1)
     state_fid_proxy = env.statetorch2proxy(state_fid)
@@ -130,17 +127,22 @@ def plot_gp_predictions(env, regressor):
         state_fid_proxy = torch.concat((state_fid_proxy[0], state_fid_proxy[1]), dim=1)
     states = states[:n_states]
 
+    model = regressor.model
+    model.eval()
+    model.likelihood.eval()
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        predictions = model.likelihood(model(state_fid_proxy))
-        mean = predictions.mean
-    scores = mean.detach().cpu().numpy()
+        posterior = model.posterior(state_fid_proxy)
+        mean = posterior.mean
+        # predictions = model.likelihood(model(state_fid_proxy))
+        # mean = predictions.mean
+    scores = mean.detach().cpu().numpy().squeeze(-1)
     width = (n_fid) * 5
     fig, axs = plt.subplots(1, n_fid, figsize=(width, 5))
     for fid in range(0, n_fid):
         index = states.long().detach().cpu().numpy()
         grid_scores = np.zeros((env.env.length, env.env.length))
         grid_scores[index[:, 0], index[:, 1]] = scores[
-            fid * len(states) : (fid + 1) * len(states)
+            fid * n_states : (fid + 1) * n_states
         ]
         axs[fid].set_xticks(np.arange(env.env.length))
         axs[fid].set_yticks(np.arange(env.env.length))

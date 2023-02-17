@@ -10,7 +10,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 class Branin(Proxy):
     def __init__(self, fid=None, cost=None, env=None, **kwargs):
         super().__init__(**kwargs)
-        # maximise the value so negate = True
+        # minimisation problem so negate = False
         self.task = AugmentedBranin(negate=False)
         self.fid = fid
         self.cost = cost
@@ -20,6 +20,8 @@ class Branin(Proxy):
             torch.ones((len(states), 1), device=self.device, dtype=self.float)
             * self.fid
         )
+        if isinstance(states, TensorType) == False:
+            states = torch.tensor(states, device=self.device, dtype=self.float)
         # fidelity[:,0] = fidelity[:, 0] - 0.1
         # states = states - 5
         state_fid = torch.cat([states, fidelity], dim=1)
@@ -29,7 +31,7 @@ class Branin(Proxy):
 
     def plot_true_rewards(self, env, ax):
         states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
-        scores = self(states).detach().cpu().numpy() / (1e4)
+        scores = self(states).detach().cpu().numpy()
         # what the GP is trained on
         scores = scores * (-0.1)
         index = states.long().detach().cpu().numpy()

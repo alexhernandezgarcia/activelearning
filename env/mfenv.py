@@ -73,7 +73,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def set_fidelity_costs(self):
         fidelity_costs = {}
         for idx in range(self.n_fid):
-            fidelity_costs[float(idx)] = self.oracle[idx].cost
+            fidelity_costs[self.oracle[idx].fid] = self.oracle[idx].cost
         return fidelity_costs
 
     def copy(self):
@@ -99,7 +99,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 states = list(
                     itertools.compress(state_oracle, chosen_state_index.tolist())
                 )
-            scores[idx_fid] = self.oracle[fid](states)
+            if len(states) > 0:
+                scores[idx_fid] = self.oracle[fid](states)
         return scores
 
     def get_actions_space(self):
@@ -358,7 +359,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_cost(self, samples):
         fidelities = [sample[-1] for sample in samples]
-        costs = [self.fidelity_costs[fid] for fid in fidelities]
+        fidelity_of__oracle = [self.oracle[int(fid)].fid for fid in fidelities]
+        costs = [self.fidelity_costs[fid] for fid in fidelity_of__oracle]
         return costs
 
     def get_pairwise_distance(self, samples):

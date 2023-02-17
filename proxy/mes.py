@@ -199,7 +199,8 @@ class MultiFidelityMES(Proxy):
             )
         elif self.cost_type == "botorch":
             cost_model = AffineFidelityCostModel(
-                fidelity_weights={-1: 2.0}, fixed_cost=self.fixed_cost
+                fidelity_weights={-1: self.env.oracle[self.n_fid - 1].fid},
+                fixed_cost=self.fixed_cost,
             )
             cost_aware_utility = InverseCostWeightedUtility(cost_model=cost_model)
         elif self.cost_type == "botorch_proxy":
@@ -346,7 +347,7 @@ class GaussianProcessMultiFidelityMES(MultiFidelityMES):
     def project(self, states):
         input_dim = states.ndim
         max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
-            self.n_fid - 1
+            self.env.oracle[self.n_fid - 1].fid
         )
         if input_dim == 3:
             states = states[:, :, :-1]

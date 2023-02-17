@@ -74,14 +74,19 @@ class DataHandler:
         """
         n_samples = len(states)
         if self.fidelity.mixed:
-            fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1))
+            fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1)).to(
+                self.float
+            )
+            # for i in range(self.n_fid):
+            # fidelities[fidelities[:, 0] == i, 0] = self.env.oracle[i].fid
         else:
             # One for each sample
             fidelities = torch.zeros((n_samples * self.n_fid, 1)).to(self.device)
             for i in range(self.n_fid):
-                fidelities[i * n_samples : (i + 1) * n_samples, 0] = self.env.oracle[
-                    i
-                ].fid
+                fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
+                # self.env.oracle[
+                # i
+                # ].fid
             states = [states for _ in range(self.n_fid)]
             # TODO: return tensor states here instead of list
         return states, fidelities
@@ -130,6 +135,7 @@ class DataHandler:
 
         if self.n_fid > 1 and self.fidelity.do == True:
             states, fidelities = self.generate_fidelities(states)
+            # specifically for discrete case (states) are integers
             states = torch.cat([states, fidelities], dim=1).long()
             state_oracle, fid = self.env.statetorch2oracle(states)
             if scores is None:
@@ -336,10 +342,14 @@ class DataHandler:
         #     dataset = np.load(self.data_path, allow_pickle=True)
         #     self.dataset = dataset.item()
         #     # index_col=False
-        for fid in range(self.n_fid):
-            fidelity[fidelity == fid] = self.env.oracle[fid].fid
+        # for fid in range(self.n_fid):
+        # fidelity[fidelity == fid] = self.env.oracle[fid].fid
         if self.n_fid > 1:
             states = [state + [fid.tolist()] for state, fid in zip(states, fidelity)]
+        # remove duplicate rows from tensor states
+        # get indices of unique rows
+        # states, index = torch.unique(torch.tensor(states), dim=0, return_inverse=True)
+        # energies = energies[index]
         readable_dataset = {
             "samples": [self.env.state2readable(state) for state in states],
             "energies": energies,

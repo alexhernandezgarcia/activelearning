@@ -19,7 +19,7 @@ class FidelityCostModel(CostAwareUtility):
     def forward(self, X, deltas, **kwargs):
         fidelity = X[:, 0, -1]
         scaled_deltas = torch.zeros(X.shape[0], dtype=self.float).to(self.device)
-        for fid in range(len(self.fidelity_weights)):
+        for fid in self.fidelity_weights.keys():
             idx_fid = torch.where(fidelity == fid)[0]
             cost_fid = torch.tensor([self.fidelity_weights[fid]], dtype=self.float).to(
                 self.device
