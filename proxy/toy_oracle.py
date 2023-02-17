@@ -21,9 +21,14 @@ class ToyOracle(Proxy):
     def __call__(self, states):
         true_values = self.oracle(states)
         if self.valid is not None:
-            bounds = torch.FloatTensor(
-                [[self.valid.xmin, self.valid.ymin], [self.valid.xmax, self.valid.ymax]]
-            ).to(self.device)
+            bounds = torch.tensor(
+                [
+                    [self.valid.xmin, self.valid.ymin],
+                    [self.valid.xmax, self.valid.ymax],
+                ],
+                device=self.device,
+                dtype=self.float,
+            )
             bounds = self.env.statetorch2oracle(bounds)
             mask = (states >= bounds[0]) & (states <= bounds[1])
             mask = mask[:, 0] & mask[:, 1]
@@ -33,7 +38,9 @@ class ToyOracle(Proxy):
         return noisy_values
 
     def plot_true_rewards(self, env, ax):
-        states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
+        states = torch.tensor(
+            env.get_all_terminating_states(), dtype=self.float, device=self.device
+        )
         states_oracle = env.statetorch2oracle(states)
         scores = self(states_oracle).detach().cpu().numpy()
         index = states.long().detach().cpu().numpy()
@@ -42,7 +49,7 @@ class ToyOracle(Proxy):
         ax.set_xticks(np.arange(env.length))
         ax.set_yticks(np.arange(env.length))
         ax.imshow(grid_scores)
-        ax.set_title("True Reward with fid {}".format(self.fid))
+        ax.set_title("Oracle Energy with fid {}".format(self.fid))
         im = ax.imshow(grid_scores)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)

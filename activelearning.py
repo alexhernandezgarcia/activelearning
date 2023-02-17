@@ -24,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_debug_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -113,17 +113,17 @@ def main(config):
             logger=logger,
         )
     # check if path exists
-    elif config.multifidelity.proxy == False and not os.path.exists(
-        config.multifidelity.candidate_set_path
-    ):
-        # makes context set for acquisition function
-        make_dataset(
-            env,
-            oracles,
-            N_FID,
-            device=config.device,
-            path=config.multifidelity.candidate_set_path,
-        )
+    elif config.multifidelity.proxy == False:
+        regressor = None
+        if not os.path.exists(config.multifidelity.candidate_set_path):
+            # makes context set for acquisition function
+            make_dataset(
+                env,
+                oracles,
+                N_FID,
+                device=config.device,
+                path=config.multifidelity.candidate_set_path,
+            )
 
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\n Starting iteration {iter} of active learning")
@@ -137,31 +137,31 @@ def main(config):
             plt.close()
             logger.log_figure("gp_predictions", fig, use_context=True)
             # TODO: remove if condition and check if proxy initialisation works with both proxy (below) and oracle (second clause)
-            proxy = hydra.utils.instantiate(
-                config.proxy,
-                regressor=regressor,
-                device=config.device,
-                float_precision=config.float_precision,
-                logger=logger,
-                oracle=oracles,
-                env=env,
-                fixed_cost=config.multifidelity.fixed_cost,
-            )
-        else:
-            # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state
-            proxy = hydra.utils.instantiate(
-                config.proxy,
-                device=config.device,
-                float_precision=config.float_precision,
-                n_fid=N_FID,
-                logger=logger,
-                oracle=oracles,
-                env=env,
-                data_path=config.multifidelity.candidate_set_path,
-                fixed_cost=config.multifidelity.fixed_cost,
-            )
-            # fig = proxy.plot_context_points()
-            # logger.log_figure("context_points", fig, True)
+        proxy = hydra.utils.instantiate(
+            config.proxy,
+            regressor=regressor,
+            device=config.device,
+            float_precision=config.float_precision,
+            logger=logger,
+            oracle=oracles,
+            env=env,
+            fixed_cost=config.multifidelity.fixed_cost,
+        )
+        # else:
+        #     # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state
+        #     proxy = hydra.utils.instantiate(
+        #         config.proxy,
+        #         device=config.device,
+        #         float_precision=config.float_precision,
+        #         n_fid=N_FID,
+        #         logger=logger,
+        #         oracle=oracles,
+        #         env=env,
+        #         data_path=config.multifidelity.candidate_set_path,
+        #         fixed_cost=config.multifidelity.fixed_cost,
+        #     )
+        # fig = proxy.plot_context_points()
+        # logger.log_figure("context_points", fig, True)
         # plot_context_points(env, proxy)
         # plot_acquisition(env, 0, proxy)
         # plot_acquisition(env, 1, proxy)

@@ -108,6 +108,7 @@ class MultifidelityOracleModel(Model):
 
     def posterior(self, X, observation_noise=False, posterior_transform=None):
         super().posterior(X, observation_noise, posterior_transform)
+        # specifically works with oracle.noise.sigma = 0.01, 0.1, 0.15
         covar_mm = torch.FloatTensor(
             [
                 [self.oracle[0].sigma ** 2, (0.015) ** 2, (5e-3) ** 2],
