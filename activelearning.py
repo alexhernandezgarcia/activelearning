@@ -147,19 +147,6 @@ def main(config):
             env=env,
             fixed_cost=config.multifidelity.fixed_cost,
         )
-        # else:
-        #     # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state
-        #     proxy = hydra.utils.instantiate(
-        #         config.proxy,
-        #         device=config.device,
-        #         float_precision=config.float_precision,
-        #         n_fid=N_FID,
-        #         logger=logger,
-        #         oracle=oracles,
-        #         env=env,
-        #         data_path=config.multifidelity.candidate_set_path,
-        #         fixed_cost=config.multifidelity.fixed_cost,
-        #     )
         # fig = proxy.plot_context_points()
         # logger.log_figure("context_points", fig, True)
         # plot_context_points(env, proxy)

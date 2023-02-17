@@ -323,6 +323,50 @@ class OracleMultiFidelityMES(MultiFidelityMES):
             state, scores, "Context Points across Fidelities"
         )
 
+    def plot_acquisition_rewards(self, **kwargs):
+        states = torch.tensor(
+            self.env.env.get_all_terminating_states(), dtype=self.float
+        ).to(self.device)
+        n_states = states.shape[0]
+        fidelities = torch.zeros((len(states) * self.n_fid, 1), dtype=self.float).to(
+            self.device
+        )
+        for i in range(self.n_fid):
+            fidelities[i * len(states) : (i + 1) * len(states), 0] = self.env.oracle[
+                i
+            ].fid
+        states = states.repeat(self.n_fid, 1)
+        state_fid = torch.cat([states, fidelities], dim=1)
+        states_oracle, fid = self.env.statetorch2oracle(state_fid)
+        # Specific to grid as the states are transformed to oracle space on feeding to MES
+        if isinstance(states_oracle, torch.Tensor):
+            states_fid_oracle = torch.cat([states_oracle, fid], dim=1)
+        states = states[:n_states]
+
+        scores = self(states_fid_oracle).detach().cpu().numpy()
+        width = (self.n_fid) * 5
+        fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        for fid in range(0, self.n_fid):
+            index = states.long().detach().cpu().numpy()
+            grid_scores = np.zeros((self.env.env.length, self.env.env.length))
+            grid_scores[index[:, 0], index[:, 1]] = scores[
+                fid * len(states) : (fid + 1) * len(states)
+            ]
+            axs[fid].set_xticks(np.arange(self.env.env.length))
+            axs[fid].set_yticks(np.arange(self.env.env.length))
+            axs[fid].imshow(grid_scores)
+            axs[fid].set_title(
+                "Oracle-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+            )
+            im = axs[fid].imshow(grid_scores)
+            divider = make_axes_locatable(axs[fid])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+            plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig
+
 
 class GaussianProcessMultiFidelityMES(MultiFidelityMES):
     def __init__(self, regressor, **kwargs):
