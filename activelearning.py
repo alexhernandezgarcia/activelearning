@@ -87,8 +87,11 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
-            scores = env.proxy(env.statetorch2proxy(states))
-            idx_pick = torch.argsort(scores, descending= True)[: config.n_samples].tolist()
+            # for AMP, states is a list
+            scores = env.proxy(env.statebatch2proxy(states))
+            idx_pick = torch.argsort(scores, descending=True)[
+                : config.n_samples
+            ].tolist()
             picked_states = [states[i] for i in idx_pick]
             picked_samples = env.statebatch2oracle(picked_states)
             energies = oracle(picked_samples)

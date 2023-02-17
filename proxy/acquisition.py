@@ -5,6 +5,7 @@ from botorch.sampling import SobolQMCNormalSampler
 from .dropout_regressor import DropoutRegressor
 import numpy as np
 
+
 class UCB(DropoutRegressor):
     def __init__(self, kappa, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -25,7 +26,7 @@ class UCB(DropoutRegressor):
         )
         mean, std = torch.mean(outputs, dim=1), torch.std(outputs, dim=1)
         score = mean + self.kappa * std
-        score = torch.Tensor(score).detach().cpu().numpy()
+        # score = torch.tensor(score, dtype=torch.float32, device='cuda')
         return score
 
 
@@ -49,4 +50,4 @@ class BotorchUCB(UCB):
             model=self.model, beta=self.kappa, sampler=self.sampler
         )
         acq_values = UCB(inputs)
-        return acq_values.detach().cpu().numpy()
+        return acq_values
