@@ -17,7 +17,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Does not require the different oracles as scoring is performed by GFN not env
     """
 
-    def __init__(self, env, n_fid, oracle, proxy_state_format=False, **kwargs):
+    def __init__(
+        self, env, n_fid, oracle, proxy_state_format=False, rescale=1, **kwargs
+    ):
         # TODO: super init kwargs
         super().__init__(**kwargs)
         self.env = env
@@ -49,16 +51,24 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.fidelity_costs = self.set_fidelity_costs()
         self._test_traj_list = []
         self._test_traj_actions_list = []
+        # rescale is used to rescale the state to the range of the oracle
+        self.rescale = rescale
         self.reset()
 
     def state_from_statefid(self, state):
-        return state[:, :-1], state[:, -1].unsqueeze(-1)
+        states = state[:, :-1]
+        states = states / self.rescale
+        fidelities = state[:, -1].unsqueeze(-1)
+        return states, fidelities
 
     def state_only_from_tensor(self, state):
-        return state[:, :-1].to(self.float)
+        state = state[:, :-1].to(self.float)
+        state[:, :-1] = state[:, :-1] / self.rescale
+        return state
 
     def state_only(self, states):
         states = states.to(self.float)
+        states[:, :-1] = states[:, :-1] / self.rescale
         for fid in range(self.n_fid):
             states[states[:, -1] == fid, -1] = self.oracle[fid].fid
         return states
@@ -68,6 +78,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # replace all ones in the last column of tensor state with 0.75
         for fid in range(self.n_fid):
             states[states[:, -1] == fid, -1] = self.oracle[fid].fid
+        states[:, :-1] = states[:, :-1] / self.rescale
         return states
 
     def set_fidelity_costs(self):

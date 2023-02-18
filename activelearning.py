@@ -79,7 +79,7 @@ def main(config):
             )
             oracles.append(oracle)
             if hasattr(oracle, "plot_true_rewards"):
-                axs[fid - 1] = oracle.plot_true_rewards(env, axs[fid - 1])
+                axs[fid - 1] = oracle.plot_true_rewards(env, axs[fid - 1], rescale = config.multifidelity.rescale)
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -91,6 +91,7 @@ def main(config):
             n_fid=N_FID,
             oracle=oracles,
             proxy_state_format=config.env.proxy_state_format,
+            rescale=config.multifidelity.rescale,
         )
 
     if config.multifidelity.proxy == True:
