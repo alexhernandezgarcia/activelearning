@@ -37,7 +37,7 @@ class ToyOracle(Proxy):
         noisy_values = true_values + noise
         return noisy_values
 
-    def plot_true_rewards(self, env, ax):
+    def plot_true_rewards(self, env, ax, **kwargs):
         states = torch.tensor(
             env.get_all_terminating_states(), dtype=self.float, device=self.device
         )

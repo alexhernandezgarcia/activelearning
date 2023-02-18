@@ -87,7 +87,7 @@ class MultiFidelity(Proxy):
 
 
 class MES(MultiFidelity):
-    def __init__(self, gibbon, **kwargs):
+    def __init__(self, gibbon=True, **kwargs):
         super().__init__(**kwargs)
         cost_aware_utility = self.get_cost_utility()
         model = self.load_model()
