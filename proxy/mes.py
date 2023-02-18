@@ -264,8 +264,20 @@ class GaussianProcessMultiFidelityMES(MES):
             grid_scores[index[:, 0], index[:, 1]] = scores[
                 fid * len(states) : (fid + 1) * len(states)
             ]
-            axs[fid].set_xticks(np.arange(self.env.env.length))
-            axs[fid].set_yticks(np.arange(self.env.env.length))
+            axs[fid].set_xticks(
+                np.arange(
+                    start=0,
+                    stop=self.env.env.length,
+                    step=int(self.env.env.length / self.env.rescale),
+                )
+            )
+            axs[fid].set_yticks(
+                np.arange(
+                    start=0,
+                    stop=self.env.env.length,
+                    step=int(self.env.env.length / self.env.rescale),
+                )
+            )
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
                 "GP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)

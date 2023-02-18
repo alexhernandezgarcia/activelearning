@@ -79,7 +79,9 @@ def main(config):
             )
             oracles.append(oracle)
             if hasattr(oracle, "plot_true_rewards"):
-                axs[fid - 1] = oracle.plot_true_rewards(env, axs[fid - 1], rescale = config.multifidelity.rescale)
+                axs[fid - 1] = oracle.plot_true_rewards(
+                    env, axs[fid - 1], rescale=config.multifidelity.rescale
+                )
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -102,6 +104,7 @@ def main(config):
             oracle=oracle,
             device=config.device,
             float_precision=config.float_precision,
+            rescale=config.multifidelity.rescale,
         )
         regressor = hydra.utils.instantiate(
             config.regressor,
@@ -123,6 +126,7 @@ def main(config):
             oracles,
             N_FID,
             device=config.device,
+            # path = "/home/mila/n/nikita.saxena/activelearning/storage/branin/mf_train50.csv"
             path=config.multifidelity.candidate_set_path,
         )
 
@@ -132,7 +136,7 @@ def main(config):
             logger.set_context(iter)
         if config.multifidelity.proxy == True:
             regressor.fit()
-            fig = plot_gp_predictions(env, regressor)
+            fig = plot_gp_predictions(env, regressor, config.multifidelity.rescale)
             plt.tight_layout()
             plt.show()
             plt.close()
@@ -205,7 +209,16 @@ def main(config):
                 picked_samples = env.statebatch2oracle(picked_states)
 
             if config.env.proxy_state_format == "raw":
-                energies = env.call_oracle_per_fidelity(picked_states, picked_fidelity)
+                picked_states_tensor = torch.tensor(
+                    picked_states, device=config.device, dtype=env.float
+                )
+                picked_states_tensor = (
+                    picked_states_tensor / config.multifidelity.rescale
+                )
+                picked_states_oracle = picked_states_tensor.tolist()
+                energies = env.call_oracle_per_fidelity(
+                    picked_states_oracle, picked_fidelity
+                )
             else:
                 energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
             if config.env.proxy_state_format == "ohe":
