@@ -46,6 +46,7 @@ class DataHandler:
         n_samples,
         fidelity,
         float_precision,
+        rescale,
     ):
         self.env = env
         self.normalise_data = normalise_data
@@ -66,6 +67,7 @@ class DataHandler:
         else:
             self.n_fid = 1
         self.float = set_float_precision(float_precision)
+        self.rescale = rescale
         self.initialise_dataset()
 
     def generate_fidelities(self, states):
@@ -105,14 +107,24 @@ class DataHandler:
         if self.path.oracle_dataset:
             # when one dataset without fidelity is given
             # load dataset and convert to states
-            train = pd.read_csv(self.path.oracle_dataset.train)
-            test = pd.read_csv(self.path.oracle_dataset.test)
-            train_states = train["samples"].values.tolist()
-            train_scores = train["energies"].values.tolist()
-            test_states = test["samples"].values.tolist()
-            test_scores = test["energies"].values.tolist()
+            if self.path.oracle_dataset.train is not None:
+                train = pd.read_csv(self.path.oracle_dataset.train.path)
+                train_states = train["samples"].values.tolist()
+                if self.path.oracle_dataset.train.get_scores:
+                    train_scores = []
+                else:
+                    train_scores = train["energies"].values.tolist()
+            if self.path.oracle_dataset.test is not None:
+                test = pd.read_csv(self.path.oracle_dataset.test.path)
+                test_states = test["samples"].values.tolist()
+                test_scores = test["energies"].values.tolist()
+            else:
+                test_states = []
+                test_scores = []
             states = train_states + test_states
             scores = train_scores + test_scores
+            if scores == []:
+                scores = None
             states = [
                 torch.LongTensor(self.env.env.readable2state(sample))
                 for sample in states
@@ -145,7 +157,9 @@ class DataHandler:
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
 
             if hasattr(self.env.env, "plot_samples_frequency"):
-                fig = self.env.env.plot_samples_frequency(states, title="Train Dataset")
+                fig = self.env.env.plot_samples_frequency(
+                    states, title="Train Dataset", rescale=self.rescale
+                )
                 self.logger.log_figure("train_dataset", fig, use_context=True)
             if hasattr(self.env.env, "plot_reward_distribution"):
                 fig = self.env.env.plot_reward_distribution(scores, title="Dataset")
@@ -359,7 +373,9 @@ class DataHandler:
 
         # plot the frequency of sampled dataset
         if hasattr(self.env.env, "plot_samples_frequency"):
-            fig = self.env.env.plot_samples_frequency(states, title="Sampled Dataset")
+            fig = self.env.env.plot_samples_frequency(
+                states, title="Sampled Dataset", rescale=self.rescale
+            )
             self.logger.log_figure(
                 "post_al_iter_sampled_dataset", fig, use_context=True
             )

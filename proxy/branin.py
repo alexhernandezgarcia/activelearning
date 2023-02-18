@@ -29,16 +29,21 @@ class Branin(Proxy):
         # scores = scores.unsqueeze(-1)
         return scores.to(self.device).to(self.float)
 
-    def plot_true_rewards(self, env, ax):
+    def plot_true_rewards(self, env, ax, rescale):
         states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
-        scores = self(states).detach().cpu().numpy()
+        oracle_states = states / rescale
+        scores = self(oracle_states).detach().cpu().numpy()
         # what the GP is trained on
-        scores = scores * (-0.1)
+        scores = scores * (-1)
         index = states.long().detach().cpu().numpy()
         grid_scores = np.zeros((env.length, env.length))
         grid_scores[index[:, 0], index[:, 1]] = scores
-        ax.set_xticks(np.arange(env.length))
-        ax.set_yticks(np.arange(env.length))
+        ax.set_xticks(
+            np.arange(start=0, stop=env.length, step=int(env.length / rescale))
+        )
+        ax.set_yticks(
+            np.arange(start=0, stop=env.length, step=int(env.length / rescale))
+        )
         ax.imshow(grid_scores)
         ax.set_title("True Reward with fid {}".format(self.fid))
         im = ax.imshow(grid_scores)
