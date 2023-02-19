@@ -167,6 +167,7 @@ class OracleMultiFidelityMES(MES):
         path = self.data_path
         data = pd.read_csv(path, index_col=0)
         samples = data["samples"]
+        # samples have states and fidelity
         state = [self.env.readable2state(sample) for sample in samples]
         state_proxy = self.env.statebatch2proxy(state)
         if isinstance(state_proxy, torch.Tensor):

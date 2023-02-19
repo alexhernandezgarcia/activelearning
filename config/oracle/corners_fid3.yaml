@@ -12,11 +12,12 @@ _target_: proxy.toy_oracle.ToyOracle
 
 noise:
   mu: 0
-  sigma: 0.1 #0.3
+  sigma: 0.1 #15 #0.3
 valid:
   xmin: 5
   xmax: 9
   ymin: 0
   ymax: 9
-cost: 0.5
+cost: 0.008 #5
 fid: 0
+maximize: True

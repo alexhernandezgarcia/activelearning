@@ -13,7 +13,7 @@ def make_dataset(env, oracles, n_fid, device, path):
     # get_states return a list right now
     # states = torch.Tensor(env.env.get_uniform_terminating_states(200)).to(device).long()
     states = (
-        torch.Tensor(np.random.randint(low=0, high=3, size=(10, 2))).to(device).long()
+        torch.Tensor(np.random.randint(low=0, high=10, size=(30, 2))).to(device).long()
     )
     # states = states + 50
     # states = states.tolist()

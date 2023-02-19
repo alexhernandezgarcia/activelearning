@@ -25,7 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="debug_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -156,8 +156,6 @@ def main(config):
             logger=logger,
             oracle=oracles,
             env=env,
-            fixed_cost=config.multifidelity.fixed_cost,
-            data_path=config.multifidelity.candidate_set_path,
         )
         # fig = proxy.plot_context_points()
         # logger.log_figure("context_points", fig, True)
@@ -204,6 +202,7 @@ def main(config):
 
             if N_FID == 1:
                 energies = env.oracle(picked_samples)
+                picked_fidelity = None
             else:
                 if config.env.proxy_state_format == "raw":
                     # Specifically for Branin

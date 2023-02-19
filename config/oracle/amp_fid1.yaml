@@ -6,4 +6,5 @@ oracle_features: "AlBert"
 dist_fn: "edit"
 medoid_oracle_norm: 1
 cost: 0.5
+maximize: True
 # fid: 0
