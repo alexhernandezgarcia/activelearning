@@ -83,6 +83,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def set_fidelity_costs(self):
         fidelity_costs = {}
+        if hasattr(self.oracle[0], "fid") == False:
+            # if anyone of the oracles dont have fid, fid is reassigned to all oracles
+            for idx in range(self.n_fid):
+                setattr(self.oracle[idx], "fid", idx)
         for idx in range(self.n_fid):
             fidelity_costs[self.oracle[idx].fid] = self.oracle[idx].cost
         return fidelity_costs
@@ -389,6 +393,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def get_trajectories(
         self, traj_list, traj_actions_list, current_traj, current_actions
     ):
+        # TODO: Optimize
         mf_traj_list = []
         mf_traj_actions_list = []
         traj_with_fidelity = current_traj[0]
@@ -406,14 +411,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # search for action in list of actions
             action_idx = self.action_space.index(action)
             single_fid_traj_actions_list[0][idx] = action_idx
+        mf_traj_list = []
+        mf_traj_actions_list = []
         for traj_idx in range(len(single_fid_traj_list)):
-            mf_traj_list = []
-            mf_traj_actions_list = []
             num_traj_states = len(single_fid_traj_list[traj_idx])
             for idx in range(num_traj_states):
                 trajs = copy.deepcopy(single_fid_traj_list[traj_idx])
                 traj_actions = single_fid_traj_actions_list[traj_idx].copy()
-                trajs[idx].append(fidelity)
+                fidelity_traj = trajs[idx].copy()
+                fidelity_traj.append(fidelity)
+                trajs.insert(idx, fidelity_traj)
                 traj_actions.insert(idx, action_fidelity)
                 for j in range(idx):
                     trajs[j].append(fidelity)

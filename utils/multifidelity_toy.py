@@ -13,21 +13,22 @@ def make_dataset(env, oracles, n_fid, device, path):
     # get_states return a list right now
     # states = torch.Tensor(env.env.get_uniform_terminating_states(200)).to(device).long()
     states = (
-        torch.Tensor(np.random.randint(low=0, high=50, size=(500, 2))).to(device).long()
+        torch.Tensor(np.random.randint(low=0, high=3, size=(10, 2))).to(device).long()
     )
-    states = states + 50
-    states = states.tolist()
-    # fidelities = torch.randint(0, n_fid, (len(states), 1)).to(device)
-    # state_fid = torch.cat([states, fidelities], dim=1)
-    # states_fid_oracle = env.statetorch2oracle(state_fid)
-    # scores = env.call_oracle_per_fidelity(states, fidelities)
-    # states_fid_list = state_fid.detach().tolist()
-    readable_states = [env.env.state2readable(state) for state in states]
+    # states = states + 50
+    # states = states.tolist()
+    fidelities = torch.randint(0, n_fid, (len(states), 1)).to(device)
+    state_fid = torch.cat([states, fidelities], dim=1)
+    states_fid_oracle = env.statetorch2oracle(state_fid)
+    scores = env.call_oracle_per_fidelity(states, fidelities)
+    states_fid_list = state_fid.detach().tolist()
+    readable_states = [env.state2readable(state) for state in states_fid_list]
     df = pd.DataFrame(
         {
             "samples": readable_states,
+            # }
+            "energies": scores.tolist(),
         }
-        # "scores": scores.detach().cpu().tolist()
     )
     df.to_csv(path)
 

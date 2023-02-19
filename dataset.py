@@ -145,15 +145,14 @@ class DataHandler:
             ).long()
             scores = None
 
-        if self.n_fid > 1 and self.fidelity.do == True:
+        if scores is not None:
+            scores = torch.tensor(scores, dtype=self.float, device=self.device)
+        elif self.n_fid > 1 and self.fidelity.do == True:
             states, fidelities = self.generate_fidelities(states)
             # specifically for discrete case (states) are integers
             states = torch.cat([states, fidelities], dim=1).long()
             state_oracle, fid = self.env.statetorch2oracle(states)
             if scores is None:
-                # for AMP practice
-                # scores = torch.tensor(scores, dtype=self.float, device=self.device)
-                # for grid
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
 
             if hasattr(self.env.env, "plot_samples_frequency"):
@@ -164,6 +163,9 @@ class DataHandler:
             if hasattr(self.env.env, "plot_reward_distribution"):
                 fig = self.env.env.plot_reward_distribution(scores, title="Dataset")
                 self.logger.log_figure("initial_dataset", fig, use_context=True)
+        # TODO: add clause for when n_fid> 1 but fidelity.do=False
+        else:
+            scores = self.env.oracle(states)
 
         if self.split == "random":
             if (
