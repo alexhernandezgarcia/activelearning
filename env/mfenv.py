@@ -233,7 +233,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             parents.append(parent)
         # each parent must be of the same length for self.tfloat to work
         # Can we have getparents return tensor instead of list?
-        if len(parents) > 0:
+        if self.env.do_state_padding and len(parents) > 0:
             max_parent_length = max([len(parent) for parent in parents])
             parents = [
                 parent[:-1]
@@ -261,8 +261,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             else:
                 raise ValueError("Fidelity has already been chosen.")
             self.done = self.env.done and self.fid_done
-            # TODO: action or eos in else
-            # padded_action = tuple(list(action) + [0]*(self.action_pad_length-len(action)))
             return self.state, action, True
         else:
             fid = self.state[-1]
@@ -390,44 +388,44 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         else:
             return None
 
-    def get_trajectories(
-        self, traj_list, traj_actions_list, current_traj, current_actions
-    ):
-        # TODO: Optimize
-        mf_traj_list = []
-        mf_traj_actions_list = []
-        traj_with_fidelity = current_traj[0]
-        fidelity = traj_with_fidelity[-1]
-        action_fidelity = self.fid + fidelity
-        current_traj = traj_with_fidelity[:-1]
-        single_fid_traj_list, single_fid_traj_actions_list = self.env.get_trajectories(
-            [], [], [current_traj], current_actions
-        )
-        for idx in range(len(single_fid_traj_actions_list[0])):
-            action = single_fid_traj_actions_list[0][idx]
-            if isinstance(action, int):
-                action = (action,)
-            action = tuple(list(action) + [0] * (self.action_pad_length))
-            # search for action in list of actions
-            action_idx = self.action_space.index(action)
-            single_fid_traj_actions_list[0][idx] = action_idx
-        mf_traj_list = []
-        mf_traj_actions_list = []
-        for traj_idx in range(len(single_fid_traj_list)):
-            num_traj_states = len(single_fid_traj_list[traj_idx])
-            for idx in range(num_traj_states):
-                trajs = copy.deepcopy(single_fid_traj_list[traj_idx])
-                traj_actions = single_fid_traj_actions_list[traj_idx].copy()
-                fidelity_traj = trajs[idx].copy()
-                fidelity_traj.append(fidelity)
-                trajs.insert(idx, fidelity_traj)
-                traj_actions.insert(idx, action_fidelity)
-                for j in range(idx):
-                    trajs[j].append(fidelity)
-                for k in range(idx + 1, len(trajs)):
-                    trajs[k].append(-1)
-                mf_traj_list.append(trajs)
-                mf_traj_actions_list.append(traj_actions)
-        self._test_traj_list.append(mf_traj_list)
-        self._test_traj_actions_list.append(mf_traj_actions_list)
-        return mf_traj_list, mf_traj_actions_list
+    # def get_trajectories(
+    #     self, traj_list, traj_actions_list, current_traj, current_actions
+    # ):
+    #     # TODO: Optimize
+    #     mf_traj_list = []
+    #     mf_traj_actions_list = []
+    #     traj_with_fidelity = current_traj[0]
+    #     fidelity = traj_with_fidelity[-1]
+    #     action_fidelity = self.fid + fidelity
+    #     current_traj = traj_with_fidelity[:-1]
+    #     single_fid_traj_list, single_fid_traj_actions_list = self.env.get_trajectories(
+    #         [], [], [current_traj], current_actions
+    #     )
+    #     for idx in range(len(single_fid_traj_actions_list[0])):
+    #         action = single_fid_traj_actions_list[0][idx]
+    #         if isinstance(action, int):
+    #             action = (action,)
+    #         action = tuple(list(action) + [0] * (self.action_pad_length))
+    #         # search for action in list of actions
+    #         action_idx = self.action_space.index(action)
+    #         single_fid_traj_actions_list[0][idx] = action_idx
+    #     mf_traj_list = []
+    #     mf_traj_actions_list = []
+    #     for traj_idx in range(len(single_fid_traj_list)):
+    #         num_traj_states = len(single_fid_traj_list[traj_idx])
+    #         for idx in range(num_traj_states):
+    #             trajs = copy.deepcopy(single_fid_traj_list[traj_idx])
+    #             traj_actions = single_fid_traj_actions_list[traj_idx].copy()
+    #             fidelity_traj = trajs[idx].copy()
+    #             fidelity_traj.append(fidelity)
+    #             trajs.insert(idx, fidelity_traj)
+    #             traj_actions.insert(idx, action_fidelity)
+    #             for j in range(idx):
+    #                 trajs[j].append(fidelity)
+    #             for k in range(idx + 1, len(trajs)):
+    #                 trajs[k].append(-1)
+    #             mf_traj_list.append(trajs)
+    #             mf_traj_actions_list.append(traj_actions)
+    #     self._test_traj_list.append(mf_traj_list)
+    #     self._test_traj_actions_list.append(mf_traj_actions_list)
+    #     return mf_traj_list, mf_traj_actions_list

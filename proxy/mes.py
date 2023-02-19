@@ -160,6 +160,8 @@ class OracleMultiFidelityMES(MES):
         self.data_path = data_path
         self.oracle = oracle
         super().__init__(**kwargs)
+        fig = self.plot_acquisition_rewards()
+        self.logger.log_figure("acquisition_rewards", fig, use_context=True)
 
     def load_candidate_set(self):
         path = self.data_path
