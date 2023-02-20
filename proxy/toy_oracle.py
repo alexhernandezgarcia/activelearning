@@ -8,8 +8,10 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class ToyOracle(Proxy):
     # TODO: resolve the kwargs error here
-    def __init__(self, oracle, noise, env, valid, cost, fid, device, float_precision):
-        super().__init__(device, float_precision)
+    def __init__(
+        self, oracle, noise, env, valid, cost, fid, device, float_precision, maximize
+    ):
+        super().__init__(device, float_precision, maximize)
         self.oracle = oracle
         self.noise_distribution = torch.distributions.Normal(noise.mu, noise.sigma)
         self.sigma = noise.sigma
