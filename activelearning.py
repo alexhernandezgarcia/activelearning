@@ -8,7 +8,6 @@ import hydra
 from omegaconf import OmegaConf
 import yaml
 from gflownet.utils.common import flatten_config
-import numpy as np
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import make_dataset, plot_gp_predictions
@@ -25,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="debug_test")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd

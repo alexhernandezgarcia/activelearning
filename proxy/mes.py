@@ -305,6 +305,10 @@ class GaussianProcessMultiFidelityMES(MES):
         scores = self(states_fid_oracle).detach().cpu().numpy()
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        if self.env.rescale != 1:
+            step = int(self.env.env.length / self.env.rescale)
+        else:
+            step = 1
         for fid in range(0, self.n_fid):
             index = states.long().detach().cpu().numpy()
             grid_scores = np.zeros((self.env.env.length, self.env.env.length))
@@ -315,14 +319,14 @@ class GaussianProcessMultiFidelityMES(MES):
                 np.arange(
                     start=0,
                     stop=self.env.env.length,
-                    step=int(self.env.env.length / self.env.rescale),
+                    step=step,
                 )
             )
             axs[fid].set_yticks(
                 np.arange(
                     start=0,
                     stop=self.env.env.length,
-                    step=int(self.env.env.length / self.env.rescale),
+                    step=step,
                 )
             )
             axs[fid].imshow(grid_scores)
