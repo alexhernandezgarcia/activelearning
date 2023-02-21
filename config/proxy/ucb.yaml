@@ -1,4 +1,4 @@
 defaults:
   - base
-_target_: proxy.acquisition.UCB
+_target_: proxy.ucb.UCB
 kappa: 0.1

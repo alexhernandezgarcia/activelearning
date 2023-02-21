@@ -2,6 +2,7 @@ from gflownet.proxy.base import Proxy
 import torch
 import numpy as np
 
+
 class DropoutRegressor(Proxy):
     def __init__(self, regressor, num_dropout_samples, **kwargs) -> None:
         super().__init__(**kwargs)

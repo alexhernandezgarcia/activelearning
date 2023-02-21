@@ -108,6 +108,7 @@ class MultifidelityOracleModel(Model):
 
     def posterior(self, X, observation_noise=False, posterior_transform=None):
         super().posterior(X, observation_noise, posterior_transform)
+        # specifically works with oracle.noise.sigma = 0.01, 0.1, 0.15
         covar_mm = torch.FloatTensor(
             [
                 [self.oracle[0].sigma ** 2, (0.015) ** 2, (5e-3) ** 2],
@@ -115,6 +116,22 @@ class MultifidelityOracleModel(Model):
                 [(5e-3) ** 2, (4e-3) ** 2, self.oracle[2].sigma ** 2],
             ]
         )
+        # covar_mm = torch.FloatTensor(
+        #     [
+        #         [self.oracle[0].sigma ** 2, (4e-3) ** 2, (0.015) ** 2],
+        #         [(4e-3) ** 2, self.oracle[1].sigma ** 2, (5e-3) ** 2],
+        #         [(0.015) ** 2, (5e-3) ** 2, self.oracle[2].sigma ** 2],
+        #     ]
+        # )
+
+        # specifically works with oracle.noise.sigma = 0.1, 0.2, 0.15
+        # covar_mm = torch.FloatTensor(
+        #     [
+        #         [self.oracle[0].sigma ** 2, (4e-4) ** 2, (0.015) ** 2],
+        #         [(4e-4) ** 2, self.oracle[1].sigma ** 2, (5e-3) ** 2],
+        #         [(0.015) ** 2, (5e-3) ** 2, self.oracle[2].sigma ** 2],
+        #     ]
+        # )
         if len(X.shape) == 2:
             fid_tensor = X[:, -1]
             state_tensor = X[:, :-1]
@@ -141,7 +158,10 @@ class MultifidelityOracleModel(Model):
             covar = torch.zeros(X.shape[0], 2, 2)
             for fid in range(self.n_fid):
                 idx_fid = torch.where(fid_tensor == fid)[0]
-                var_curr_fidelity = self.oracle[fid].sigma ** 2
+                if fid == self.n_fid - 1:
+                    var_curr_fidelity = self.oracle[fid].sigma ** 2 + 2e-7
+                else:
+                    var_curr_fidelity = self.oracle[fid].sigma ** 2
                 mean_curr_fidelity[idx_fid] = self.oracle[fid](states[idx_fid])
                 covar[idx_fid] = torch.FloatTensor(
                     [
@@ -173,6 +193,8 @@ class MultifidelityOracleModel(Model):
 
         mean = mean.to(self.device)
         covar = covar.to(self.device)
+        # if covar.shape[0]>800:
+        #     print(covar[800])
         mvn = MultivariateNormal(mean, covar)
         posterior = GPyTorchPosterior(mvn)
         return posterior

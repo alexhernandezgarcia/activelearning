@@ -83,6 +83,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def set_fidelity_costs(self):
         fidelity_costs = {}
+        if hasattr(self.oracle[0], "fid") == False:
+            # if anyone of the oracles dont have fid, fid is reassigned to all oracles
+            for idx in range(self.n_fid):
+                setattr(self.oracle[idx], "fid", idx)
         for idx in range(self.n_fid):
             fidelity_costs[self.oracle[idx].fid] = self.oracle[idx].cost
         return fidelity_costs
@@ -229,7 +233,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             parents.append(parent)
         # each parent must be of the same length for self.tfloat to work
         # Can we have getparents return tensor instead of list?
-        if len(parents) > 0:
+        if self.env.do_state_padding and len(parents) > 0:
             max_parent_length = max([len(parent) for parent in parents])
             parents = [
                 parent[:-1]
@@ -257,8 +261,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             else:
                 raise ValueError("Fidelity has already been chosen.")
             self.done = self.env.done and self.fid_done
-            # TODO: action or eos in else
-            # padded_action = tuple(list(action) + [0]*(self.action_pad_length-len(action)))
             return self.state, action, True
         else:
             fid = self.state[-1]
@@ -367,6 +369,23 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         plt.show()
         plt.close()
         return fig
+    
+    def plot_reward_distribution(self, states, **kwargs):
+        width = (self.n_fid) * 5
+        fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        for fid in range(0, self.n_fid):
+            samples_fid = [state[:-1] for state in states if state[-1] == fid]
+            if hasattr(self.env, "plot_reward_distribution"):
+                axs[fid] = self.env.plot_reward_distribution(
+                    states = samples_fid, ax = axs[fid], title="Fidelity {}".format(fid)
+                )
+            else:
+                return None
+        fig.suptitle("Rewards of Sequences Sampled")
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+        return fig
 
     def get_cost(self, samples):
         fidelities = [sample[-1] for sample in samples]
@@ -389,31 +408,32 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def get_trajectories(
         self, traj_list, traj_actions_list, current_traj, current_actions
     ):
+        # TODO: Optimize
         mf_traj_list = []
         mf_traj_actions_list = []
         traj_with_fidelity = current_traj[0]
         fidelity = traj_with_fidelity[-1]
-        action_fidelity = self.fid + fidelity
+        action_fidelity = (self.fid, fidelity)
+        action = tuple(list(action_fidelity) + [0] * (self.action_max_length - len(action_fidelity)))
         current_traj = traj_with_fidelity[:-1]
         single_fid_traj_list, single_fid_traj_actions_list = self.env.get_trajectories(
             [], [], [current_traj], current_actions
         )
-        for idx in range(len(single_fid_traj_actions_list[0])):
-            action = single_fid_traj_actions_list[0][idx]
-            if isinstance(action, int):
-                action = (action,)
-            action = tuple(list(action) + [0] * (self.action_pad_length))
-            # search for action in list of actions
-            action_idx = self.action_space.index(action)
-            single_fid_traj_actions_list[0][idx] = action_idx
+        for idx in range(len(single_fid_traj_actions_list)):
+            for action_idx in range(len(single_fid_traj_actions_list[idx])):
+                action = single_fid_traj_actions_list[idx][action_idx]
+                action = tuple(list(action) + [0] * (self.action_max_length - len(action)))
+                single_fid_traj_actions_list[idx][action_idx] = action
+        mf_traj_list = []
+        mf_traj_actions_list = []
         for traj_idx in range(len(single_fid_traj_list)):
-            mf_traj_list = []
-            mf_traj_actions_list = []
             num_traj_states = len(single_fid_traj_list[traj_idx])
             for idx in range(num_traj_states):
                 trajs = copy.deepcopy(single_fid_traj_list[traj_idx])
                 traj_actions = single_fid_traj_actions_list[traj_idx].copy()
-                trajs[idx].append(fidelity)
+                fidelity_traj = trajs[idx].copy()
+                fidelity_traj.append(fidelity)
+                trajs.insert(idx, fidelity_traj)
                 traj_actions.insert(idx, action_fidelity)
                 for j in range(idx):
                     trajs[j].append(fidelity)
@@ -421,6 +441,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     trajs[k].append(-1)
                 mf_traj_list.append(trajs)
                 mf_traj_actions_list.append(traj_actions)
-        self._test_traj_list.append(mf_traj_list)
-        self._test_traj_actions_list.append(mf_traj_actions_list)
+        # self._test_traj_list.append(mf_traj_list)
+        # self._test_traj_actions_list.append(mf_traj_actions_list)
         return mf_traj_list, mf_traj_actions_list

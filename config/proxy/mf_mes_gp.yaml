@@ -2,3 +2,4 @@ defaults:
   - base
 _target_: proxy.mes.GaussianProcessMultiFidelityMES
 cost_type: user
+maximize: True

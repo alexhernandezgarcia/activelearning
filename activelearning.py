@@ -8,11 +8,11 @@ import hydra
 from omegaconf import OmegaConf
 import yaml
 from gflownet.utils.common import flatten_config
-import numpy as np
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import make_dataset, plot_gp_predictions
 import matplotlib.pyplot as plt
+from regressor.gp import MultitaskGPRegressor
 
 # ToyOracle,
 # ,
@@ -24,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_amp_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -64,24 +64,27 @@ def main(config):
         float_precision=config.float_precision,
     )
 
-    if N_FID > 1:
-        oracles = []
-        width = (N_FID) * 5
-        fig, axs = plt.subplots(1, N_FID, figsize=(width, 5))
-        for fid in range(1, N_FID + 1):
-            oracle = hydra.utils.instantiate(
-                config._oracle_dict[str(fid)],
-                # required for toy oracle setups
-                oracle=true_oracle,
-                env=env,
-                device=config.device,
-                float_precision=config.float_precision,
+    oracles = []
+    width = (N_FID) * 5
+    fig, axs = plt.subplots(1, N_FID, figsize=(width, 5))
+    do_figure = True
+    for fid in range(1, N_FID + 1):
+        oracle = hydra.utils.instantiate(
+            config._oracle_dict[str(fid)],
+            # required for toy oracle setups
+            oracle=true_oracle,
+            env=env,
+            device=config.device,
+            float_precision=config.float_precision,
+        )
+        oracles.append(oracle)
+        if hasattr(oracle, "plot_true_rewards"):
+            axs[fid - 1] = oracle.plot_true_rewards(
+                env, axs[fid - 1], rescale=config.multifidelity.rescale
             )
-            oracles.append(oracle)
-            if hasattr(oracle, "plot_true_rewards"):
-                axs[fid - 1] = oracle.plot_true_rewards(
-                    env, axs[fid - 1], rescale=config.multifidelity.rescale
-                )
+        else:
+            do_figure = False
+    if do_figure:
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -95,8 +98,21 @@ def main(config):
             proxy_state_format=config.env.proxy_state_format,
             rescale=config.multifidelity.rescale,
         )
+    else:
+        oracle = oracles[0]
+        env.oracle = oracle
 
-    if config.multifidelity.proxy == True:
+    # states = [[12, 5, 7], [3, 5, 12, 15]]
+    # states_tensor = torch.tensor([[12, 5, 7, -2], [3, 5, 12, 15]])
+    # tensor_policy_ohe = env.statetorch2policy(states_tensor)
+    # numpy_policy_ohe = env.statebatch2policy(states)
+    # print(tensor_policy_ohe)
+    # print(numpy_policy_ohe)
+    # torch_numpy_policy_ohe = torch.from_numpy(numpy_policy_ohe)
+    # # check tensor_policy_ohe and numpy_policy_ohe for equality
+    # assert torch.all(torch.eq(tensor_policy_ohe.detach().cpu(), torch_numpy_policy_ohe))
+
+    if N_FID == 1 or config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
             config.dataset,
             env=env,
@@ -117,56 +133,41 @@ def main(config):
             logger=logger,
         )
     # check if path exists
-    elif config.multifidelity.proxy == False and not os.path.exists(
-        config.multifidelity.candidate_set_path
-    ):
-        # makes context set for acquisition function
-        make_dataset(
-            env,
-            oracles,
-            N_FID,
-            device=config.device,
-            # path = "/home/mila/n/nikita.saxena/activelearning/storage/branin/mf_train50.csv"
-            path=config.multifidelity.candidate_set_path,
-        )
+    elif config.multifidelity.proxy == False:
+        regressor = None
+        if not os.path.exists(config.multifidelity.candidate_set_path):
+            # makes context set for acquisition function
+            make_dataset(
+                env,
+                oracles,
+                N_FID,
+                device=config.device,
+                path=config.multifidelity.candidate_set_path,
+            )
 
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\n Starting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
-        if config.multifidelity.proxy == True:
+        if N_FID == 1 or config.multifidelity.proxy == True:
             regressor.fit()
-            fig = plot_gp_predictions(env, regressor, config.multifidelity.rescale)
-            plt.tight_layout()
-            plt.show()
-            plt.close()
-            logger.log_figure("gp_predictions", fig, use_context=True)
-            # TODO: remove if condition and check if proxy initialisation works with both proxy (below) and oracle (second clause)
-            proxy = hydra.utils.instantiate(
-                config.proxy,
-                regressor=regressor,
-                device=config.device,
-                float_precision=config.float_precision,
-                logger=logger,
-                oracle=oracles,
-                env=env,
-                fixed_cost=config.multifidelity.fixed_cost,
-            )
-        else:
-            # proxy is used to get rewards and in oracle steup, we get rewards by calling separate oracle for each state
-            proxy = hydra.utils.instantiate(
-                config.proxy,
-                device=config.device,
-                float_precision=config.float_precision,
-                n_fid=N_FID,
-                logger=logger,
-                oracle=oracles,
-                env=env,
-                data_path=config.multifidelity.candidate_set_path,
-                fixed_cost=config.multifidelity.fixed_cost,
-            )
-            # fig = proxy.plot_context_points()
-            # logger.log_figure("context_points", fig, True)
+            if isinstance(regressor, MultitaskGPRegressor):
+                fig = plot_gp_predictions(env, regressor, config.multifidelity.rescale)
+                plt.tight_layout()
+                plt.show()
+                plt.close()
+                logger.log_figure("gp_predictions", fig, use_context=True)
+        proxy = hydra.utils.instantiate(
+            config.proxy,
+            regressor=regressor,
+            device=config.device,
+            float_precision=config.float_precision,
+            logger=logger,
+            oracle=oracles,
+            env=env,
+        )
+        # fig = proxy.plot_context_points()
+        # logger.log_figure("context_points", fig, True)
         # plot_context_points(env, proxy)
         # plot_acquisition(env, 0, proxy)
         # plot_acquisition(env, 1, proxy)
@@ -175,7 +176,7 @@ def main(config):
         # plot_predictions_oracle(env, 1)
         # plot_predictions_oracle(env, 2)
 
-        env.proxy = proxy
+        env.set_proxy(proxy)
         gflownet = hydra.utils.instantiate(
             config.gflownet,
             env=env,
@@ -208,19 +209,27 @@ def main(config):
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
 
-            if config.env.proxy_state_format == "raw":
-                picked_states_tensor = torch.tensor(
-                    picked_states, device=config.device, dtype=env.float
-                )
-                picked_states_tensor = (
-                    picked_states_tensor / config.multifidelity.rescale
-                )
-                picked_states_oracle = picked_states_tensor.tolist()
-                energies = env.call_oracle_per_fidelity(
-                    picked_states_oracle, picked_fidelity
-                )
+            if N_FID == 1:
+                energies = env.oracle(picked_samples)
+                picked_fidelity = None
             else:
-                energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
+                if config.env.proxy_state_format == "raw":
+                    # Specifically for Branin
+                    picked_states_tensor = torch.tensor(
+                        picked_states, device=config.device, dtype=env.float
+                    )
+                    picked_states_tensor = (
+                        picked_states_tensor / config.multifidelity.rescale
+                    )
+                    picked_states_oracle = picked_states_tensor.tolist()
+                    energies = env.call_oracle_per_fidelity(
+                        picked_states_oracle, picked_fidelity
+                    )
+                else:
+                    energies = env.call_oracle_per_fidelity(
+                        picked_samples, picked_fidelity
+                    )
+
             if config.env.proxy_state_format == "ohe":
                 gflownet.evaluate(
                     picked_samples, energies, data_handler.train_dataset["samples"]
@@ -235,7 +244,7 @@ def main(config):
             df = df.sort_values(by=["energies"])
             path = logger.logdir / Path("gfn_samples.csv")
             df.to_csv(path)
-            if config.multifidelity.proxy == True:
+            if N_FID == 1 or config.multifidelity.proxy == True:
                 data_handler.update_dataset(
                     list(picked_states), energies.tolist(), picked_fidelity
                 )

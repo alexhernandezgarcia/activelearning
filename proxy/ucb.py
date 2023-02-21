@@ -13,7 +13,7 @@ class UCB(DropoutRegressor):
         if not self.regressor.load_model():
             raise FileNotFoundError
 
-    def __call__(self, inputs, fids):
+    def __call__(self, inputs):
         # TODO: modify this. input arg would never be fids
         """
         Args
@@ -23,11 +23,11 @@ class UCB(DropoutRegressor):
         if isinstance(inputs, np.ndarray):
             inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
-            inputs, fids, self.num_dropout_samples
+            inputs, self.num_dropout_samples
         )
         mean, std = torch.mean(outputs, dim=1), torch.std(outputs, dim=1)
         score = mean + self.kappa * std
-        score = torch.Tensor(score).detach().cpu().numpy()
+        score = score.to(self.device).to(self.float)
         return score
 
 
@@ -37,19 +37,16 @@ class BotorchUCB(UCB):
         self.sampler_config = sampler
         if not self.regressor.load_model():
             raise FileNotFoundError
-        self.model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
-        self.sampler = SobolQMCNormalSampler(
+        model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
+        sampler = SobolQMCNormalSampler(
             sample_shape=torch.Size([self.sampler_config.num_samples]),
             seed=self.sampler_config.seed,
         )
+        self.acqf = qUpperConfidenceBound(model=model, beta=self.kappa, sampler=sampler)
 
     def __call__(self, inputs):
         if isinstance(inputs, np.ndarray):
-            inputs = torch.FloatTensor(inputs).to(self.device)
+            inputs = torch.tensor(inputs, device=self.device, dtype=self.float)
         inputs = inputs.unsqueeze(-2)
-        UCB = qUpperConfidenceBound(
-            model=self.model, beta=self.kappa, sampler=self.sampler
-        )
-        inputs = inputs.unsqueeze(-2)
-        acq_values = UCB(inputs)
-        return acq_values.detach().cpu().numpy()
+        acq_values = self.acqf(inputs)
+        return acq_values

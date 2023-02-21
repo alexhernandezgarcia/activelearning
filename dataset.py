@@ -43,10 +43,10 @@ class DataHandler:
         split,
         dataset_size,
         device,
-        n_samples,
-        fidelity,
         float_precision,
-        rescale,
+        n_samples=None,
+        fidelity=None,
+        rescale=None,
     ):
         self.env = env
         self.normalise_data = normalise_data
@@ -64,8 +64,10 @@ class DataHandler:
         self.device = device
         if hasattr(env, "n_fid"):
             self.n_fid = env.n_fid
+            self.sfenv = env.env
         else:
             self.n_fid = 1
+            self.sfenv = env
         self.float = set_float_precision(float_precision)
         self.rescale = rescale
         self.initialise_dataset()
@@ -94,6 +96,7 @@ class DataHandler:
         return states, fidelities
 
     def initialise_dataset(self):
+        # TODO: Modify to ensure validation set has equal number of points across fidelities
         """
         Loads the dataset as a dictionary
         OR
@@ -117,7 +120,10 @@ class DataHandler:
             if self.path.oracle_dataset.test is not None:
                 test = pd.read_csv(self.path.oracle_dataset.test.path)
                 test_states = test["samples"].values.tolist()
-                test_scores = test["energies"].values.tolist()
+                if self.path.oracle_dataset.train.get_scores:
+                    test_scores = []
+                else:
+                    test_scores = test["energies"].values.tolist()
             else:
                 test_states = []
                 test_scores = []
@@ -126,65 +132,72 @@ class DataHandler:
             if scores == []:
                 scores = None
             states = [
-                torch.LongTensor(self.env.env.readable2state(sample))
-                for sample in states
+                torch.LongTensor(self.sfenv.readable2state(sample)) for sample in states
             ]
-            states = pad_sequence(
-                states,
-                batch_first=True,
-                padding_value=self.env.invalid_state_element,
-            )
+            if self.sfenv.do_state_padding:
+                states = pad_sequence(
+                    states,
+                    batch_first=True,
+                    padding_value=self.sfenv.invalid_state_element,
+                )
         else:
             # for AMP this is the implementation
             # dataset = self.env.load_dataset()
             # for grid, I call uniform states. Need to make it uniform
             if self.progress:
                 print("Creating dataset of size: ", self.n_samples)
-            states = torch.Tensor(
-                self.env.env.get_uniform_terminating_states(self.n_samples)
-            ).long()
+            if self.n_samples is not None:
+                states = torch.Tensor(
+                    self.sfenv.get_uniform_terminating_states(self.n_samples)
+                ).long()
+            else:
+                raise ValueError(
+                    "Train Dataset size is not provided. n_samples is None"
+                )
             scores = None
 
+        if scores is not None:
+            scores = torch.tensor(scores, dtype=self.float, device=self.device)
         if self.n_fid > 1 and self.fidelity.do == True:
             states, fidelities = self.generate_fidelities(states)
             # specifically for discrete case (states) are integers
             states = torch.cat([states, fidelities], dim=1).long()
             state_oracle, fid = self.env.statetorch2oracle(states)
             if scores is None:
-                # for AMP practice
-                # scores = torch.tensor(scores, dtype=self.float, device=self.device)
-                # for grid
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
-
-            if hasattr(self.env.env, "plot_samples_frequency"):
-                fig = self.env.env.plot_samples_frequency(
+            # Grid
+            if hasattr(self.sfenv, "plot_samples_frequency"):
+                fig = self.sfenv.plot_samples_frequency(
                     states, title="Train Dataset", rescale=self.rescale
                 )
                 self.logger.log_figure("train_dataset", fig, use_context=True)
-            if hasattr(self.env.env, "plot_reward_distribution"):
-                fig = self.env.env.plot_reward_distribution(scores, title="Dataset")
-                self.logger.log_figure("initial_dataset", fig, use_context=True)
+        # TODO: add clause for when n_fid> 1 but fidelity.do=False
+        elif self.n_fid == 1 and scores is None:
+            state_oracle = self.env.statetorch2oracle(states)
+            scores = self.env.oracle(state_oracle)
+
+        if hasattr(self.sfenv, "plot_reward_distribution"):
+            fig = self.sfenv.plot_reward_distribution(scores=scores, title="Dataset")
+            self.logger.log_figure("initial_dataset", fig, use_context=True)
 
         if self.split == "random":
             if (
                 self.path.oracle_dataset is not None
                 and self.path.oracle_dataset.train is not None
             ):
-                states = states.tolist()
-                scores = scores.tolist()
-                # TODO: figure out for single fidelity
-                train_states, test_states, train_scores, test_scores = train_test_split(
-                    states, scores, train_size=self.train_fraction
-                )
+                index = torch.randperm(len(states))
+                train_index = index[: int(len(states) * self.train_fraction)]
+                test_index = index[int(len(states) * self.train_fraction) :]
+                train_states = states[train_index]
+                test_states = states[test_index]
+                if scores is not None:
+                    train_scores = scores[train_index]
+                    test_scores = scores[test_index]
                 # TODO: can we change this to dtype = self.float and device = cuda
-                train_states = torch.tensor(train_states).long()
-                test_states = torch.tensor(test_states).long()
-                train_scores = torch.tensor(
-                    train_scores, dtype=self.float, device=self.device
-                )
-                test_scores = torch.tensor(
-                    test_scores, dtype=self.float, device=self.device
-                )
+                train_states = train_states.long().to(self.device)
+                test_states = test_states.long().to(self.device)
+                train_scores = train_scores.to(self.float).to(self.device)
+                test_scores = test_scores.to(self.float).to(self.device)
 
         elif self.split == "all_train":
             train_states = states.to(self.device)
@@ -199,7 +212,7 @@ class DataHandler:
             # train_targets = self.oracle(train_samples)
             # test_targets = self.oracle(test_samples)
         # TODO: make general to sf
-        if hasattr(self.env.env, "statetorch2readable"):
+        if hasattr(self.sfenv, "statetorch2readable"):
             readable_train_samples = [
                 self.env.statetorch2readable(sample) for sample in train_states
             ]
@@ -225,7 +238,7 @@ class DataHandler:
         )
 
         if len(test_states) > 0:
-            if hasattr(self.env.env, "statetorch2readable"):
+            if hasattr(self.sfenv, "statetorch2readable"):
                 readable_test_samples = [
                     self.env.statetorch2readable(sample) for sample in test_states
                 ]
@@ -285,10 +298,11 @@ class DataHandler:
         """
         samples = dataset["samples"]
         scores = dataset["energies"]
-        if self.n_fid == 1 and self.path.oracle_dataset:
-            state_batch = [self.env.readable2state(sample) for sample in samples]
-        else:
-            state_batch = samples
+        # Following is not needed in AMP. Not sure where it is needed
+        # if self.n_fid == 1 and self.path.oracle_dataset:
+        # state_batch = [self.env.readable2state(sample) for sample in samples]
+        # else:
+        state_batch = samples
         state_proxy = self.env.statetorch2proxy(state_batch)
         # for when oracle is proxy and grid setup when oracle state is tensor
         if isinstance(state_proxy, tuple):
@@ -341,7 +355,7 @@ class DataHandler:
         y = y * stats["std"] + stats["mean"]
         return y
 
-    def update_dataset(self, states, energies, fidelity):
+    def update_dataset(self, states, energies, fidelity=None):
         """
         Args:
             queries: list of queries [[0, 0], [1, 1], ...]
@@ -371,17 +385,18 @@ class DataHandler:
         # readable_dataset = readable_dataset.sort_values(by=["energies"])
         self.logger.save_dataset(readable_dataset, "sampled")
 
-        # plot the frequency of sampled dataset
-        if hasattr(self.env.env, "plot_samples_frequency"):
-            fig = self.env.env.plot_samples_frequency(
+        # for grid
+        if hasattr(self.sfenv, "plot_samples_frequency"):
+            fig = self.sfenv.plot_samples_frequency(
                 states, title="Sampled Dataset", rescale=self.rescale
             )
             self.logger.log_figure(
                 "post_al_iter_sampled_dataset", fig, use_context=True
             )
-        if hasattr(self.env.env, "plot_reward_distribution"):
-            fig = self.env.env.plot_reward_distribution(
-                energies, title="Sampled Dataset"
+        # for AMP
+        if hasattr(self.sfenv, "plot_reward_distribution"):
+            fig = self.sfenv.plot_reward_distribution(
+                scores=energies, title="Post AL Iteration Sampled Dataset"
             )
             self.logger.log_figure(
                 "post_al_iter_sampled_dataset", fig, use_context=True
@@ -465,7 +480,7 @@ class DataHandler:
         for (_sequence, _label) in batch:
             y.append(_label)
             x.append(_sequence)
-        y = torch.tensor(y, dtype=self.float)
+        y = torch.tensor(y, dtype=self.float, device=self.device)
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
         return xPadded, y
 
@@ -480,8 +495,8 @@ class DataHandler:
             self.train_data,
             batch_size=self.dataloader.train.batch_size,
             shuffle=self.dataloader.train.shuffle,
-            num_workers=0,
-            pin_memory=False,
+            # num_workers=0,
+            # pin_memory=True,
             collate_fn=self.collate_batch,
         )
 
@@ -489,8 +504,8 @@ class DataHandler:
             self.test_data,
             batch_size=self.dataloader.test.batch_size,
             shuffle=self.dataloader.test.shuffle,
-            num_workers=0,
-            pin_memory=False,
+            # num_workers=0,
+            # pin_memory=True,
             collate_fn=self.collate_batch,
         )
 

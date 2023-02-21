@@ -29,7 +29,8 @@ class Rosenbrock(Proxy):
         # scores = scores.unsqueeze(-1)
         return scores.to(self.device).to(self.float)
 
-    def plot_true_rewards(self, env, ax):
+    # for rescale needed in branin
+    def plot_true_rewards(self, env, ax, **kwargs):
         states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
         scores = self(states).detach().cpu().numpy() / (1e4)
         scores = scores * (-0.1)

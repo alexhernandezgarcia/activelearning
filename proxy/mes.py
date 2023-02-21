@@ -87,7 +87,7 @@ class MultiFidelity(Proxy):
 
 
 class MES(MultiFidelity):
-    def __init__(self, gibbon, **kwargs):
+    def __init__(self, gibbon=True, **kwargs):
         super().__init__(**kwargs)
         cost_aware_utility = self.get_cost_utility()
         model = self.load_model()
@@ -124,7 +124,7 @@ class ProxyMultiFidelityMES(MES):
 
     def project(self, states):
         input_dim = states.ndim
-        max_fid = torch.zeros((states.shape[0], self.n_fid), device=self.device).long()
+        max_fid = torch.zeros((states.shape[0], self.n_fid), device=self.device)
         max_fid[:, -1] = 1
         if input_dim == 3:
             states = states[:, :, : -self.n_fid]
@@ -160,11 +160,14 @@ class OracleMultiFidelityMES(MES):
         self.data_path = data_path
         self.oracle = oracle
         super().__init__(**kwargs)
+        fig = self.plot_acquisition_rewards()
+        self.logger.log_figure("acquisition_rewards", fig, use_context=True)
 
     def load_candidate_set(self):
         path = self.data_path
         data = pd.read_csv(path, index_col=0)
         samples = data["samples"]
+        # samples have states and fidelity
         state = [self.env.readable2state(sample) for sample in samples]
         state_proxy = self.env.statebatch2proxy(state)
         if isinstance(state_proxy, torch.Tensor):
@@ -200,6 +203,50 @@ class OracleMultiFidelityMES(MES):
             state, scores, "Context Points across Fidelities"
         )
 
+    def plot_acquisition_rewards(self, **kwargs):
+        states = torch.tensor(
+            self.env.env.get_all_terminating_states(), dtype=self.float
+        ).to(self.device)
+        n_states = states.shape[0]
+        fidelities = torch.zeros((len(states) * self.n_fid, 1), dtype=self.float).to(
+            self.device
+        )
+        for i in range(self.n_fid):
+            fidelities[i * len(states) : (i + 1) * len(states), 0] = self.env.oracle[
+                i
+            ].fid
+        states = states.repeat(self.n_fid, 1)
+        state_fid = torch.cat([states, fidelities], dim=1)
+        states_oracle, fid = self.env.statetorch2oracle(state_fid)
+        # Specific to grid as the states are transformed to oracle space on feeding to MES
+        if isinstance(states_oracle, torch.Tensor):
+            states_fid_oracle = torch.cat([states_oracle, fid], dim=1)
+        states = states[:n_states]
+
+        scores = self(states_fid_oracle).detach().cpu().numpy()
+        width = (self.n_fid) * 5
+        fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        for fid in range(0, self.n_fid):
+            index = states.long().detach().cpu().numpy()
+            grid_scores = np.zeros((self.env.env.length, self.env.env.length))
+            grid_scores[index[:, 0], index[:, 1]] = scores[
+                fid * len(states) : (fid + 1) * len(states)
+            ]
+            axs[fid].set_xticks(np.arange(self.env.env.length))
+            axs[fid].set_yticks(np.arange(self.env.env.length))
+            axs[fid].imshow(grid_scores)
+            axs[fid].set_title(
+                "Oracle-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+            )
+            im = axs[fid].imshow(grid_scores)
+            divider = make_axes_locatable(axs[fid])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+            plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig
+
 
 class GaussianProcessMultiFidelityMES(MES):
     def __init__(self, regressor, **kwargs):
@@ -216,7 +263,7 @@ class GaussianProcessMultiFidelityMES(MES):
         data = pd.read_csv(path, index_col=0)
         samples = data["samples"]
         state = [self.env.readable2state(sample) for sample in samples]
-        state_proxy = self.env.statebatch2proxy(state)[: self.regressor.n_samples]
+        state_proxy = self.env.statebatch2proxy(state)  # [: self.regressor.n_samples]
         if isinstance(state_proxy, torch.Tensor):
             return state_proxy.to(self.device)
         return torch.FloatTensor(state_proxy).to(self.device)
@@ -258,6 +305,10 @@ class GaussianProcessMultiFidelityMES(MES):
         scores = self(states_fid_oracle).detach().cpu().numpy()
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        if self.env.rescale != 1:
+            step = int(self.env.env.length / self.env.rescale)
+        else:
+            step = 1
         for fid in range(0, self.n_fid):
             index = states.long().detach().cpu().numpy()
             grid_scores = np.zeros((self.env.env.length, self.env.env.length))
@@ -268,14 +319,14 @@ class GaussianProcessMultiFidelityMES(MES):
                 np.arange(
                     start=0,
                     stop=self.env.env.length,
-                    step=int(self.env.env.length / self.env.rescale),
+                    step=step,
                 )
             )
             axs[fid].set_yticks(
                 np.arange(
                     start=0,
                     stop=self.env.env.length,
-                    step=int(self.env.env.length / self.env.rescale),
+                    step=step,
                 )
             )
             axs[fid].imshow(grid_scores)
