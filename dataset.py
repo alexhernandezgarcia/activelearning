@@ -96,6 +96,7 @@ class DataHandler:
         return states, fidelities
 
     def initialise_dataset(self):
+        # TODO: Modify to ensure validation set has equal number of points across fidelities
         """
         Loads the dataset as a dictionary
         OR

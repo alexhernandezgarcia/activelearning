@@ -124,7 +124,7 @@ class ProxyMultiFidelityMES(MES):
 
     def project(self, states):
         input_dim = states.ndim
-        max_fid = torch.zeros((states.shape[0], self.n_fid), device=self.device).long()
+        max_fid = torch.zeros((states.shape[0], self.n_fid), device=self.device)
         max_fid[:, -1] = 1
         if input_dim == 3:
             states = states[:, :, : -self.n_fid]

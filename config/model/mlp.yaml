@@ -1,6 +1,6 @@
 _target_: model.mlp.MLP
 
-activation: 'relu'
+activation: "relu"
 num_output: 1
 n_hid: 64
 dropout_prob: 0.1
