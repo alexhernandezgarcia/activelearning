@@ -263,7 +263,7 @@ class GaussianProcessMultiFidelityMES(MES):
         data = pd.read_csv(path, index_col=0)
         samples = data["samples"]
         state = [self.env.readable2state(sample) for sample in samples]
-        state_proxy = self.env.statebatch2proxy(state)[: self.regressor.n_samples]
+        state_proxy = self.env.statebatch2proxy(state)  # [: self.regressor.n_samples]
         if isinstance(state_proxy, torch.Tensor):
             return state_proxy.to(self.device)
         return torch.FloatTensor(state_proxy).to(self.device)
