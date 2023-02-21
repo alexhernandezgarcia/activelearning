@@ -13,7 +13,7 @@ class UCB(DropoutRegressor):
         if not self.regressor.load_model():
             raise FileNotFoundError
 
-    def __call__(self, inputs, fids):
+    def __call__(self, inputs):
         # TODO: modify this. input arg would never be fids
         """
         Args
@@ -23,11 +23,11 @@ class UCB(DropoutRegressor):
         if isinstance(inputs, np.ndarray):
             inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
-            inputs, fids, self.num_dropout_samples
+            inputs, self.num_dropout_samples
         )
         mean, std = torch.mean(outputs, dim=1), torch.std(outputs, dim=1)
         score = mean + self.kappa * std
-        score = torch.tensor(score, device=self.device, dtype=self.float)
+        score = score.to(self.device).to(self.float)
         return score
 
 
