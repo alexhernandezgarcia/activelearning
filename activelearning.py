@@ -24,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="mf_debug_test")
+@hydra.main(config_path="./config", config_name="mf_amp_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -101,6 +101,16 @@ def main(config):
     else:
         oracle = oracles[0]
         env.oracle = oracle
+
+    # states = [[12, 5, 7], [3, 5, 12, 15]]
+    # states_tensor = torch.tensor([[12, 5, 7, -2], [3, 5, 12, 15]])
+    # tensor_policy_ohe = env.statetorch2policy(states_tensor)
+    # numpy_policy_ohe = env.statebatch2policy(states)
+    # print(tensor_policy_ohe)
+    # print(numpy_policy_ohe)
+    # torch_numpy_policy_ohe = torch.from_numpy(numpy_policy_ohe)
+    # # check tensor_policy_ohe and numpy_policy_ohe for equality
+    # assert torch.all(torch.eq(tensor_policy_ohe.detach().cpu(), torch_numpy_policy_ohe))
 
     if N_FID == 1 or config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
