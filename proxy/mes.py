@@ -253,7 +253,8 @@ class GaussianProcessMultiFidelityMES(MES):
         self.regressor = regressor
         super().__init__(**kwargs)
         fig = self.plot_acquisition_rewards()
-        self.logger.log_figure("acquisition_rewards", fig, use_context=True)
+        if fig is not None:
+            self.logger.log_figure("acquisition_rewards", fig, use_context=True)
 
     def load_model(self):
         return self.regressor.model
@@ -283,6 +284,8 @@ class GaussianProcessMultiFidelityMES(MES):
         return states
 
     def plot_acquisition_rewards(self, **kwargs):
+        if hasattr(self.env.env, "get_all_terminating_states") == False:
+            return None
         states = torch.tensor(
             self.env.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
