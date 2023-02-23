@@ -44,6 +44,7 @@ class DataHandler:
         dataset_size,
         device,
         float_precision,
+        tokenizer=None,
         n_samples=None,
         fidelity=None,
         rescale=None,
@@ -70,6 +71,7 @@ class DataHandler:
             self.sfenv = env
         self.float = set_float_precision(float_precision)
         self.rescale = rescale
+        self.tokenizer = tokenizer
         self.initialise_dataset()
 
     def generate_fidelities(self, states):
@@ -304,6 +306,9 @@ class DataHandler:
         # else:
         state_batch = samples
         state_proxy = self.env.statetorch2proxy(state_batch)
+        if self.tokenizer is not None:
+            # Inout must be a tensor
+            state_proxy = self.tokenizer(state_proxy)
         # for when oracle is proxy and grid setup when oracle state is tensor
         if isinstance(state_proxy, tuple):
             state_proxy = torch.concat((state_proxy[0], state_proxy[1]), dim=1)

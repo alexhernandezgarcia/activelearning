@@ -13,6 +13,7 @@ from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import make_dataset, plot_gp_predictions
 import matplotlib.pyplot as plt
 from regressor.gp import MultitaskGPRegressor
+from regressor.dkl import Tokenizer
 
 # ToyOracle,
 # ,
@@ -24,7 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="mf_amp_test")
+@hydra.main(config_path="./config", config_name="sf_dkl")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -64,6 +65,11 @@ def main(config):
         float_precision=config.float_precision,
     )
 
+    if hasattr(env, "vocab"):
+        tokenizer = Tokenizer(env.vocab)
+    else:
+        tokenizer = None
+
     oracles = []
     width = (N_FID) * 5
     fig, axs = plt.subplots(1, N_FID, figsize=(width, 5))
@@ -102,16 +108,6 @@ def main(config):
         oracle = oracles[0]
         env.oracle = oracle
 
-    # states = [[12, 5, 7], [3, 5, 12, 15]]
-    # states_tensor = torch.tensor([[12, 5, 7, -2], [3, 5, 12, 15]])
-    # tensor_policy_ohe = env.statetorch2policy(states_tensor)
-    # numpy_policy_ohe = env.statebatch2policy(states)
-    # print(tensor_policy_ohe)
-    # print(numpy_policy_ohe)
-    # torch_numpy_policy_ohe = torch.from_numpy(numpy_policy_ohe)
-    # # check tensor_policy_ohe and numpy_policy_ohe for equality
-    # assert torch.all(torch.eq(tensor_policy_ohe.detach().cpu(), torch_numpy_policy_ohe))
-
     if N_FID == 1 or config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
             config.dataset,
@@ -121,6 +117,7 @@ def main(config):
             device=config.device,
             float_precision=config.float_precision,
             rescale=config.multifidelity.rescale,
+            tokenizer=tokenizer,
         )
         regressor = hydra.utils.instantiate(
             config.regressor,
@@ -131,6 +128,7 @@ def main(config):
             float_precision=config.float_precision,
             _recursive_=False,
             logger=logger,
+            tokenizer=tokenizer,
         )
     # check if path exists
     elif config.multifidelity.proxy == False:

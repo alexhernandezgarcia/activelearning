@@ -73,7 +73,7 @@ def mlm_train_step(model, optimizer, token_batch, mask_ratio, loss_scale=1.0):
     return loss, masked_logits, masked_tokens
 
 
-def mlm_eval_epoch(model, eval_loader, mask_ratio, split):
+def mlm_eval_epoch(model, eval_loader, mask_ratio, split=None):
     metrics = dict(
         perplexity=0.0,
     )

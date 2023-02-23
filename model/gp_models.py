@@ -13,10 +13,14 @@ from gpytorch import likelihoods, kernels
 # from lambo import transforms as gfp_transforms
 from lambo.models.metrics import quantile_calibration
 
-from .gp_utils import fit_gp_surrogate
+from .base_surrogate import fit_gp_surrogate
+from gpytorch.variational import IndependentMultitaskVariationalStrategy
+from gpytorch.settings import cholesky_jitter
+from gpytorch.lazy import ConstantDiagLazyTensor
+from gpytorch import lazify
 
 
-class BaseGPSurrogate(BaseSurrogate, abc.ABC):
+class BaseGPSurrogate(abc.ABC):
     def __init__(
         self,
         max_shift,
@@ -54,39 +58,42 @@ class BaseGPSurrogate(BaseSurrogate, abc.ABC):
         self.lengthscale_init = lengthscale_init
         self.tokenizer = tokenizer
 
-        self._set_transforms(tokenizer, max_shift, mask_size)
+        # self._set_transforms(tokenizer, max_shift, mask_size)
 
-    def get_features(
-        self, seq_array, batch_size=None, transform=True
-    ):  # batch_size not used
-        # if transform:
-        #     original_shape = seq_array.shape
-        #     flat_seq_array = seq_array.reshape(-1)
-        # else:
-        #     original_shape = seq_array.shape[:-1]
-        #     flat_seq_array = seq_array.flatten(end_dim=-2)
+    # def get_features(
+    #     self, seq_array, batch_size=None, transform=True
+    # ):  # batch_size not used
+    #     # if transform:
+    #     #     original_shape = seq_array.shape
+    #     #     flat_seq_array = seq_array.reshape(-1)
+    #     # else:
+    #     original_shape = seq_array.shape[:-1]
+    #     flat_seq_array = seq_array.flatten(end_dim=-2)
 
-        # if self.training and transform:
-        #     enc_seq_array = gfp_transforms.padding_collate_fn(
-        #         [self.train_transform(seq) for seq in flat_seq_array],
-        #         self.tokenizer.padding_idx,
-        #     )
-        # elif transform:  # transforms from string to int
-        #     enc_seq_array = gfp_transforms.padding_collate_fn(
-        #         [self.test_transform(seq) for seq in flat_seq_array],
-        #         self.tokenizer.padding_idx,
-        #     )
-        # else:
-        #     enc_seq_array = seq_array
+    #     # Train transform = data augmentations + test transform
 
-        enc_seq_array = enc_seq_array.to(
-            self.device
-        )  # torch.Size([32, 36]), padded states
-        features = self.encoder(
-            enc_seq_array
-        )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
+    #     # if self.training and transform:
+    #     #     enc_seq_array = gfp_transforms.padding_collate_fn(
+    #     #         [self.train_transform(seq) for seq in flat_seq_array],
+    #     #         self.tokenizer.padding_idx,
+    #     #     )
+    #     # elif transform:  # transforms from string to int
+    #     #     enc_seq_array = gfp_transforms.padding_collate_fn(
+    #     #         [self.test_transform(seq) for seq in flat_seq_array],
+    #     #         self.tokenizer.padding_idx,
+    #     #     )
+    #     # else:
+    #     #     enc_seq_array = seq_array
 
-        return features.view(*original_shape, -1)
+    #     enc_seq_array = enc_seq_array.to(
+    #         self.device
+    #     )  # torch.Size([32, 36]), padded states
+    #     features = self.encoder(
+    #         enc_seq_array
+    #     )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
+
+    #     # TODO: what is oroginal shape?
+    #     return features.view(*original_shape, -1)
 
     def reshape_targets(self, targets):
         return targets
@@ -131,9 +138,8 @@ class BaseGPSurrogate(BaseSurrogate, abc.ABC):
             for (
                 input_batch,
                 target_batch,
-            ) in (
-                loader
-            ):  # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
+            ) in loader:
+                # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
                 features = self.get_features(
                     input_batch.to(self.device), transform=False
@@ -295,6 +301,10 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
                 noise_constraint=noise_constraint
             )
             likelihood.initialize(noise=self.task_noise_init)
+        else:
+            raise NotImplementedError(
+                "More than one output dim not supported. Refer to lambo repo if you really wanna"
+            )
         # else:
         #     covar_module = kernels.MaternKernel(
         #         batch_shape=(out_dim,), ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
@@ -365,40 +375,131 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
     def set_train_data(self, inputs=None, targets=None, strict=True):
         self.clear_cache()
 
-    def fit(
-        self,
-        X_train,
-        Y_train,
-        X_val,
-        Y_val,
-        X_test,
-        Y_test,
-        reset=False,
-        log_prefix="single_task_svgp",
-        **kwargs,
-    ):
-        if reset:
-            raise NotImplementedError
+    # def fit(
+    #     self,
+    #     X_train,
+    #     Y_train,
+    #     X_val,
+    #     Y_val,
+    #     X_test,
+    #     Y_test,
+    #     reset=False,
+    #     log_prefix="single_task_svgp",
+    #     **kwargs,
+    # ):
+    #     if reset:
+    #         raise NotImplementedError
 
-        fit_kwargs = dict(
-            surrogate=self,
-            mll=VariationalELBO(self.likelihood, self.model, num_data=X_train.shape[0]),
-            X_train=X_train,
-            Y_train=Y_train,
-            X_val=X_val,
-            Y_val=Y_val,
-            X_test=X_test,
-            Y_test=Y_test,
-            train_bs=self.bs,
-            eval_bs=self.bs,
-            shuffle_train=True,
-            log_prefix=log_prefix,
-        )
-        fit_kwargs.update(kwargs)
-        return fit_gp_surrogate(**fit_kwargs)
+    #     fit_kwargs = dict(
+    #         surrogate=self,
+    #         mll=VariationalELBO(self.likelihood, self.model, num_data=X_train.shape[0]),
+    #         X_train=X_train,
+    #         Y_train=Y_train,
+    #         X_val=X_val,
+    #         Y_val=Y_val,
+    #         X_test=X_test,
+    #         Y_test=Y_test,
+    #         train_bs=self.bs,
+    #         eval_bs=self.bs,
+    #         shuffle_train=True,
+    #         log_prefix=log_prefix,
+    #     )
+    #     fit_kwargs.update(kwargs)
+    #     return fit_gp_surrogate(**fit_kwargs)
 
     def reshape_targets(self, targets):
         if targets.shape[-1] > 1:
             return targets
         else:
             return targets.squeeze(-1)
+
+    def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
+        """
+        This is only intended for whitened variational distributions and gaussian likelihoods
+        at present.
+
+        \bar m = L^{-1} m
+        \bar S = L^{-1} S L^{-T}
+
+        where $LL^T = K_{uu}$.
+
+        Thus, the optimal \bar m, \bar S are given by
+        \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
+        \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
+        """
+
+        if isinstance(
+            self.model.variational_strategy, IndependentMultitaskVariationalStrategy
+        ):  # True
+            ind_pts = (
+                self.model.variational_strategy.base_variational_strategy.inducing_points
+            )  # Parameter containing: torch.Size([64, 16])
+            train_y = train_y.transpose(-1, -2).unsqueeze(-1)
+            is_batch_model = True
+        else:
+            ind_pts = self.model.variational_strategy.inducing_points
+            is_batch_model = False
+
+        with cholesky_jitter(1e-4):
+            kuu = self.model.covar_module(
+                ind_pts
+            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+            kuu_chol = (
+                kuu.cholesky()
+            )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
+            kuv = self.model.covar_module(ind_pts, train_x).double()
+
+            # noise = model.likelihood.noise if not is_batch_model else model.likelihood.task_noises.unsqueeze(-1).unsqueeze(-1)
+
+            if hasattr(self.likelihood, "noise"):  # False
+                noise = self.likelihood.noise
+            elif hasattr(self.likelihood, "task_noises"):
+                noise = self.likelihood.task_noises.view(-1, 1, 1)
+            else:
+                raise AttributeError
+            noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
+
+            if len(train_y.shape) < len(kuv.shape):
+                train_y = train_y.unsqueeze(-1)
+            if len(noise.shape) < len(kuv.shape):
+                noise = noise.unsqueeze(-1)
+
+            data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
+            # mean_term = kuu_chol.inv_matmul(data_term)
+            if is_batch_model:  # True
+                # TODO: clean this up a bit more
+                noise_as_lt = ConstantDiagLazyTensor(
+                    noise.squeeze(-1), diag_shape=kuv.shape[-1]
+                )
+                inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
+                inner_term = inner_prod + kuu
+            else:
+                inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
+
+            s_mat = kuu_chol.transpose(-1, -2).matmul(
+                inner_term.inv_matmul(kuu_chol.evaluate())
+            )  # torch.Size([3, 64, 64])
+            s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
+            # mean_param = s_mat.matmul(mean_term)
+            # the expression below is less efficient but probably more stable
+            mean_param = kuu_chol.transpose(-1, -2).matmul(
+                inner_term.inv_matmul(data_term)
+            )
+
+        mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
+        s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
+
+        # if not is_batch_model:
+        #     model.model.variational_strategy._variational_distribution.variational_mean.data = mean_param.data.detach().squeeze()
+        #     model.model.variational_strategy._variational_distribution.chol_variational_covar.data = s_root.data.detach()
+        #     model.model.variational_strategy.variational_params_initialized.fill_(1)
+        # else: #True
+        self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
+            mean_param.data.detach().squeeze()
+        )
+        self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
+            s_root.data.detach()
+        )
+        self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
+            1
+        )

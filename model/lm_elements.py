@@ -64,11 +64,11 @@ class LanguageModel(nn.Module):
     #     )
     #     return records
 
-    def get_token_idx(self, token):
-        return self.model.tokenizer.convert_token_to_id(token)
+    # def get_token_idx(self, token):
+    #     return self.model.tokenizer.convert_token_to_id(token)
 
-    def get_token(self, idx):
-        return self.model.tokenizer.convert_id_to_token(idx)
+    # def get_token(self, idx):
+    #     return self.model.tokenizer.convert_id_to_token(idx)
 
     def get_token_features(self, src_tok_idxs):
         src_tok_features, src_mask = self.model.enc_tok_features(src_tok_idxs)

@@ -24,9 +24,9 @@ def swish(x):
 
 
 def get_activation_fn(name: str) -> typing.Callable:
-    if name == "gelu":
-        return gelu
-    elif name == "relu":
+    # if name == "gelu":
+    #     return gelu
+    if name == "relu":
         return torch.nn.functional.relu
     elif name == "swish":
         return swish
@@ -338,33 +338,30 @@ class Expression(nn.Module):
         return self.func(x)
 
 
-# def check_early_stopping(
-#         model,
-#         best_score,
-#         best_epoch,
-#         best_weights,
-#         curr_score,
-#         curr_epoch,
-#         patience,
-#         tol=1e-3,
-#         save_weights=True,
-# ):
-#     eps = 1e-6
-#     stop = False
-#     if (
-#             best_score is None
-#             or (best_score - curr_score) / (abs(best_score) + eps) > tol
-#     ):
-#         best_score, best_epoch = curr_score, curr_epoch
-#     elif curr_epoch - best_epoch >= patience:
-#         stop = True
-#     else:
-#         pass
+def check_early_stopping(
+    model,
+    best_score,
+    best_epoch,
+    best_weights,
+    curr_score,
+    curr_epoch,
+    patience,
+    tol=1e-3,
+    save_weights=True,
+):
+    eps = 1e-6
+    stop = False
+    if best_score is None or (best_score - curr_score) / (abs(best_score) + eps) > tol:
+        best_score, best_epoch = curr_score, curr_epoch
+    elif curr_epoch - best_epoch >= patience:
+        stop = True
+    else:
+        pass
 
-#     if best_epoch == curr_epoch and save_weights:
-#         del best_weights
-#         model.cpu()  # avoid storing two copies of the weights on GPU
-#         best_weights = copy.deepcopy(model.state_dict())
-#         model.to(model.device)
+    if best_epoch == curr_epoch and save_weights:
+        del best_weights
+        model.cpu()  # avoid storing two copies of the weights on GPU
+        best_weights = copy.deepcopy(model.state_dict())
+        model.to(model.device)
 
-#     return best_score, best_epoch, best_weights, stop
+    return best_score, best_epoch, best_weights, stop

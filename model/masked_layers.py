@@ -89,9 +89,9 @@ class mResidualBlock(nn.Module):
         if layernorm:
             self.norm_1 = MaskLayerNorm1d(normalized_shape=[in_channels, 1])
             self.norm_2 = MaskLayerNorm1d(normalized_shape=[out_channels, 1])
-        else:
-            self.norm_1 = MaskBatchNormNd(in_channels)
-            self.norm_2 = MaskBatchNormNd(out_channels)
+        # else:
+        #     self.norm_1 = MaskBatchNormNd(in_channels)
+        #     self.norm_2 = MaskBatchNormNd(out_channels)
 
         if act_fn == "swish":
             self.act_fn = fused_swish

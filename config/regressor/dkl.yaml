@@ -11,14 +11,14 @@ surrogate:
   gp_lr: 1e-3
   enc_lr: 1e-3
   bs: ${encoder.batch_size}
-  eval_bs: ${task.batch_size}
+  eval_bs: 32
   num_epochs: 128
   holdout_ratio: 0.2
   early_stopping: True
   patience: 16
   eval_period: 2
   feature_dim: 16
-  out_dim: ${task.obj_dim}
+  out_dim: 1
   num_inducing_points: 64
   learn_inducing_points: True
   encoder_wd: 1e-4
@@ -30,3 +30,26 @@ surrogate:
   noise_constraint:
     _target_: gpytorch.constraints.GreaterThan
     lower_bound: 1e-4
+
+# encoder:
+#   _target_: lambo.models.lm_elements.LanguageModel
+#   name: mlm_cnn
+
+#   model:
+#     _target_: lambo.models.shared_elements.mCNN
+#     # tokenizer: ${tokenizer}
+#     max_len: ${env.max_len}
+#     embed_dim: 64
+#     latent_dim: 16
+#     out_dim: 16
+#     kernel_size: 5
+#     p: 0.
+#     layernorm: True
+#     max_len_delta: 0
+
+#   batch_size: 32
+#   num_epochs: 128
+#   patience: 32
+#   lr: 1e-3
+#   max_shift: 0
+#   mask_ratio: 0.125

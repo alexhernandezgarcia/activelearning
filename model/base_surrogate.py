@@ -18,7 +18,7 @@ class BaseSurrogate(torch.nn.Module):
         # convert from string to LongTensor of token indexes
         # don't use the max_len arg here, will interfere with the translation augmentation
         train_transform = [] if train_prepend is None else train_prepend
-        train_transform += [transforms.StringToLongTensor(tokenizer, max_len=None)]
+        # train_transform += [transforms.StringToLongTensor(tokenizer, max_len=None)]
         # randomly substitute masking tokens
         # mask_size = 0 and max_shift = 0
         # if mask_size > 0:
@@ -30,10 +30,10 @@ class BaseSurrogate(torch.nn.Module):
         #     train_transform.append(
         #         transforms.SequenceTranslation(max_shift)
         #     )
-        train_transform = torchvision.transforms.Compose(train_transform)
+        # train_transform = torchvision.transforms.Compose(train_transform)
 
         # no data augmentation at test-time
-        test_transform = transforms.StringToLongTensor(tokenizer)
+        # test_transform = transforms.StringToLongTensor(tokenizer)
 
         self.train_transform = train_transform
         self.test_transform = test_transform
