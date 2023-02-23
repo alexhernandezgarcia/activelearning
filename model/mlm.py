@@ -2,7 +2,8 @@ import math
 
 import numpy as np
 import torch
-import torchvision
+
+# import torchvision
 import wandb
 
 from torch.nn import functional as F
@@ -30,19 +31,19 @@ def sample_mask(
     # special_vocab = {'[UNK]', '0', '[MASK]', '[PAD]', '[SEP]', '[CLS]'}
     # special_idxs = [3, 25, 4, 0, 2, 1]
     # lookup: {'[PAD]': 0, '[CLS]': 1, '[SEP]': 2, '[UNK]': 3, '[MASK]': 4, 'A': 5, 'R': 6, 'N': 7, 'D': 8, 'C': 9, 'E': 10, 'Q': 11, 'G': 12, 'H': 13, ...}
-    special_idxs = torch.tensor(tokenizer.special_idxs).view(
-        -1, 1, 1
+    special_idxs = (
+        torch.tensor(tokenizer.special_idxs).view(-1, 1, 1).to(token_batch)
     )  # torch.Size([6, 1, 1])
     is_non_special = (
         token_batch.ne(special_idxs).prod(dim=0).float()
-    )  # torch.Size([32, 36])
+    )  # torch.Size([32, 51])
     mask_weights = is_non_special / is_non_special.sum(
         dim=-1, keepdims=True
-    )  # torch.Size([32, 36])
+    )  # torch.Size([32, 51])
     mask_idxs = torch.multinomial(
         mask_weights, mask_size, replacement=False
-    )  # torch.Size([32, 5])
-    return mask_idxs.numpy()
+    )  # torch.Size([32, 7])
+    return mask_idxs.detach().cpu().numpy()
 
 
 def mlm_train_step(model, optimizer, token_batch, mask_ratio, loss_scale=1.0):
@@ -73,7 +74,7 @@ def mlm_train_step(model, optimizer, token_batch, mask_ratio, loss_scale=1.0):
     return loss, masked_logits, masked_tokens
 
 
-def mlm_eval_epoch(model, eval_loader, mask_ratio, split=None):
+def mlm_eval_epoch(model, eval_loader, mask_ratio):
     metrics = dict(
         perplexity=0.0,
     )
@@ -117,6 +118,6 @@ def mlm_eval_epoch(model, eval_loader, mask_ratio, split=None):
         )
 
     metrics = {key: val.item() for key, val in metrics.items()}
-    metrics = {f"{split}_{key}": val for key, val in metrics.items()}
+    metrics = {f"test_{key}": val for key, val in metrics.items()}
 
     return metrics

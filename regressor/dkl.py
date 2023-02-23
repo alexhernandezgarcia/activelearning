@@ -2,7 +2,7 @@ import torch
 import gpytorch
 import hydra
 from gflownet.utils.common import set_device, set_float_precision
-from ..utils.dkl_utils import batched_call
+from utils.dkl_utils import batched_call
 from gpytorch.settings import cholesky_jitter
 from gpytorch.lazy import ConstantDiagLazyTensor
 import math
@@ -10,33 +10,38 @@ from torch import LongTensor
 from gpytorch import lazify
 import numpy as np
 from torch.nn import functional as F
-from ..model.mlm import sample_mask
+from model.mlm import sample_mask
 from gpytorch.variational import IndependentMultitaskVariationalStrategy
 from gpytorch.mlls import ExactMarginalLogLikelihood, VariationalELBO
-from ..model.mlm import mlm_eval_epoch
-from ..model.shared_elements import check_early_stopping
+from model.mlm import mlm_eval_epoch
+from model.shared_elements import check_early_stopping
 import copy
+from torch.nn.utils.rnn import pad_sequence
 
 
 class Tokenizer:
     def __init__(self, non_special_vocab):
+        # self.device = set_device(device)
+        # self.float_precision = set_float_precision(float_precision)
         self.non_special_vocab = non_special_vocab
         # skipped UNK and 0
-        self.special_vocab = ["[CLS]", "[SEP]", "[MASK]", "[PAD]"]
-        self.full_vocab = self.special_vocab + self.non_special_vocab
+        self.special_vocab = ["[SEP]", "[CLS]", "[PAD]", "[MASK]"]
+        self.full_vocab = self.non_special_vocab + self.special_vocab
         self.lookup = {a: i for (i, a) in enumerate(self.full_vocab)}
         self.inverse_lookup = {i: a for (i, a) in enumerate(self.full_vocab)}
-        self.lookup["[PAD]"] = -2
-        self.inverse_lookup[-2] = "[PAD]"
+        # self.lookup["[PAD]"] = -2
+        # self.inverse_lookup[-2] = "[PAD]"
         padding_token = "[PAD]"
         masking_token = "[MASK]"
         bos_token = "[CLS]"
         eos_token = "[SEP]"
         self.padding_idx = self.lookup[padding_token]
-        assert self.padding_idx == -2
+        assert self.padding_idx == 22
         self.masking_idx = self.lookup[masking_token]
         self.bos_idx = self.lookup[bos_token]
-        self.eos_idx = self.lookup[eos_token]
+        self.eos_idx = self.lookup[
+            eos_token
+        ]  # preferably ensure eos here is the same eos in gfn
         self.sampling_vocab = non_special_vocab
         self.special_idxs = [
             self.padding_idx,
@@ -45,12 +50,27 @@ class Tokenizer:
             self.masking_idx,
         ]
 
-    def transform(self, seq_array):
+    def transform(self, list_of_seq_tensors):
+        # add [CLS] and [SEP] tokens to the beginning and end of each list in seq_list
+        # seq_list is a list of tensors
+        # return a list of lists
+        seq_list = [
+            torch.cat([torch.tensor([self.bos_idx]), seq, torch.tensor([self.eos_idx])])
+            for seq in list_of_seq_tensors
+        ]
+        states = pad_sequence(
+            seq_list,
+            batch_first=True,
+            padding_value=self.padding_idx,
+        )
+
         # Add [CLS] and [SEP] tokens to the beginning and end of each sequence
-        cls_tensor = torch.ones(seq_array.shape[0], 1).long() * self.bos_idx
-        sep_tensor = torch.ones(seq_array.shape[0], 1).long() * self.eos_idx
-        seq_array = torch.cat([cls_tensor, seq_array, sep_tensor], dim=1)
-        return seq_array
+        # cls_tensor = torch.ones(seq_array.shape[0], 1).long() * self.bos_idx
+        # sep_tensor = torch.ones(seq_array.shape[0], 1).long() * self.eos_idx
+        # cls_tensor = cls_tensor.to(seq_array)
+        # sep_tensor = sep_tensor.to(seq_array)
+        # seq_array = torch.cat([cls_tensor, seq_array, sep_tensor], dim=1)
+        return states  # torch.Size([1280, 51])
 
 
 class DeepKernelRegressor:
@@ -61,11 +81,11 @@ class DeepKernelRegressor:
         dataset,
         config_model,
         surrogate,
-        env_vocab,
         float_precision,
         tokenizer,
         encoder_obj="mlm",
         batch_size=32,
+        **kwargs,
     ):
         self.logger = logger
         self.progress = self.logger.progress
@@ -80,56 +100,65 @@ class DeepKernelRegressor:
         # self.n_samples = dataset.n_samples
 
         self.tokenizer = tokenizer
-
+        # config_model.model["tokenizer"] = self.tokenizer
         # self.encoder_config = encoder
         self.language_model = hydra.utils.instantiate(
-            config_model, tokenizer=self.tokenizer
+            config_model,
+            tokenizer=self.tokenizer,
+            device=self.device,
+            float_precision=self.float,
+            _recursive_=False,
         )
         self.encoder_obj = encoder_obj
 
         self.surrogate_config = surrogate
         self.surrogate = hydra.utils.instantiate(
-            surrogate, tokenizer=self.encoder.tokenizer
+            surrogate,
+            tokenizer=self.language_model.tokenizer,
+            encoder=self.language_model,
+            device=self.device,
+            float_precision=self.float,
         )
 
         self.batch_size = batch_size
 
-    def get_features(self, seq_array, batch_size, transform=True):
-        # batch_size not used
-        # if transform:
-        #     original_shape = seq_array.shape
-        #     flat_seq_array = seq_array.reshape(-1)
-        # else:
-        original_shape = seq_array.shape[:-1]
-        flat_seq_array = seq_array.flatten(end_dim=-2)
+    # def get_features(self, seq_array, batch_size=None, transform=True):
+    #     # batch_size not used
+    #     # if transform:
+    #     #     original_shape = seq_array.shape
+    #     #     flat_seq_array = seq_array.reshape(-1)
+    #     # else:
+    #     original_shape = seq_array.shape[:-1]
+    #     flat_seq_array = seq_array.flatten(end_dim=-2)
 
-        # Train transform = data augmentations + test transform
+    #     # Train transform = data augmentations + test transform
 
-        # if self.training and transform:
-        #     enc_seq_array = gfp_transforms.padding_collate_fn(
-        #         [self.train_transform(seq) for seq in flat_seq_array],
-        #         self.tokenizer.padding_idx,
-        #     )
-        # elif transform:  # transforms from string to int
-        #     enc_seq_array = gfp_transforms.padding_collate_fn(
-        #         [self.test_transform(seq) for seq in flat_seq_array],
-        #         self.tokenizer.padding_idx,
-        #     )
-        # else:
-        #     enc_seq_array = seq_array
+    #     # if self.training and transform:
+    #     #     enc_seq_array = gfp_transforms.padding_collate_fn(
+    #     #         [self.train_transform(seq) for seq in flat_seq_array],
+    #     #         self.tokenizer.padding_idx,
+    #     #     )
+    #     # elif transform:  # transforms from string to int
+    #     #     enc_seq_array = gfp_transforms.padding_collate_fn(
+    #     #         [self.test_transform(seq) for seq in flat_seq_array],
+    #     #         self.tokenizer.padding_idx,
+    #     #     )
+    #     # else:
+    #     #     enc_seq_array = seq_array
 
-        enc_seq_array = enc_seq_array.to(
-            self.device
-        )  # torch.Size([32, 36]), padded states
-        features = self.language_model(
-            enc_seq_array
-        )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
+    #     enc_seq_array = seq_array.to(
+    #         self.device
+    #     )  # torch.Size([32, 36]), padded states
+    #     features = self.language_model(
+    #         enc_seq_array
+    #     )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
 
-        # TODO: what is original shape?
-        return features.view(*original_shape, -1)
+    #     # TODO: what is original shape?
+    #     return features.view(*original_shape, -1)
 
     def initialize_surrogate(self, X_train, Y_train):
         # Is X_train 32 or 426?
+        # X_train = torch.Size([5119, 51])
         if (
             hasattr(self.surrogate, "init_inducing_points")
             and self.surrogate.num_inducing_points <= X_train.shape[0]
@@ -138,26 +167,26 @@ class DeepKernelRegressor:
             self.surrogate.eval()
             self.surrogate.requires_grad_(False)
             init_features = torch.cat(
-                batched_call(self.get_features, X_train, self.batch_size)
+                batched_call(self.surrogate.get_features, X_train, self.batch_size)
             )
-            try:
-                self.surrogate.train()
-                self.surrogate.init_inducing_points(
-                    init_features
-                )  # botorch.SingleTaskVariationalGP based function
-                self.surrogate.initialize_var_dist_sgpr(
-                    self.surrogate,
-                    init_features,
-                    Y_train.to(init_features),
-                    noise_lb=1.0,
-                )
-                print("variational initialization successful")
-            except Exception as exp:
-                # logging.exception(exp)
-                print("variational initialization failed")
+            # try:
+            self.surrogate.train()
+            self.surrogate.init_inducing_points(
+                init_features
+            )  # botorch.SingleTaskVariationalGP based function
+            self.surrogate.initialize_var_dist_sgpr(
+                # self.surrogate,
+                init_features,
+                Y_train.to(init_features),
+                noise_lb=1.0,
+            )
+            print("variational initialization successful")
+            # except Exception as exp:
+            # logging.exception(exp)
+            # print("variational initialization failed")
 
         self.mll = VariationalELBO(
-            self.likelihood, self.model, num_data=X_train.shape[0]
+            self.surrogate.likelihood, self.surrogate.model, num_data=X_train.shape[0]
         )
         self.mll.to(self.surrogate.device)
 
@@ -193,7 +222,7 @@ class DeepKernelRegressor:
     def gp_train_step(self, optimizer, inputs, targets, mll):
         self.surrogate.zero_grad(set_to_none=True)
         self.surrogate.clear_cache()  # possibly unnecessary
-        features = self.get_features(
+        features = self.surrogate.get_features(
             inputs.to(self.surrogate.device), self.batch_size, transform=False
         )  # torch.Size([32, 16])
 
@@ -212,7 +241,7 @@ class DeepKernelRegressor:
         return loss
 
     def fit(self):
-        select_crit_key = "val_loss"
+        select_crit_key = "val_nll"
 
         X_train = self.dataset.train_dataset["samples"]
         Y_train = self.dataset.train_dataset["energies"]
@@ -229,14 +258,13 @@ class DeepKernelRegressor:
         self.surrogate.requires_grad_(False)
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
         start_metrics = {}
-        start_metrics.update(self.surrogate.evaluate(test_loader, split="test"))
+        start_metrics.update(self.surrogate.evaluate(test_loader))
         start_metrics["epoch"] = 0
         start_metrics.update(
             mlm_eval_epoch(
                 self.language_model,
                 test_loader,
                 self.language_model.mask_ratio,
-                split="test",
             )
         )
 
@@ -248,7 +276,7 @@ class DeepKernelRegressor:
         if best_score is not None:
             print(f"starting val NLL: {best_score:.4f}")
 
-        self.initialize_surrogate()
+        self.initialize_surrogate(X_train, Y_train)
 
         if hasattr(self.mll, "num_data"):
             self.mll.num_data = len(train_loader.dataset)
@@ -260,7 +288,7 @@ class DeepKernelRegressor:
         gp_optimizer = torch.optim.Adam(self.surrogate.param_groups)
         gp_lr_sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
             gp_optimizer,
-            patience=math.ceil(self.urrogate.patience / 2.0),
+            patience=math.ceil(self.surrogate.patience / 2.0),
             threshold=1e-3,
         )
         # records = [start_metrics]
@@ -287,7 +315,6 @@ class DeepKernelRegressor:
                         True
                     )  # inputs = 32 x 36, mask_ratio=0.125, loss_scale=1.
                     mlm_loss, _, _ = self.mlm_train_step(
-                        self.surrogate.encoder,
                         gp_optimizer,
                         inputs,
                         self.surrogate.encoder.mask_ratio,
@@ -303,9 +330,7 @@ class DeepKernelRegressor:
 
                 # train all params through supervised MLL objective
                 self.surrogate.requires_grad_(True)
-                gp_loss = self.gp_train_step(
-                    self.surrogate, gp_optimizer, inputs, targets, self.mll
-                )
+                gp_loss = self.gp_train_step(gp_optimizer, inputs, targets, self.mll)
 
                 avg_train_loss += (mlm_loss.detach() + gp_loss.detach()) / len(
                     train_loader
@@ -326,7 +351,7 @@ class DeepKernelRegressor:
                 # update train features, use unaugmented train data for evaluation
                 self.surrogate.eval()
                 self.surrogate.set_train_data(X_train, Y_train, strict=False)
-                metrics.update(self.surrogate.evaluate(test_loader, split="test"))
+                metrics.update(self.surrogate.evaluate(test_loader))
                 if self.encoder_obj == "mlm":
                     metrics.update(
                         mlm_eval_epoch(

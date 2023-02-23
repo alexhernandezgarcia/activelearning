@@ -83,11 +83,15 @@ class mCNN(nn.Module):
         **kwargs,
     ):
         super().__init__()
+        # one for sep and one for eos
+        # max_len_delta = 2
+        max_len = max_len + 2
         vocab_size = len(tokenizer.full_vocab)
         # vocab_size = 26 = 20 amino acids + 5 residue tokens + 1 padding token
         self.embedding = nn.Embedding(
             vocab_size, embed_dim, padding_idx=tokenizer.padding_idx
         )  # Embedding(26, 64, padding_idx=0)
+        # tokenizer.padding_idx
         self.pos_encoder = PositionalEncoding(
             embed_dim, p, max_len, batch_first=True
         )  # PositionalEncoding((dropout): Dropout(p=0.0, inplace=False))

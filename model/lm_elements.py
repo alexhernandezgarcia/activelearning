@@ -1,12 +1,13 @@
 import math
-
 import numpy as np
 import torch
 from torch import nn, Tensor
 from torch.nn import functional as F
+import hydra
 
 # from lambo.models.lanmt import fit_lanmt_model
-from lambo.models.masked_layers import mResidualBlock
+from .masked_layers import mResidualBlock
+from gflownet.utils.common import set_device, set_float_precision
 
 
 class LanguageModel(nn.Module):
@@ -23,24 +24,34 @@ class LanguageModel(nn.Module):
         lr,
         max_shift,
         mask_ratio,
+        tokenizer,
+        device,
+        float_precision,
         **kwargs
     ):
         super().__init__()
-        self.model = model.to(self.device)
+        self.device = device
+        self.float = float_precision
+        config_model = model
+        self.model = hydra.utils.instantiate(
+            config_model, tokenizer=tokenizer, **kwargs
+        )  # Change max_len of model
+        self.model = self.model.to(self.device)
+        # self.model.tokenizer = tokenizer
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.patience = patience
         self.lr = lr
         self.max_shift = max_shift
-        self.tokenizer = model.tokenizer
+        self.tokenizer = tokenizer
         self.mask_ratio = mask_ratio
 
     def forward(self, inputs):  # torch.Size([426, 36])
-        if isinstance(inputs, np.ndarray):
-            tok_idxs = self.str_to_tokens(inputs)
-        else:
-            tok_idxs = inputs  # torch.Size([426, 36])
-        return self.model(tok_idxs)
+        # if isinstance(inputs, np.ndarray):
+        # tok_idxs = self.str_to_tokens(inputs)
+        # else:
+        # tok_idxs = inputs  # torch.Size([426, 36])
+        return self.model(inputs)
 
     def pool_features(self, src_tok_features, src_mask):
         lat_tok_features, pooled_features = self.model.function_head(

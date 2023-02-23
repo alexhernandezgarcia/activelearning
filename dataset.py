@@ -136,12 +136,14 @@ class DataHandler:
             states = [
                 torch.LongTensor(self.sfenv.readable2state(sample)) for sample in states
             ]
-            if self.sfenv.do_state_padding:
-                states = pad_sequence(
-                    states,
-                    batch_first=True,
-                    padding_value=self.sfenv.invalid_state_element,
-                )
+            if self.tokenizer is not None:
+                states = self.tokenizer.transform(states)
+            # if self.sfenv.do_state_padding:
+            #     states = pad_sequence(
+            #         states,
+            #         batch_first=True,
+            #         padding_value=self.sfenv.invalid_state_element,
+            #     )
         else:
             # for AMP this is the implementation
             # dataset = self.env.load_dataset()
@@ -216,7 +218,8 @@ class DataHandler:
         # TODO: make general to sf
         if hasattr(self.sfenv, "statetorch2readable"):
             readable_train_samples = [
-                self.env.statetorch2readable(sample) for sample in train_states
+                self.env.statetorch2readable(sample, self.tokenizer.inverse_lookup)
+                for sample in train_states
             ]
             readable_train_dataset = {
                 "samples": readable_train_samples,
@@ -242,7 +245,8 @@ class DataHandler:
         if len(test_states) > 0:
             if hasattr(self.sfenv, "statetorch2readable"):
                 readable_test_samples = [
-                    self.env.statetorch2readable(sample) for sample in test_states
+                    self.env.statetorch2readable(sample, self.tokenizer.inverse_lookup)
+                    for sample in test_states
                 ]
                 readable_test_dataset = {
                     "samples": readable_test_samples,
@@ -306,9 +310,9 @@ class DataHandler:
         # else:
         state_batch = samples
         state_proxy = self.env.statetorch2proxy(state_batch)
-        if self.tokenizer is not None:
-            # Inout must be a tensor
-            state_proxy = self.tokenizer(state_proxy)
+        # if self.tokenizer is not None:
+        # Inout must be a tensor
+        # state_proxy = self.tokenizer.transform(state_proxy)
         # for when oracle is proxy and grid setup when oracle state is tensor
         if isinstance(state_proxy, tuple):
             state_proxy = torch.concat((state_proxy[0], state_proxy[1]), dim=1)

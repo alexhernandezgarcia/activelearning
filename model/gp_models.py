@@ -11,9 +11,9 @@ from gpytorch import likelihoods, kernels
 
 # from lambo.models.base_surrogate import BaseSurrogate
 # from lambo import transforms as gfp_transforms
-from lambo.models.metrics import quantile_calibration
+from model.metrics import quantile_calibration
 
-from .base_surrogate import fit_gp_surrogate
+# from .base_surrogate import fit_gp_surrogate
 from gpytorch.variational import IndependentMultitaskVariationalStrategy
 from gpytorch.settings import cholesky_jitter
 from gpytorch.lazy import ConstantDiagLazyTensor
@@ -60,40 +60,38 @@ class BaseGPSurrogate(abc.ABC):
 
         # self._set_transforms(tokenizer, max_shift, mask_size)
 
-    # def get_features(
-    #     self, seq_array, batch_size=None, transform=True
-    # ):  # batch_size not used
-    #     # if transform:
-    #     #     original_shape = seq_array.shape
-    #     #     flat_seq_array = seq_array.reshape(-1)
-    #     # else:
-    #     original_shape = seq_array.shape[:-1]
-    #     flat_seq_array = seq_array.flatten(end_dim=-2)
+    def get_features(
+        self, seq_array, batch_size=None, transform=True
+    ):  # batch_size not used
+        # if transform:
+        #     original_shape = seq_array.shape
+        #     flat_seq_array = seq_array.reshape(-1)
+        # else:
+        original_shape = seq_array.shape[:-1]
+        flat_seq_array = seq_array.flatten(end_dim=-2)
 
-    #     # Train transform = data augmentations + test transform
+        # Train transform = data augmentations + test transform
 
-    #     # if self.training and transform:
-    #     #     enc_seq_array = gfp_transforms.padding_collate_fn(
-    #     #         [self.train_transform(seq) for seq in flat_seq_array],
-    #     #         self.tokenizer.padding_idx,
-    #     #     )
-    #     # elif transform:  # transforms from string to int
-    #     #     enc_seq_array = gfp_transforms.padding_collate_fn(
-    #     #         [self.test_transform(seq) for seq in flat_seq_array],
-    #     #         self.tokenizer.padding_idx,
-    #     #     )
-    #     # else:
-    #     #     enc_seq_array = seq_array
+        # if self.training and transform:
+        #     enc_seq_array = gfp_transforms.padding_collate_fn(
+        #         [self.train_transform(seq) for seq in flat_seq_array],
+        #         self.tokenizer.padding_idx,
+        #     )
+        # elif transform:  # transforms from string to int
+        #     enc_seq_array = gfp_transforms.padding_collate_fn(
+        #         [self.test_transform(seq) for seq in flat_seq_array],
+        #         self.tokenizer.padding_idx,
+        #     )
+        # else:
+        #     enc_seq_array = seq_array
 
-    #     enc_seq_array = enc_seq_array.to(
-    #         self.device
-    #     )  # torch.Size([32, 36]), padded states
-    #     features = self.encoder(
-    #         enc_seq_array
-    #     )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
+        enc_seq_array = seq_array.to(self.device)  # torch.Size([32, 36]), padded states
+        features = self.encoder(
+            enc_seq_array
+        )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
 
-    #     # TODO: what is oroginal shape?
-    #     return features.view(*original_shape, -1)
+        # TODO: what is oroginal shape?
+        return features.view(*original_shape, -1)
 
     def reshape_targets(self, targets):
         return targets
@@ -131,7 +129,7 @@ class BaseGPSurrogate(abc.ABC):
     #         pred_dist = pred_dist if latent else self.likelihood(pred_dist)
     #     return pred_dist
 
-    def evaluate(self, loader, split="", *args, **kwargs):
+    def evaluate(self, loader, *args, **kwargs):
         self.eval()
         targets, y_mean, y_std, f_std = [], [], [], []
         with torch.no_grad():
@@ -198,12 +196,12 @@ class BaseGPSurrogate(abc.ABC):
             ).correlation / targets.size(-1)
 
         metrics = {
-            f"{split}_nll": nll.item(),
-            f"{split}_rmse": rmse.item(),
-            f"{split}_s_rho": spearman_rho,
-            f"{split}_ece": ece,
-            f"{split}_occ_diff": occ_diff,
-            f"{split}_post_var": (f_std**2).mean().item(),
+            f"test_nll": nll.item(),
+            f"test_rmse": rmse.item(),
+            f"test_s_rho": spearman_rho,
+            f"test_ece": ece,
+            f"test_occ_diff": occ_diff,
+            f"test_post_var": (f_std**2).mean().item(),
         }
 
         if hasattr(self.likelihood, "task_noises"):
@@ -278,6 +276,8 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         out_dim,
         num_inducing_points,
         encoder,
+        device,
+        float_precision,
         noise_constraint=None,
         lengthscale_prior=None,
         outcome_transform=None,
@@ -287,6 +287,8 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         *args,
         **kwargs,
     ):
+        self.device = device
+        self.float = float_precision
         # bootstrap_ratio = None, bs = 32, early_stopping = True, enc_lr = 1e-3, encoder_wd = 1e-4, lengthscale_init = 0.7, num_epochs = 128, min_num_train = 128, task_noise_init = 0.5
         # initialize common attributes
         BaseGPSurrogate.__init__(self, encoder=encoder, *args, **kwargs)
@@ -317,14 +319,14 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
 
         # initialize GP
         dummy_X = 2 * (
-            torch.rand(num_inducing_points, feature_dim).to(self.device, self.dtype)
+            torch.rand(num_inducing_points, feature_dim).to(self.device, self.float)
             - 0.5
         )  # torch.Size([64, 16])
-        dummy_Y = torch.randn(num_inducing_points, out_dim).to(self.device, self.dtype)
+        dummy_Y = torch.randn(num_inducing_points, out_dim).to(self.device, self.float)
         covar_module = (
             covar_module
             if covar_module is None
-            else covar_module.to(self.device, self.dtype)
+            else covar_module.to(self.device, self.float)
         )
 
         self.base_cls = SingleTaskVariationalGP
@@ -340,7 +342,7 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
             outcome_transform=outcome_transform,
             input_transform=input_transform,
         )
-        self.encoder = encoder.to(self.device, self.dtype)
+        self.encoder = encoder.to(self.device, self.float)
         self.mll_beta = mll_beta  # 0.01
 
     def clear_cache(self):
@@ -430,7 +432,7 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
 
         if isinstance(
             self.model.variational_strategy, IndependentMultitaskVariationalStrategy
-        ):  # True
+        ):  # True in lambo code but False for me
             ind_pts = (
                 self.model.variational_strategy.base_variational_strategy.inducing_points
             )  # Parameter containing: torch.Size([64, 16])
@@ -489,17 +491,21 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
         s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
 
-        # if not is_batch_model:
-        #     model.model.variational_strategy._variational_distribution.variational_mean.data = mean_param.data.detach().squeeze()
-        #     model.model.variational_strategy._variational_distribution.chol_variational_covar.data = s_root.data.detach()
-        #     model.model.variational_strategy.variational_params_initialized.fill_(1)
-        # else: #True
-        self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
-            mean_param.data.detach().squeeze()
-        )
-        self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
-            s_root.data.detach()
-        )
-        self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
-            1
-        )
+        if not is_batch_model:
+            self.model.variational_strategy._variational_distribution.variational_mean.data = (
+                mean_param.data.detach().squeeze()
+            )
+            self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
+                s_root.data.detach()
+            )
+            self.model.variational_strategy.variational_params_initialized.fill_(1)
+        else:  # True
+            self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
+                mean_param.data.detach().squeeze()
+            )
+            self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
+                s_root.data.detach()
+            )
+            self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
+                1
+            )

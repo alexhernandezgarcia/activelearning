@@ -1,7 +1,7 @@
-_target_: regressor.gp.DeepKernelRegressor
+_target_: regressor.dkl.DeepKernelRegressor
 
 surrogate:
-  _target_: lambo.models.gp_models.SingleTaskSVGP
+  _target_: model.gp_models.SingleTaskSVGP
   max_shift: 0
   mask_size: 0
   bootstrap_ratio: null
@@ -10,7 +10,7 @@ surrogate:
   lengthscale_init: 0.7
   gp_lr: 1e-3
   enc_lr: 1e-3
-  bs: ${encoder.batch_size}
+  bs: ${model.batch_size}
   eval_bs: 32
   num_epochs: 128
   holdout_ratio: 0.2
@@ -25,7 +25,7 @@ surrogate:
   mll_beta: 1e-2
   lengthscale_prior:
     _target_: gpytorch.priors.NormalPrior
-    loc: ${surrogate.lengthscale_init}
+    loc: ${regressor.surrogate.lengthscale_init}
     scale: 1e-2
   noise_constraint:
     _target_: gpytorch.constraints.GreaterThan
