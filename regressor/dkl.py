@@ -21,8 +21,6 @@ from torch.nn.utils.rnn import pad_sequence
 
 class Tokenizer:
     def __init__(self, non_special_vocab):
-        # self.device = set_device(device)
-        # self.float_precision = set_float_precision(float_precision)
         self.non_special_vocab = non_special_vocab
         # skipped UNK and 0
         self.special_vocab = ["[SEP]", "[CLS]", "[PAD]", "[MASK]"]
@@ -175,15 +173,11 @@ class DeepKernelRegressor:
                 init_features
             )  # botorch.SingleTaskVariationalGP based function
             self.surrogate.initialize_var_dist_sgpr(
-                # self.surrogate,
                 init_features,
                 Y_train.to(init_features),
                 noise_lb=1.0,
             )
             print("variational initialization successful")
-            # except Exception as exp:
-            # logging.exception(exp)
-            # print("variational initialization failed")
 
         self.mll = VariationalELBO(
             self.surrogate.likelihood, self.surrogate.model, num_data=X_train.shape[0]
@@ -241,15 +235,12 @@ class DeepKernelRegressor:
         return loss
 
     def fit(self):
-        select_crit_key = "val_nll"
+        select_crit_key = "test_nll"
 
         X_train = self.dataset.train_dataset["samples"]
         Y_train = self.dataset.train_dataset["energies"]
-        # prepare train targets to be passed to `surrogate.set_train_data`
         Y_train = self.surrogate.reshape_targets(Y_train)
         Y_train = Y_train.to(dtype=list(self.surrogate.parameters())[0].dtype)
-        # X_test = self.dataset.test_dataset["samples"]
-        # Y_test = self.dataset.test_dataset["energies"]
 
         train_loader, test_loader = self.dataset.get_dataloader()
 
@@ -374,8 +365,8 @@ class DeepKernelRegressor:
                 #     )
 
             # use validation NLL for model selection
-            select_crit = metrics.get("val_nll", None)
-            if self.surrogate.early_stopping:
+            select_crit = metrics.get(select_crit_key, None)
+            if self.surrogate.early_stopping and select_crit is not None:
                 # and select_crit is not None:
                 assert (
                     self.surrogate.holdout_ratio > 0.0

@@ -5,7 +5,6 @@ from torch import nn, Tensor
 from torch.nn import functional as F
 import hydra
 
-# from lambo.models.lanmt import fit_lanmt_model
 from .masked_layers import mResidualBlock
 from gflownet.utils.common import set_device, set_float_precision
 
@@ -47,10 +46,6 @@ class LanguageModel(nn.Module):
         self.mask_ratio = mask_ratio
 
     def forward(self, inputs):  # torch.Size([426, 36])
-        # if isinstance(inputs, np.ndarray):
-        # tok_idxs = self.str_to_tokens(inputs)
-        # else:
-        # tok_idxs = inputs  # torch.Size([426, 36])
         return self.model(inputs)
 
     def pool_features(self, src_tok_features, src_mask):

@@ -1,17 +1,8 @@
 import math
-
 import numpy as np
 import torch
-
-# import torchvision
-import wandb
-
 from torch.nn import functional as F
 from torch import LongTensor
-
-# from lambo import transforms as gfp_transform/s, dataset as gfp_dataset
-# from lambo.models.shared_elements import check_early_stopping
-# from lambo.utils import str_to_tokens
 
 
 def sample_mask(
@@ -44,34 +35,6 @@ def sample_mask(
         mask_weights, mask_size, replacement=False
     )  # torch.Size([32, 7])
     return mask_idxs.detach().cpu().numpy()
-
-
-def mlm_train_step(model, optimizer, token_batch, mask_ratio, loss_scale=1.0):
-    optimizer.zero_grad(set_to_none=True)
-
-    # replace random tokens with mask token
-    mask_idxs = sample_mask(token_batch, model.tokenizer, mask_ratio)  # (32, 5)
-    masked_token_batch = token_batch.clone().to(model.device)
-    np.put_along_axis(
-        masked_token_batch, mask_idxs, model.tokenizer.masking_idx, axis=1
-    )  # masking_idx = 4
-
-    # get predicted logits for masked tokens
-    logits, _ = model.logits_from_tokens(masked_token_batch)
-    vocab_size = logits.shape[-1]
-    masked_logits = np.take_along_axis(logits, mask_idxs[..., None], axis=1).view(
-        -1, vocab_size
-    )  # torch.Size([160, 26])
-
-    # use the ground-truth tokens as labels
-    masked_tokens = np.take_along_axis(token_batch, mask_idxs, axis=1)
-    masked_tokens = masked_tokens.view(-1).to(model.device)  # torch.Size([160])
-
-    loss = loss_scale * F.cross_entropy(masked_logits, masked_tokens)
-    loss.backward()
-    optimizer.step()
-
-    return loss, masked_logits, masked_tokens
 
 
 def mlm_eval_epoch(model, eval_loader, mask_ratio):
