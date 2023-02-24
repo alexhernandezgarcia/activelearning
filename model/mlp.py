@@ -76,8 +76,8 @@ class MLP(nn.Module):
 
         """
         # Pads the tensor till maximum length of dataset
-        input = torch.zeros(x.shape[0], self.init_layer_depth)
-        input[:, : x.shape[1]] = x
+        # input = torch.zeros(x.shape[0], self.init_layer_depth).to(x.device)
+        # input[:, : x.shape[1]] = x
         # Performs a forward call
         return self.model(x)
 
