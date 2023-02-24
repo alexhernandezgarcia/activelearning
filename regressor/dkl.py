@@ -24,23 +24,25 @@ class Tokenizer:
     def __init__(self, non_special_vocab):
         self.non_special_vocab = non_special_vocab
         # skipped UNK and 0
-        self.special_vocab = ["[SEP]", "[CLS]", "[PAD]", "[MASK]"]
+        self.special_vocab = ["[EOS]", "[CLS]", "[PAD]", "[MASK]"]
+        special_dict = dict.fromkeys(self.special_vocab)
+        non_special_dict = dict.fromkeys(self.non_special_vocab)
+        special_vocab_dict = dict.fromkeys(x for x in special_dict if x not in non_special_dict)
+        self.special_vocab = list(special_vocab_dict.keys())
+        # remove duplicates (like if [EOS] and [PAD] were already in the dataset)
         self.full_vocab = self.non_special_vocab + self.special_vocab
         self.lookup = {a: i for (i, a) in enumerate(self.full_vocab)}
         self.inverse_lookup = {i: a for (i, a) in enumerate(self.full_vocab)}
-        # self.lookup["[PAD]"] = -2
-        # self.inverse_lookup[-2] = "[PAD]"
         padding_token = "[PAD]"
         masking_token = "[MASK]"
         bos_token = "[CLS]"
-        eos_token = "[SEP]"
+        eos_token = "[EOS]"
         self.padding_idx = self.lookup[padding_token]
-        assert self.padding_idx == 22
         self.masking_idx = self.lookup[masking_token]
         self.bos_idx = self.lookup[bos_token]
         self.eos_idx = self.lookup[
             eos_token
-        ]  # preferably ensure eos here is the same eos in gfn
+        ]
         self.sampling_vocab = non_special_vocab
         self.special_idxs = [
             self.padding_idx,
@@ -49,27 +51,16 @@ class Tokenizer:
             self.masking_idx,
         ]
 
-    def transform(self, list_of_seq_tensors):
-        # add [CLS] and [SEP] tokens to the beginning and end of each list in seq_list
-        # seq_list is a list of tensors
-        # return a list of lists
-        seq_list = [
-            torch.cat([torch.tensor([self.bos_idx]), seq, torch.tensor([self.eos_idx])])
-            for seq in list_of_seq_tensors
-        ]
-        states = pad_sequence(
-            seq_list,
-            batch_first=True,
-            padding_value=self.padding_idx,
-        )
-
-        # Add [CLS] and [SEP] tokens to the beginning and end of each sequence
-        # cls_tensor = torch.ones(seq_array.shape[0], 1).long() * self.bos_idx
-        # sep_tensor = torch.ones(seq_array.shape[0], 1).long() * self.eos_idx
-        # cls_tensor = cls_tensor.to(seq_array)
-        # sep_tensor = sep_tensor.to(seq_array)
-        # seq_array = torch.cat([cls_tensor, seq_array, sep_tensor], dim=1)
-        return states  # torch.Size([1280, 51])
+    def transform(self, sequence_tensor):
+        # for each tensor in tensor of tensors
+        # find the index of the first [PAD] token
+        #  replace that index with [EOS] token
+        index = [torch.where(sequence==self.padding_idx)[0][0] for sequence in sequence_tensor]
+        eos_tensor = torch.ones(sequence_tensor.shape[0], 1).long() * self.eos_idx
+        sequence_tensor = sequence_tensor.scatter(1, LongTensor(index).unsqueeze(1), eos_tensor)
+        bos_tensor = torch.ones(sequence_tensor.shape[0], 1).long() * self.bos_idx
+        sequence_tensor = torch.cat([bos_tensor, sequence_tensor], dim=-1)
+        return sequence_tensor
 
 
 class DeepKernelRegressor:
