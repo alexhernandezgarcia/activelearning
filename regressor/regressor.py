@@ -165,8 +165,8 @@ class DropoutRegressor:
         self.model.train(True)
         for x_batch, y_batch in tqdm(train_loader, disable=True):
             # Move self.device to class dataset instead
-            output = self.model(x_batch)
-            loss = F.mse_loss(output[:, 0], y_batch)
+            output = self.model(x_batch.to(self.device).to(self.float))
+            loss = F.mse_loss(output[:, 0], y_batch.to(self.device).to(self.float))
             if self.logger:
                 self.logger.log_metric("proxy_train_mse", loss.item())
             err_train.append(loss.data)
@@ -183,8 +183,8 @@ class DropoutRegressor:
         self.model.eval()
         with torch.no_grad():
             for x_batch, y_batch in tqdm(test_loader, disable=True):
-                output = self.model(x_batch)
-                loss = F.mse_loss(output[:, 0], y_batch)
+                output = self.model(x_batch.to(self.device).to(self.float))
+                loss = F.mse_loss(output[:, 0], y_batch.to(self.device).to(self.float))
                 if self.logger:
                     self.logger.log_metric("proxy_val_mse", loss.item())
                 err_test.append(loss.data)
