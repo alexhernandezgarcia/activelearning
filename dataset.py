@@ -373,14 +373,6 @@ class DataHandler:
         Updates the dataset stats
         Saves the updated dataset if save_data=True
         """
-        # TODO: Deprecate the "if" statement
-        # if self.save_data:
-        #     # load the saved dataset
-        #     dataset = np.load(self.data_path, allow_pickle=True)
-        #     self.dataset = dataset.item()
-        #     # index_col=False
-        # for fid in range(self.n_fid):
-        # fidelity[fidelity == fid] = self.env.oracle[fid].fid
         if self.n_fid > 1:
             states = [state + [fid.tolist()] for state, fid in zip(states, fidelity)]
         # remove duplicate rows from tensor states

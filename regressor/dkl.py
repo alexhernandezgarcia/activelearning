@@ -17,6 +17,7 @@ from model.mlm import mlm_eval_epoch
 from model.shared_elements import check_early_stopping
 import copy
 from torch.nn.utils.rnn import pad_sequence
+import os
 
 
 class Tokenizer:
@@ -81,6 +82,7 @@ class DeepKernelRegressor:
         surrogate,
         float_precision,
         tokenizer,
+        checkpoint,
         encoder_obj="mlm",
         batch_size=32,
         **kwargs,
@@ -119,40 +121,8 @@ class DeepKernelRegressor:
         )
 
         self.batch_size = batch_size
-
-    # def get_features(self, seq_array, batch_size=None, transform=True):
-    #     # batch_size not used
-    #     # if transform:
-    #     #     original_shape = seq_array.shape
-    #     #     flat_seq_array = seq_array.reshape(-1)
-    #     # else:
-    #     original_shape = seq_array.shape[:-1]
-    #     flat_seq_array = seq_array.flatten(end_dim=-2)
-
-    #     # Train transform = data augmentations + test transform
-
-    #     # if self.training and transform:
-    #     #     enc_seq_array = gfp_transforms.padding_collate_fn(
-    #     #         [self.train_transform(seq) for seq in flat_seq_array],
-    #     #         self.tokenizer.padding_idx,
-    #     #     )
-    #     # elif transform:  # transforms from string to int
-    #     #     enc_seq_array = gfp_transforms.padding_collate_fn(
-    #     #         [self.test_transform(seq) for seq in flat_seq_array],
-    #     #         self.tokenizer.padding_idx,
-    #     #     )
-    #     # else:
-    #     #     enc_seq_array = seq_array
-
-    #     enc_seq_array = seq_array.to(
-    #         self.device
-    #     )  # torch.Size([32, 36]), padded states
-    #     features = self.language_model(
-    #         enc_seq_array
-    #     )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
-
-    #     # TODO: what is original shape?
-    #     return features.view(*original_shape, -1)
+        if checkpoint:
+            self.logger.set_proxy_path(checkpoint)
 
     def initialize_surrogate(self, X_train, Y_train):
         # Is X_train 32 or 426?
@@ -276,9 +246,9 @@ class DeepKernelRegressor:
         best_loss, best_loss_epoch = None, 0
         stop = False
 
-        gp_optimizer = torch.optim.Adam(self.surrogate.param_groups)
-        gp_lr_sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            gp_optimizer,
+        optimizer = torch.optim.Adam(self.surrogate.param_groups)
+        lr_sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
             patience=math.ceil(self.surrogate.patience / 2.0),
             threshold=1e-3,
         )
@@ -306,7 +276,7 @@ class DeepKernelRegressor:
                         True
                     )  # inputs = 32 x 36, mask_ratio=0.125, loss_scale=1.
                     mlm_loss, _, _ = self.mlm_train_step(
-                        gp_optimizer,
+                        optimizer,
                         inputs,
                         self.surrogate.encoder.mask_ratio,
                         loss_scale=1.0,
@@ -321,13 +291,13 @@ class DeepKernelRegressor:
 
                 # train all params through supervised MLL objective
                 self.surrogate.requires_grad_(True)
-                gp_loss = self.gp_train_step(gp_optimizer, inputs, targets, self.mll)
+                gp_loss = self.gp_train_step(optimizer, inputs, targets, self.mll)
 
                 avg_train_loss += (mlm_loss.detach() + gp_loss.detach()) / len(
                     train_loader
                 )
 
-            gp_lr_sched.step(avg_train_loss)
+            lr_sched.step(avg_train_loss)
 
             metrics.update(
                 {
@@ -416,6 +386,9 @@ class DeepKernelRegressor:
         if self.surrogate.early_stopping:
             print(f"\n---- loading checkpoint from epoch {best_score_epoch} ----")
             self.surrogate.load_state_dict(best_weights)
+        self.logger.save_proxy(
+            self.surrogate, optimizer, epoch=best_score_epoch, final=True
+        )
         self.surrogate.requires_grad_(False)
         self.surrogate.train()  # clear caches
         self.surrogate.clear_cache()
@@ -423,3 +396,36 @@ class DeepKernelRegressor:
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
 
         # return records
+
+    def load_model(self):
+        """
+        Load and returns the model
+        """
+        name = (
+            self.logger.proxy_ckpt_path.stem + self.logger.context + "final" + ".ckpt"
+        )
+        path = self.logger.proxy_ckpt_path.parent / name
+
+        self.surrogate = hydra.utils.instantiate(
+            self.surrogate_config,
+            tokenizer=self.language_model.tokenizer,
+            encoder=self.language_model,
+            device=self.device,
+            float_precision=self.float,
+        )
+        optimizer = torch.optim.Adam(self.surrogate.param_groups)
+
+        # self.initialize_model()
+        if os.path.exists(path):
+            # make the following line cpu compatible
+            checkpoint = torch.load(path, map_location="cuda:0")
+            self.surrogate.load_state_dict(checkpoint["model_state_dict"])
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            self.surrogate.to(self.device).to(self.float)
+            for state in optimizer.state.values():  # move optimizer to GPU
+                for k, v in state.items():
+                    if isinstance(v, torch.Tensor):
+                        state[k] = v.to(self.device)
+            return True
+        else:
+            raise FileNotFoundError

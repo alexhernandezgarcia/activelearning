@@ -274,7 +274,9 @@ class LengthTransform(nn.Module):
         ):  # Always enters here in eval and mlm_train_step
             return src_tok_features, src_mask.bool()
         else:
-            raise NotImplementedError("Portion from lambo is commented out")
+            raise NotImplementedError(
+                "Lenght Tranb=formation nto supported here. Check Lambo."
+            )
 
         # src_arange = torch.arange(num_src_tokens).to(src_mask.device)
         # src_arange = src_arange.expand(batch_size, -1).unsqueeze(-1).float()  # (batch_size, num_src_tokens, 1)
