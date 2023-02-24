@@ -18,6 +18,7 @@ from model.shared_elements import check_early_stopping
 import copy
 from torch.nn.utils.rnn import pad_sequence
 import os
+from tqdm import tqdm
 
 
 class Tokenizer:
@@ -27,7 +28,9 @@ class Tokenizer:
         self.special_vocab = ["[EOS]", "[CLS]", "[PAD]", "[MASK]"]
         special_dict = dict.fromkeys(self.special_vocab)
         non_special_dict = dict.fromkeys(self.non_special_vocab)
-        special_vocab_dict = dict.fromkeys(x for x in special_dict if x not in non_special_dict)
+        special_vocab_dict = dict.fromkeys(
+            x for x in special_dict if x not in non_special_dict
+        )
         self.special_vocab = list(special_vocab_dict.keys())
         # remove duplicates (like if [EOS] and [PAD] were already in the dataset)
         self.full_vocab = self.non_special_vocab + self.special_vocab
@@ -40,9 +43,7 @@ class Tokenizer:
         self.padding_idx = self.lookup[padding_token]
         self.masking_idx = self.lookup[masking_token]
         self.bos_idx = self.lookup[bos_token]
-        self.eos_idx = self.lookup[
-            eos_token
-        ]
+        self.eos_idx = self.lookup[eos_token]
         self.sampling_vocab = non_special_vocab
         self.special_idxs = [
             self.padding_idx,
@@ -55,12 +56,29 @@ class Tokenizer:
         # for each tensor in tensor of tensors
         # find the index of the first [PAD] token
         #  replace that index with [EOS] token
-        index = [torch.where(sequence==self.padding_idx)[0][0] for sequence in sequence_tensor]
-        eos_tensor = torch.ones(sequence_tensor.shape[0], 1).long() * self.eos_idx
-        sequence_tensor = sequence_tensor.scatter(1, LongTensor(index).unsqueeze(1), eos_tensor)
-        bos_tensor = torch.ones(sequence_tensor.shape[0], 1).long() * self.bos_idx
+        index = [
+            torch.where(sequence == self.padding_idx)[0][0]
+            if sequence[-1] == self.padding_idx
+            else len(sequence)
+            for sequence in sequence_tensor
+        ]
+        pad_tensor = (
+            torch.zeros(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
+            * self.padding_idx
+        )
+        sequence_tensor = torch.cat([pad_tensor, sequence_tensor], dim=1)
+        eos_tensor = (
+            torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
+            * self.eos_idx
+        )
+        index = LongTensor(index).to(sequence_tensor.device).unsqueeze(1)
+        sequence_tensor = sequence_tensor.scatter(1, index, eos_tensor)
+        bos_tensor = (
+            torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
+            * self.bos_idx
+        )
         sequence_tensor = torch.cat([bos_tensor, sequence_tensor], dim=-1)
-        return sequence_tensor
+        return sequence_tensor.long()
 
 
 class DeepKernelRegressor:
@@ -88,7 +106,6 @@ class DeepKernelRegressor:
 
         # Dataset
         self.dataset = dataset
-        # self.n_samples = dataset.n_samples
 
         self.tokenizer = tokenizer
         # config_model.model["tokenizer"] = self.tokenizer
@@ -128,7 +145,6 @@ class DeepKernelRegressor:
             init_features = torch.cat(
                 batched_call(self.surrogate.get_features, X_train, self.batch_size)
             )
-            # try:
             self.surrogate.train()
             self.surrogate.init_inducing_points(
                 init_features
@@ -138,7 +154,8 @@ class DeepKernelRegressor:
                 Y_train.to(init_features),
                 noise_lb=1.0,
             )
-            print("variational initialization successful")
+            if self.progress:
+                print("variational initialization successful")
 
         self.mll = VariationalELBO(
             self.surrogate.likelihood, self.surrogate.model, num_data=X_train.shape[0]
@@ -153,7 +170,7 @@ class DeepKernelRegressor:
         masked_token_batch = token_batch.clone().to(self.language_model.device)
         np.put_along_axis(
             masked_token_batch, mask_idxs, self.tokenizer.masking_idx, axis=1
-        )  # masking_idx = 4
+        )
 
         # get predicted logits for masked tokens
         logits, _ = self.language_model.logits_from_tokens(masked_token_batch)
@@ -225,8 +242,8 @@ class DeepKernelRegressor:
         self.surrogate.cpu()  # avoid storing two copies of the weights on GPU
         best_weights = copy.deepcopy(self.surrogate.state_dict())
         self.surrogate.to(self.surrogate.device)
-        if best_score is not None:
-            print(f"starting val NLL: {best_score:.4f}")
+        if best_score is not None and self.progress is True:
+            print(f"starting Test NLL: {best_score:.4f}")
 
         self.initialize_surrogate(X_train, Y_train)
 
@@ -243,10 +260,10 @@ class DeepKernelRegressor:
             patience=math.ceil(self.surrogate.patience / 2.0),
             threshold=1e-3,
         )
-        # records = [start_metrics]
 
-        print("\n---- fitting all params ----")
-        for epoch_idx in range(self.surrogate.num_epochs):  # 128
+        print("\n---- fitting all SVGP params ----")
+        pbar = tqdm(range(1, self.surrogate.num_epochs + 1), disable=not self.progress)
+        for epoch_idx in pbar:  # 128
             metrics = {}
 
             # train encoder through supervised MLL objective
@@ -312,6 +329,11 @@ class DeepKernelRegressor:
                             self.surrogate.encoder.mask_ratio,
                         )
                     )
+                    if self.progress:
+                        description = "Train Loss: {:.4f} | Test NLL: {:.4f} | Test RMSE {:.4f}".format(
+                            avg_train_loss, metrics["test_nll"], metrics["test_rmse"]
+                        )
+                        pbar.set_description(description)
                 # elif has_encoder and encoder_obj == "lanmt":
                 #     if val_loader is not None:
                 #         metrics.update(
@@ -360,7 +382,6 @@ class DeepKernelRegressor:
                 )
             metrics.update(dict(best_loss=best_loss, best_loss_epoch=best_loss_epoch))
 
-            # records.append(metrics)
             log_prefix = "svgp"
             if len(log_prefix) > 0:
                 metrics = {
@@ -386,8 +407,6 @@ class DeepKernelRegressor:
         self.surrogate.eval()
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
 
-        # return records
-
     def load_model(self):
         """
         Load and returns the model
@@ -406,7 +425,6 @@ class DeepKernelRegressor:
         )
         optimizer = torch.optim.Adam(self.surrogate.param_groups)
 
-        # self.initialize_model()
         if os.path.exists(path):
             # make the following line cpu compatible
             checkpoint = torch.load(path, map_location="cuda:0")

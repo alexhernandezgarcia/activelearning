@@ -360,16 +360,16 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
             if isinstance(inputs, np.ndarray)
             else inputs
         )  # torch.Size([32, 16]) --> ita a tensor whenever it is called so far
-        res = self.base_cls.forward(self, features)  # torch.Size([32, 16])
+        res = self.base_cls.forward(
+            self, features
+        )  # MultivariateNormal(loc: torch.Size([32]), covariance_matrix: torch.Size([32, 32]), precision_matrix: torch.Size([32, 32]), scale_tril: torch.Size([32, 32]))
         return res
 
-    def posterior(self, inputs, output_indices=None, observation_noise=False, **kwargs):
+    def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
         self.clear_cache()
-        features = (
-            self.get_features(inputs, self.bs)
-            if isinstance(inputs, np.ndarray)
-            else inputs
-        )
+        # features = self.get_features(X.to(torch.long))
+        # if isinstance(X, np.ndarray)
+        # else X
         return self.base_cls.posterior(
             self, features, output_indices, observation_noise, **kwargs
         )
