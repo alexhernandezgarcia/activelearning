@@ -134,12 +134,16 @@ class DataHandler:
             states = [
                 torch.LongTensor(self.sfenv.readable2state(sample)) for sample in states
             ]
-            if self.sfenv.do_state_padding:
+            # AMP readable2state returns a list of tensors and can take a batch
+            # So maybe it would be worthwhile to use that directly
+            if hasattr(self.sfenv, "do_state_padding") and self.sfenv.do_state_padding:
                 states = pad_sequence(
                     states,
                     batch_first=True,
                     padding_value=self.sfenv.invalid_state_element,
                 )
+            else:
+                states = torch.stack(states)
         else:
             # for AMP this is the implementation
             # dataset = self.env.load_dataset()
