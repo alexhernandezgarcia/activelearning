@@ -44,8 +44,8 @@ class MultitaskGPRegressor:
     def fit(self):
         train = self.dataset.train_dataset
         train_x = train["samples"]
-        # HACK: we want to maximise the energy, so we multiply by -1
         train_y = train["energies"].unsqueeze(-1)
+        # HACK: we want to maximise the energy, so we multiply by -1
         train_y = train_y * (-1)
 
         self.init_model(train_x, train_y)
@@ -56,25 +56,28 @@ class MultitaskGPRegressor:
         mll.to(train_x)
         mll = fit_gpytorch_mll(mll)
 
-    def get_predictions(self, states):
+    def get_predictions(self, env, states):
+        states_proxy_input = states.clone()
+        states_proxy = env.statetorch2proxy(states_proxy_input)
         model = self.model
         model.eval()
         model.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            posterior = model.posterior(states)
+            posterior = model.posterior(states_proxy)
             y_mean = posterior.mean
             y_std = posterior.variance.sqrt()
         y_mean = y_mean.detach().cpu().numpy().squeeze(-1)
         y_std = y_std.detach().cpu().numpy().squeeze(-1)
         return y_mean, y_std
 
-    def get_metrics(self, env, states):
-        y_mean, y_std = self.get_predictions(states)
+    def get_metrics(self, y_mean, y_std, env, states):
+        state_oracle_input = states.clone()
         if hasattr(env, "call_oracle_per_fidelity"):
-            states, fidelity = env.statebatch2oracle(states)
-            targets = env.call_oracle_per_fidelity(states, fidelity).detach().cpu()
+            samples, fidelity = env.statebatch2oracle(state_oracle_input)
+            targets = env.call_oracle_per_fidelity(samples, fidelity).detach().cpu()
         elif hasattr(env, "oracle"):
-            targets = env.oracle(states).detach().cpu()
+            samples = env.statebatch2oracle(state_oracle_input)
+            targets = env.oracle(samples).detach().cpu()
         targets_numpy = targets.detach().cpu().numpy()
         # compute rmse between two numpy arrays
         rmse = np.sqrt(np.mean((y_mean - targets_numpy) ** 2))
@@ -85,9 +88,8 @@ class MultitaskGPRegressor:
         )
         return rmse, nll
 
-    def plot_predictions(self, states, length, rescale=None):
+    def plot_predictions(self, states, scores, length, rescale=None):
         n_fid = self.n_fid
-        scores, _ = self.get_predictions(states)
         n_states = int(length * length)
         states = states[:n_states]
         width = (n_fid) * 5
@@ -116,35 +118,8 @@ class MultitaskGPRegressor:
         return fig
 
     def evaluate_model(self, env, rescale):
-        n_fid = self.n_fid
-        # if n_fid == 1:
-        #     sfenv = env
-        # else:
-        #     mfenv = env
-        #     env = env.env
-        # if hasattr(env, "get_all_terminating_states") == False:
-        #     return None
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
-        # n_states = states.shape[0]
-        if n_fid > 1:
-            # fidelities = torch.zeros((len(states) * n_fid, 1)).to("cuda")
-            # for i in range(n_fid):
-            #     fidelities[i * len(states) : (i + 1) * len(states), 0] = mfenv.oracle[
-            #         i
-            #     ].fid
-            # states = states.repeat(n_fid, 1)
-            # state_fid = torch.cat([states, fidelities], dim=1)
-            state_fid = states
-            state_fid_proxy = env.statetorch2proxy(state_fid)
-            # if isinstance(state_fid_proxy, tuple):
-            #     state_fid_proxy = torch.concat(
-            #         (state_fid_proxy[0], state_fid_proxy[1]), dim=1
-            #     )
-        else:
-            state_fid = states
-            state_fid_proxy = env.statetorch2proxy(state_fid)
-            # fidelities = torch.ones((len(states), 1)).to(states.device) * env.oracle.fid
-            # state_fid_proxy = torch.cat([state_fid_proxy, fidelities], dim=1)
-        figure = self.plot_predictions(state_fid_proxy, env.length, rescale)
-        rmse, nll = self.get_metrics(env, state_fid_proxy)
+        y_mean, y_std = self.get_predictions(env, states)
+        rmse, nll = self.get_metrics(y_mean, y_std, env, states)
+        figure = self.plot_predictions(states, y_mean, env.length, rescale)
         return figure, rmse, nll

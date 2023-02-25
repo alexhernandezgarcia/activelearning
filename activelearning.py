@@ -173,7 +173,7 @@ def main(config):
                     plt.show()
                     plt.close()
                     logger.log_figure("gp_predictions", fig, use_context=True)
-                logger.log_metrics(metrics, use_context=True)
+                logger.log_metrics(metrics, use_context=False)
         if "proxy" in config:
             proxy = hydra.utils.instantiate(
                 config.proxy,
@@ -211,61 +211,70 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
-            state_proxy = env.statebatch2proxy(states)
-            if isinstance(state_proxy, list):
-                state_proxy = torch.FloatTensor(state_proxy).to(config.device)
             if proxy is not None:
+                state_proxy = env.statebatch2proxy(states)
+                if isinstance(state_proxy, list):
+                    state_proxy = torch.FloatTensor(state_proxy).to(config.device)
                 scores = env.proxy(state_proxy)
                 # to change desc/asc wrt higherIsBetter, and that should depend on proxy
                 idx_pick = torch.argsort(scores, descending=True)[
                     : config.n_samples
                 ].tolist()
                 picked_states = [states[i] for i in idx_pick]
-                if N_FID > 1:
-                    picked_states, picked_fidelity = zip(
-                        *[(state[:-1], state[-1]) for state in picked_states]
-                    )
-                    picked_fidelity = torch.LongTensor(picked_fidelity).to(
-                        config.device
-                    )
-                    picked_samples = env.env.statebatch2oracle(picked_states)
-                else:
-                    picked_samples = env.statebatch2oracle(picked_states)
             else:
-                picked_samples = state_proxy[: config.n_samples]
-                picked_states = picked_samples
-                if N_FID > 1:
-                    picked_states, picked_fidelity = zip(
-                        *[(state[:-1], state[-1]) for state in picked_states]
-                    )
+                picked_states = states
 
-            if N_FID == 1:
+            if N_FID > 1:
+                picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
+                # picked_states, picked_fidelity = zip(
+                #     *[(state[:-1], state[-1]) for state in picked_states]
+                # )
+                # picked_fidelity = torch.tensor(picked_fidelity).to(
+                #     config.device
+                # )
+                # picked_samples = env.env.statebatch2oracle(picked_states)
+                energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
+            else:
+                picked_samples = env.statebatch2oracle(picked_states)
                 energies = env.oracle(picked_samples)
                 picked_fidelity = None
-            else:
-                if config.env.proxy_state_format == "state":
-                    picked_states_oracle, picked_fidelity = env.statebatch2oracle(
-                        picked_samples
-                    )
-                    energies = env.call_oracle_per_fidelity(
-                        picked_states_oracle, picked_fidelity
-                    )
-                    # picked_states_oracle = env.statebatch2oracle(picked_samples)
-                    # # Specifically for Branin
-                    # picked_states_tensor = torch.tensor(
-                    #     picked_states, device=config.device, dtype=env.float
-                    # )
-                    # picked_states_tensor = (
-                    #     picked_states_tensor / config.multifidelity.rescale
-                    # )
-                    # picked_states_oracle = picked_states_tensor.tolist()
-                    # energies = env.call_oracle_per_fidelity(
-                    #     picked_states_oracle, picked_fidelity
-                    # )
-                else:
-                    energies = env.call_oracle_per_fidelity(
-                        picked_samples, picked_fidelity
-                    )
+            # else:
+            #     picked_states = states
+            #     picked_samples = env.statebatch2oracle(picked_states)
+            #     if N_FID > 1:
+            #         picked_states, picked_fidelity = zip(
+            #             *[(state[:-1], state[-1]) for state in picked_states]
+            #         )
+            #         picked_samples, picked_fidelity = env.env.statebatch2oracle(picked_states)
+            #     else:
+
+            # if N_FID == 1:
+            #     energies = env.oracle(picked_samples)
+            #     picked_fidelity = None
+            # else:
+            #     if config.env.proxy_state_format == "state":
+            #         picked_states_oracle, picked_fidelity = env.statebatch2oracle(
+            #             picked_samples
+            #         )
+            # energies = env.call_oracle_per_fidelity(
+            #     picked_states_oracle, picked_fidelity
+            # )
+            # picked_states_oracle = env.statebatch2oracle(picked_samples)
+            # # Specifically for Branin
+            # picked_states_tensor = torch.tensor(
+            #     picked_states, device=config.device, dtype=env.float
+            # )
+            # picked_states_tensor = (
+            #     picked_states_tensor / config.multifidelity.rescale
+            # )
+            # picked_states_oracle = picked_states_tensor.tolist()
+            # energies = env.call_oracle_per_fidelity(
+            #     picked_states_oracle, picked_fidelity
+            # )
+            # else:
+            #     energies = env.call_oracle_per_fidelity(
+            #         picked_samples, picked_fidelity
+            #     )
 
             if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
@@ -282,10 +291,10 @@ def main(config):
             path = logger.logdir / Path("gfn_samples.csv")
             df.to_csv(path)
             if N_FID == 1 or config.multifidelity.proxy == True:
-                if isinstance(picked_states[0], torch.Tensor):
-                    picked_states = torch.vstack(picked_states)
-                else:
-                    picked_states = list(picked_states)
+                # if isinstance(picked_states[0], torch.Tensor): #NOT USED
+                #     picked_states = torch.vstack(picked_states)
+                # else:
+                #     picked_states = list(picked_states)
                 data_handler.update_dataset(
                     picked_states, energies.tolist(), picked_fidelity
                 )

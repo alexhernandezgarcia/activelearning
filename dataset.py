@@ -132,7 +132,7 @@ class DataHandler:
             if scores == []:
                 scores = None
             states = [
-                torch.LongTensor(self.sfenv.readable2state(sample)) for sample in states
+                torch.tensor(self.sfenv.readable2state(sample)) for sample in states
             ]
             # AMP readable2state returns a list of tensors and can take a batch
             # So maybe it would be worthwhile to use that directly
@@ -154,9 +154,8 @@ class DataHandler:
                 states = (
                     torch.tensor(
                         self.sfenv.get_uniform_terminating_states(self.n_samples)
-                    )
-                    .to(self.device)
-                    .to(self.float)
+                    ).to(self.device)
+                    # .to(self.float)
                 )
             else:
                 raise ValueError(
@@ -168,9 +167,8 @@ class DataHandler:
             scores = torch.tensor(scores, dtype=self.float, device=self.device)
         if self.n_fid > 1 and self.fidelity.do == True:
             states, fidelities = self.generate_fidelities(states)
-            # specifically for discrete case (states) are integers
             fidelities = fidelities.to(states.device)
-            states = torch.cat([states, fidelities], dim=1).long()
+            states = torch.cat([states, fidelities], dim=1)  # .long()
             state_oracle, fid = self.env.statetorch2oracle(states)
             if scores is None:
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
@@ -203,8 +201,8 @@ class DataHandler:
                     train_scores = scores[train_index]
                     test_scores = scores[test_index]
                 # TODO: can we change this to dtype = self.float and device = cuda
-                train_states = train_states.long().to(self.device)
-                test_states = test_states.long().to(self.device)
+                train_states = train_states.to(self.device)  # long()
+                test_states = test_states.to(self.device)  # .long()
                 train_scores = train_scores.to(self.float).to(self.device)
                 test_scores = test_scores.to(self.float).to(self.device)
 
@@ -317,7 +315,7 @@ class DataHandler:
         if isinstance(state_proxy, tuple):
             state_proxy = torch.concat((state_proxy[0], state_proxy[1]), dim=1)
         if isinstance(state_proxy, list):
-            samples = torch.tensor(state_proxy, device=self.device, dtype=self.float)
+            samples = torch.tensor(state_proxy, device=self.device)
         else:
             samples = state_proxy
 
@@ -373,25 +371,6 @@ class DataHandler:
         Updates the dataset stats
         Saves the updated dataset if save_data=True
         """
-        # TODO: Deprecate the "if" statement
-        # if self.save_data:
-        #     # load the saved dataset
-        #     dataset = np.load(self.data_path, allow_pickle=True)
-        #     self.dataset = dataset.item()
-        #     # index_col=False
-        # for fid in range(self.n_fid):
-        # fidelity[fidelity == fid] = self.env.oracle[fid].fid
-        if self.n_fid > 1:
-            if isinstance(states, list):
-                states = [
-                    state + [fid.tolist()] for state, fid in zip(states, fidelity)
-                ]
-            else:
-                states = torch.cat((states, fidelity), dim=1)
-        # remove duplicate rows from tensor states
-        # get indices of unique rows
-        # states, index = torch.unique(torch.tensor(states), dim=0, return_inverse=True)
-        # energies = energies[index]
         readable_dataset = {
             "samples": [self.env.state2readable(state) for state in states],
             "energies": energies,
@@ -419,10 +398,10 @@ class DataHandler:
         states = self.env.statebatch2proxy(states)
         if isinstance(states, TensorType) == False:
             states = torch.tensor(
-                np.array(states), dtype=self.float, device=self.device
-            )
+                np.array(states), device=self.device
+            )  # dtype=self.float,
         else:
-            states = states.to(self.device, dtype=self.float)
+            states = states.to(self.device)  # dtype=self.float
         energies = torch.tensor(energies, dtype=self.float, device=self.device)
 
         if self.normalise_data:

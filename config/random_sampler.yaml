@@ -3,9 +3,9 @@
 defaults:
   # - _self_
   - env: grid
-  - oracle@_oracle_dict.1: branin1
-  - oracle@_oracle_dict.2: branin2
-  - oracle@_oracle_dict.3: branin3
+  - oracle@_oracle_dict.1: branin3
+  # - oracle@_oracle_dict.2: branin2
+  # - oracle@_oracle_dict.3: branin3
   # - oracle: amp
   - gflownet: random
   - user: nikita
