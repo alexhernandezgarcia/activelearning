@@ -40,7 +40,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         elif proxy_state_format == "ohe":
             self.statebatch2proxy = self.statebatch2policy
             self.statetorch2proxy = self.statetorch2policy
-        elif proxy_state_format == "raw":
+        elif proxy_state_format == "state":
             self.statebatch2proxy = self.state_tensor_from_list
             self.statetorch2proxy = self.state_only
             self.statetorch2oracle = self.state_from_statefid
@@ -343,7 +343,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_uniform_terminating_states(self, n_states: int) -> List[List]:
         if hasattr(self.env, "get_uniform_terminating_states"):
-            return self.env.get_uniform_terminating_states(n_states)
+            states = self.env.get_uniform_terminating_states(n_states)
+            fidelities = torch.randint(0, self.n_fid, (n_states,)).tolist()
+            state_fid = [state + [fid] for state, fid in zip(states, fidelities)]
+            return state_fid
         else:
             return None
 
@@ -369,7 +372,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         plt.show()
         plt.close()
         return fig
-    
+
     def plot_reward_distribution(self, states, **kwargs):
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
@@ -377,7 +380,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             samples_fid = [state[:-1] for state in states if state[-1] == fid]
             if hasattr(self.env, "plot_reward_distribution"):
                 axs[fid] = self.env.plot_reward_distribution(
-                    states = samples_fid, ax = axs[fid], title="Fidelity {}".format(fid)
+                    states=samples_fid, ax=axs[fid], title="Fidelity {}".format(fid)
                 )
             else:
                 return None
@@ -414,7 +417,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         traj_with_fidelity = current_traj[0]
         fidelity = traj_with_fidelity[-1]
         action_fidelity = (self.fid, fidelity)
-        action = tuple(list(action_fidelity) + [0] * (self.action_max_length - len(action_fidelity)))
+        action = tuple(
+            list(action_fidelity)
+            + [0] * (self.action_max_length - len(action_fidelity))
+        )
         current_traj = traj_with_fidelity[:-1]
         single_fid_traj_list, single_fid_traj_actions_list = self.env.get_trajectories(
             [], [], [current_traj], current_actions
@@ -422,7 +428,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         for idx in range(len(single_fid_traj_actions_list)):
             for action_idx in range(len(single_fid_traj_actions_list[idx])):
                 action = single_fid_traj_actions_list[idx][action_idx]
-                action = tuple(list(action) + [0] * (self.action_max_length - len(action)))
+                action = tuple(
+                    list(action) + [0] * (self.action_max_length - len(action))
+                )
                 single_fid_traj_actions_list[idx][action_idx] = action
         mf_traj_list = []
         mf_traj_actions_list = []

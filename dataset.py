@@ -151,9 +151,13 @@ class DataHandler:
             if self.progress:
                 print("Creating dataset of size: ", self.n_samples)
             if self.n_samples is not None:
-                states = torch.Tensor(
-                    self.sfenv.get_uniform_terminating_states(self.n_samples)
-                ).long()
+                states = (
+                    torch.tensor(
+                        self.sfenv.get_uniform_terminating_states(self.n_samples)
+                    )
+                    .to(self.device)
+                    .to(self.float)
+                )
             else:
                 raise ValueError(
                     "Train Dataset size is not provided. n_samples is None"
@@ -411,6 +415,8 @@ class DataHandler:
             states = torch.tensor(
                 np.array(states), dtype=self.float, device=self.device
             )
+        else:
+            states = states.to(self.device, dtype=self.float)
         energies = torch.tensor(energies, dtype=self.float, device=self.device)
 
         if self.normalise_data:

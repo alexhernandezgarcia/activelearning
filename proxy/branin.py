@@ -22,9 +22,12 @@ class Branin(Proxy):
         )
         if isinstance(states, TensorType) == False:
             states = torch.tensor(states, device=self.device, dtype=self.float)
-        # fidelity[:,0] = fidelity[:, 0] - 0.1
-        # states = states - 5
-        state_fid = torch.cat([states, fidelity], dim=1)
+        else:
+            states = states.to(self.device).to(self.float)
+        if states.shape[1] == 2:
+            state_fid = torch.cat([states, fidelity], dim=1)
+        else:
+            state_fid = states
         scores = self.task(state_fid)
         # scores = scores.unsqueeze(-1)
         return scores.to(self.device).to(self.float)

@@ -24,7 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="debug_test")
+@hydra.main(config_path="./config", config_name="random_sampler")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -78,9 +78,13 @@ def main(config):
             float_precision=config.float_precision,
         )
         oracles.append(oracle)
-        if hasattr(oracle, "plot_true_rewards"):
+        if hasattr(oracle, "plot_true_rewards") and N_FID > 1:
             axs[fid - 1] = oracle.plot_true_rewards(
                 env, axs[fid - 1], rescale=config.multifidelity.rescale
+            )
+        elif hasattr(oracle, "plot_true_rewards") and N_FID == 1:
+            axs = oracle.plot_true_rewards(
+                env, axs, rescale=config.multifidelity.rescale
             )
         else:
             do_figure = False
@@ -151,21 +155,37 @@ def main(config):
             logger.set_context(iter)
         if N_FID == 1 or config.multifidelity.proxy == True:
             regressor.fit()
-            if isinstance(regressor, MultitaskGPRegressor):
-                fig = plot_gp_predictions(env, regressor, config.multifidelity.rescale)
-                plt.tight_layout()
-                plt.show()
-                plt.close()
-                logger.log_figure("gp_predictions", fig, use_context=True)
-        proxy = hydra.utils.instantiate(
-            config.proxy,
-            regressor=regressor,
-            device=config.device,
-            float_precision=config.float_precision,
-            logger=logger,
-            oracle=oracles,
-            env=env,
-        )
+            if hasattr(regressor, "evaluate_model"):
+                metrics = {}
+                fig, rmse, nll = regressor.evaluate_model(
+                    env, config.multifidelity.rescale
+                )
+                metrics.update(
+                    {
+                        "proxy_rmse": rmse,
+                        "proxy_nll": nll,
+                    }
+                )
+                if fig is not None:
+                    # if isinstance(regressor, MultitaskGPRegressor):
+                    # fig = plot_gp_predictions(env, regressor, config.multifidelity.rescale)
+                    plt.tight_layout()
+                    plt.show()
+                    plt.close()
+                    logger.log_figure("gp_predictions", fig, use_context=True)
+                logger.log_metrics(metrics, use_context=True)
+        if "proxy" in config:
+            proxy = hydra.utils.instantiate(
+                config.proxy,
+                regressor=regressor,
+                device=config.device,
+                float_precision=config.float_precision,
+                logger=logger,
+                oracle=oracles,
+                env=env,
+            )
+        else:
+            proxy = None
         # fig = proxy.plot_context_points()
         # logger.log_figure("context_points", fig, True)
         # plot_context_points(env, proxy)
@@ -194,26 +214,32 @@ def main(config):
             state_proxy = env.statebatch2proxy(states)
             if isinstance(state_proxy, list):
                 state_proxy = torch.FloatTensor(state_proxy).to(config.device)
-            scores = env.proxy(state_proxy)
-            # to change desc/asc wrt higherIsBetter, and that should depend on proxy
-            idx_pick = torch.argsort(scores, descending=True)[
-                : config.n_samples
-            ].tolist()
-            picked_states = [states[i] for i in idx_pick]
-            if N_FID > 1:
-                picked_states, picked_fidelity = zip(
-                    *[(state[:-1], state[-1]) for state in picked_states]
-                )
-                picked_fidelity = torch.LongTensor(picked_fidelity).to(config.device)
-                picked_samples = env.env.statebatch2oracle(picked_states)
+            if proxy is not None:
+                scores = env.proxy(state_proxy)
+                # to change desc/asc wrt higherIsBetter, and that should depend on proxy
+                idx_pick = torch.argsort(scores, descending=True)[
+                    : config.n_samples
+                ].tolist()
+                picked_states = [states[i] for i in idx_pick]
+                if N_FID > 1:
+                    picked_states, picked_fidelity = zip(
+                        *[(state[:-1], state[-1]) for state in picked_states]
+                    )
+                    picked_fidelity = torch.LongTensor(picked_fidelity).to(
+                        config.device
+                    )
+                    picked_samples = env.env.statebatch2oracle(picked_states)
+                else:
+                    picked_samples = env.statebatch2oracle(picked_states)
             else:
-                picked_samples = env.statebatch2oracle(picked_states)
+                picked_samples = state_proxy
+                picked_states = picked_samples
 
             if N_FID == 1:
                 energies = env.oracle(picked_samples)
                 picked_fidelity = None
             else:
-                if config.env.proxy_state_format == "raw":
+                if config.env.proxy_state_format == "state":
                     # Specifically for Branin
                     picked_states_tensor = torch.tensor(
                         picked_states, device=config.device, dtype=env.float
@@ -230,7 +256,7 @@ def main(config):
                         picked_samples, picked_fidelity
                     )
 
-            if config.env.proxy_state_format == "ohe":
+            if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
                     picked_samples, energies, data_handler.train_dataset["samples"]
                 )
@@ -245,8 +271,12 @@ def main(config):
             path = logger.logdir / Path("gfn_samples.csv")
             df.to_csv(path)
             if N_FID == 1 or config.multifidelity.proxy == True:
+                if isinstance(picked_states, torch.Tensor):
+                    picked_states = picked_states.tolist()
+                else:
+                    picked_states = list(picked_states)
                 data_handler.update_dataset(
-                    list(picked_states), energies.tolist(), picked_fidelity
+                    picked_states, energies.tolist(), picked_fidelity
                 )
         del gflownet
         del proxy

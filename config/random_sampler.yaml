@@ -1,0 +1,89 @@
+# @package _global_
+
+defaults:
+  # - _self_
+  - env: grid
+  - oracle@_oracle_dict.1: branin3
+  # - oracle: amp
+  - gflownet: random
+  - user: nikita
+  - logger: wandb
+  - dataset: dataset
+  - regressor: mf_gp #dropout_regressor
+  - model: gp
+
+logger:
+  project_name: "RandomAgent"
+  test:
+    period: 1
+  oracle:
+    period: 1
+  do:
+    times: False
+    online: False
+  plot:
+    period: 1 #1000
+    first_it: True
+  tags:
+    - branin
+    - single_fidelity
+
+env:
+  reward_func: power
+  proxy_state_format: state
+  length: 10
+  reward_beta: 8.0
+  reward_norm: 0.1
+  buffer:
+    train:
+      path: null
+      n: null
+      seed: null
+      output_csv: null 
+    test:
+      path: null
+      type: all
+      output_pkl: buffer_data_test.csv
+      n: null
+      seed: null
+      output_csv: null 
+
+dataset:
+# TODO can we get rid of "do"
+  fidelity: 
+    do: False #add dependance on N_FID
+    mixed: null
+  n_samples: 30
+  split: all_train #random
+  dataloader:
+    train:
+      batch_size: null
+    test:
+      batch_size: null
+  path:
+    oracle_dataset: null
+
+# Number of objects to sample at the end of training
+# Sample 5*K and choose topK
+n_samples: 5
+# Random seeds
+seed: 0
+# Device
+device: cuda
+# Float precision
+float_precision: 32
+al_n_rounds: 15
+
+multifidelity:
+  toy: True
+  rescale: 1
+
+# Hydra config
+hydra:
+  # See: https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+    chdir: True
