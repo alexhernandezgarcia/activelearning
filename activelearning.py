@@ -191,7 +191,9 @@ def main(config):
                 env, config.n_samples * 5, train=False
             )
             if proxy is not None:
-                states = list(set(states))
+                states_tensor = torch.tensor(states)
+                states_tensor = states_tensor.unique(dim=0)
+                states = states_tensor.tolist()
                 state_proxy = env.statebatch2proxy(states)
                 if isinstance(state_proxy, list):
                     state_proxy = torch.FloatTensor(state_proxy).to(config.device)

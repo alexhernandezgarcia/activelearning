@@ -89,10 +89,6 @@ class SingleTaskGPRegressor:
 
     def plot_predictions(self, states, scores, length, rescale=1):
         n_fid = self.n_fid
-        if n_fid == 1:
-            title = "GP Predictions"
-        else:
-            title = "GP Predictions with fid {}/{}".format(0, n_fid)
         n_states = int(length * length)
         if states.shape[-1] == 3:
             states = states[:, :2]
@@ -113,6 +109,10 @@ class SingleTaskGPRegressor:
             ax.set_xticks(np.arange(start=0, stop=length, step=int(length / rescale)))
             ax.set_yticks(np.arange(start=0, stop=length, step=int(length / rescale)))
             ax.imshow(grid_scores)
+            if n_fid == 1:
+                title = "GP Predictions"
+            else:
+                title = "GP Predictions with fid {}/{}".format(fid, n_fid)
             ax.set_title(title)
             im = ax.imshow(grid_scores)
             divider = make_axes_locatable(ax)
