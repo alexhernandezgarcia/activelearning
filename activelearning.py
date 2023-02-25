@@ -14,6 +14,7 @@ from utils.multifidelity_toy import make_dataset, plot_gp_predictions
 import matplotlib.pyplot as plt
 from pathlib import Path
 import pandas as pd
+import numpy as np
 
 
 @hydra.main(config_path="./config", config_name="mf_rosenbrock")
@@ -137,7 +138,7 @@ def main(config):
             )
 
     for iter in range(1, config.al_n_rounds + 1):
-        print(f"\n Starting iteration {iter} of active learning")
+        print(f"\nStarting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
         if N_FID == 1 or config.multifidelity.proxy == True:
@@ -173,15 +174,6 @@ def main(config):
             )
         else:
             proxy = None
-        # fig = proxy.plot_context_points()
-        # logger.log_figure("context_points", fig, True)
-        # plot_context_points(env, proxy)
-        # plot_acquisition(env, 0, proxy)
-        # plot_acquisition(env, 1, proxy)
-        # plot_acquisition(env, 2, proxy)
-        # plot_predictions_oracle(env, 0)
-        # plot_predictions_oracle(env, 1)
-        # plot_predictions_oracle(env, 2)
 
         env.set_proxy(proxy)
         gflownet = hydra.utils.instantiate(
@@ -199,69 +191,28 @@ def main(config):
                 env, config.n_samples * 5, train=False
             )
             if proxy is not None:
+                states = list(set(states))
                 state_proxy = env.statebatch2proxy(states)
                 if isinstance(state_proxy, list):
                     state_proxy = torch.FloatTensor(state_proxy).to(config.device)
                 scores = env.proxy(state_proxy)
                 # to change desc/asc wrt higherIsBetter, and that should depend on proxy
-                idx_pick = torch.argsort(scores, descending=True)[
-                    : config.n_samples
-                ].tolist()
+                num_pick = min(config.n_samples, len(states))
+                idx_pick = torch.argsort(scores, descending=True)[:num_pick].tolist()
                 picked_states = [states[i] for i in idx_pick]
             else:
-                picked_states = states
+                print(
+                    "\nSince there is no proxy, we simply take the first {n_samples} number of states sampled (instead of sorting by energy)."
+                )
+                picked_states = states[: config.n_samples]
 
             if N_FID > 1:
                 picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
-                # picked_states, picked_fidelity = zip(
-                #     *[(state[:-1], state[-1]) for state in picked_states]
-                # )
-                # picked_fidelity = torch.tensor(picked_fidelity).to(
-                #     config.device
-                # )
-                # picked_samples = env.env.statebatch2oracle(picked_states)
                 energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
                 energies = env.oracle(picked_samples)
                 picked_fidelity = None
-            # else:
-            #     picked_states = states
-            #     picked_samples = env.statebatch2oracle(picked_states)
-            #     if N_FID > 1:
-            #         picked_states, picked_fidelity = zip(
-            #             *[(state[:-1], state[-1]) for state in picked_states]
-            #         )
-            #         picked_samples, picked_fidelity = env.env.statebatch2oracle(picked_states)
-            #     else:
-
-            # if N_FID == 1:
-            #     energies = env.oracle(picked_samples)
-            #     picked_fidelity = None
-            # else:
-            #     if config.env.proxy_state_format == "state":
-            #         picked_states_oracle, picked_fidelity = env.statebatch2oracle(
-            #             picked_samples
-            #         )
-            # energies = env.call_oracle_per_fidelity(
-            #     picked_states_oracle, picked_fidelity
-            # )
-            # picked_states_oracle = env.statebatch2oracle(picked_samples)
-            # # Specifically for Branin
-            # picked_states_tensor = torch.tensor(
-            #     picked_states, device=config.device, dtype=env.float
-            # )
-            # picked_states_tensor = (
-            #     picked_states_tensor / config.multifidelity.rescale
-            # )
-            # picked_states_oracle = picked_states_tensor.tolist()
-            # energies = env.call_oracle_per_fidelity(
-            #     picked_states_oracle, picked_fidelity
-            # )
-            # else:
-            #     energies = env.call_oracle_per_fidelity(
-            #         picked_samples, picked_fidelity
-            #     )
 
             if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
@@ -281,6 +232,9 @@ def main(config):
                 data_handler.update_dataset(
                     picked_states, energies.tolist(), picked_fidelity
                 )
+            if hasattr(env, "get_cost"):
+                avg_cost = np.mean(env.get_cost(picked_states, picked_fidelity))
+                logger.log_metrics({"post_al_cost": avg_cost}, use_context=False)
         del gflownet
         del proxy
 

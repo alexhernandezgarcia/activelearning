@@ -62,7 +62,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             maximize = self.proxy.maximize
         elif self.oracle is not None:
             maximize = self.oracle[0].maximize
-            print("Assumed that all Oracles have same maximize value.")
+            print("\nAssumed that all Oracles have same maximize value.")
         else:
             raise ValueError("Proxy and Oracle cannot be None together.")
         if maximize:
@@ -97,13 +97,13 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         transformed_fidelities = torch.zeros_like(fidelities)
         states = states[:, :-1]
         states = self.env.statebatch2state(states)
-        assert torch.eq(
-            torch.unique(fidelities).sort()[0],
-            torch.arange(self.n_fid)
-            .to(fidelities.device)
-            .to(fidelities.dtype)
-            .sort()[0],
-        ).all()
+        # assert torch.eq(
+        #     torch.unique(fidelities).sort()[0],
+        #     torch.arange(self.n_fid)
+        #     .to(fidelities.device)
+        #     .to(fidelities.dtype)
+        #     .sort()[0],
+        # ).all()
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
             transformed_fidelities[idx_fid] = self.oracle[fid].fid
@@ -112,7 +112,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def set_fidelity_costs(self):
         fidelity_costs = {}
         if hasattr(self.oracle[0], "fid") == False:
-            print("\n Oracle1 does not have fid. Re-assigning fid to all oracles")
+            print("\nOracle1 does not have fid. Re-assigning fid to all oracles. \n")
             # if anyone of the oracles dont have fid, fid is reassigned to all oracles
             for idx in range(self.n_fid):
                 setattr(self.oracle[idx], "fid", idx)
@@ -334,17 +334,18 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         state_fid_policy = torch.cat((state_policy, fid_policy), dim=1)
         return state_fid_policy
 
-    # TODO: Deprecate as never used.
-    # def statebatch2oracle(self, states: List[List]):
-    #     # Simply call env.statebatch2oracle
-    #     # No need to input fidelity because fid given as separate input to call_per_fidelity
-    #     states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
-    #     state_oracle = self.env.statebatch2oracle(states)
-    #     fid_torch = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
-    #     # TODO: fix assertion -- runs into tuple error
-    #     # assert torch.where(fid_torch == -1)[0].shape == 0
-    #     state_fid = torch.concatenate((state_oracle, fid_torch), axis=1)
-    #     return state_fid
+    def statebatch2oracle(self, states: List[List]):
+        states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
+        state_oracle = self.env.statebatch2oracle(states)
+        fidelities = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
+        transformed_fidelities = torch.zeros_like(fidelities)
+        for fid in range(self.n_fid):
+            idx_fid = torch.where(fidelities == fid)[0]
+            if idx_fid.shape[0] > 0:
+                transformed_fidelities[idx_fid] = self.oracle[fid].fid
+        # TODO: fix assertion -- runs into tuple error
+        # assert torch.where(fid_torch == -1)[0].shape == 0
+        return state_oracle, transformed_fidelities
 
     def statetorch2oracle(
         self, states: TensorType["batch", "state_dim"]
@@ -352,15 +353,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         state_oracle = states[:, :-1]
         state_oracle = self.env.statetorch2oracle(state_oracle)
         fidelities = states[:, -1]
-        assert torch.eq(
-            torch.unique(fidelities), torch.arange(self.n_fid).to(fidelities.device)
-        ).all()
+        transformed_fidelities = torch.zeros_like(fidelities)
+        # assert torch.eq(
+        #     torch.unique(fidelities), torch.arange(self.n_fid).to(fidelities.device)
+        # ).all()
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
             if idx_fid.shape[0] > 0:
-                fidelities[idx_fid] = self.oracle[fid].fid
+                transformed_fidelities[idx_fid] = self.oracle[fid].fid
         # state_fid = torch.cat((state_oracle, fid), dim=1)
-        return state_oracle, fidelities
+        return state_oracle, transformed_fidelities
 
     def true_density(self):
         if self._true_density is not None:
@@ -387,8 +389,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def get_all_terminating_states(self) -> List[List]:
         if hasattr(self.env, "get_all_terminating_states"):
             states = self.env.get_all_terminating_states()
-            states = [state + [fid] for state in states for fid in range(self.n_fid)]
-            return states
+            if isinstance(states, TensorType):
+                states = states.to(self.device).to(self.float)
+            else:
+                states = torch.tensor(states, dtype=self.float, device=self.device)
+            fidelities = torch.zeros((len(states) * 3, 1)).to(states.device)
+            for i in range(self.n_fid):
+                fidelities[i * len(states) : (i + 1) * len(states), 0] = i
+            states = states.repeat(self.n_fid, 1)
+            state_fid = torch.cat([states, fidelities], dim=1)
+            return state_fid.tolist()
         else:
             return None
 
@@ -441,8 +451,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         plt.close()
         return fig
 
-    def get_cost(self, samples):
-        fidelities = [sample[-1] for sample in samples]
+    def get_cost(self, samples, fidelities=None):
+        if fidelities is None:
+            fidelities = [sample[-1] for sample in samples]
         fidelity_of__oracle = [self.oracle[int(fid)].fid for fid in fidelities]
         costs = [self.fidelity_costs[fid] for fid in fidelity_of__oracle]
         return costs

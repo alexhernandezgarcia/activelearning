@@ -12,8 +12,6 @@ class UCB(DropoutRegressor):
     def __init__(self, kappa, **kwargs) -> None:
         super().__init__(**kwargs)
         self.kappa = kappa
-        # if hasattr(self.regressor, "load_model") and not self.regressor.load_model():
-        # raise FileNotFoundError
 
     def __call__(self, inputs):
         # TODO: modify this. input arg would never be fids
@@ -37,8 +35,6 @@ class BotorchUCB(UCB):
     def __init__(self, sampler, **kwargs):
         super().__init__(**kwargs)
         self.sampler_config = sampler
-        # if not self.regressor.load_model():
-        # raise FileNotFoundError
         model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
         sampler = SobolQMCNormalSampler(
             sample_shape=torch.Size([self.sampler_config.num_samples]),

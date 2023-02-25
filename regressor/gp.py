@@ -31,6 +31,7 @@ class SingleTaskGPRegressor:
 
         # Logger
         self.progress = self.logger.progress
+        self.target_factor = -1
 
     @abstractmethod
     def init_model(self, train_x, train_y):
@@ -43,7 +44,7 @@ class SingleTaskGPRegressor:
         train_x = train["states"]
         train_y = train["energies"].unsqueeze(-1)
         # HACK: we want to maximise the energy, so we multiply by -1
-        train_y = train_y * (-1)
+        train_y = train_y * self.target_factor
 
         self.init_model(train_x, train_y)
 
@@ -75,8 +76,9 @@ class SingleTaskGPRegressor:
         elif hasattr(env, "oracle"):
             samples = env.statebatch2oracle(state_oracle_input)
             targets = env.oracle(samples).detach().cpu()
+        targets = targets * self.target_factor
         targets_numpy = targets.detach().cpu().numpy()
-        # compute rmse between two numpy arrays
+        targets_numpy = targets_numpy
         rmse = np.sqrt(np.mean((y_mean - targets_numpy) ** 2))
         nll = (
             -torch.distributions.Normal(torch.tensor(y_mean), torch.tensor(y_std))
@@ -85,14 +87,17 @@ class SingleTaskGPRegressor:
         )
         return rmse, nll
 
-    def plot_predictions(self, states, scores, length, rescale=None):
+    def plot_predictions(self, states, scores, length, rescale=1):
         n_fid = self.n_fid
         if n_fid == 1:
             title = "GP Predictions"
         else:
             title = "GP Predictions with fid {}/{}".format(0, n_fid)
         n_states = int(length * length)
-        states = states[:n_states]
+        if states.shape[-1] == 3:
+            states = states[:, :2]
+            states = torch.unique(states, dim=0)
+        # states = states[:n_states]
         width = (n_fid) * 5
         fig, axs = plt.subplots(1, n_fid, figsize=(width, 5))
         for fid in range(0, n_fid):

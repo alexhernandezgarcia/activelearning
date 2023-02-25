@@ -145,7 +145,7 @@ class DataHandler:
             # dataset = self.env.load_dataset()
             # for grid, I call uniform states. Need to make it uniform
             if self.progress:
-                print("Creating dataset of size: ", self.n_samples)
+                print("\nCreating dataset of size: ", self.n_samples)
             if self.n_samples is not None:
                 states = (
                     torch.tensor(
@@ -162,6 +162,7 @@ class DataHandler:
         if scores is not None:
             scores = torch.tensor(scores, dtype=self.float, device=self.device)
         if self.n_fid > 1 and self.fidelity.do == True:
+            # TODO: Use mfenv.get_uniform_terminating_states instead
             states, fidelities = self.generate_fidelities(states)
             fidelities = fidelities.to(states.device)
             states = torch.cat([states, fidelities], dim=1)  # .long()
@@ -180,7 +181,7 @@ class DataHandler:
             states_oracle_input = states.clone()
             state_oracle = self.env.statetorch2oracle(states)
             scores = self.env.oracle(state_oracle)
-        else:
+        elif self.n_fid > 1 and self.fidelity.do == False:
             raise NotImplementedError(
                 "Not implemented for when n_fid>1 and fidelity.do == False"
             )
@@ -213,13 +214,6 @@ class DataHandler:
             train_scores = scores.to(self.device)
             test_states = torch.Tensor([])
             test_scores = torch.Tensor([])
-            # else:
-            # train_samples, test_samples = (
-            #     dataset[0],
-            #     dataset[1],
-            # )
-            # train_targets = self.oracle(train_samples)
-            # test_targets = self.oracle(test_samples)
         # TODO: make general to sf
         if hasattr(self.sfenv, "statetorch2readable"):
             readable_train_samples = [
@@ -278,7 +272,7 @@ class DataHandler:
         # Log the dataset statistics
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            prefix = "Normalised " if self.normalise_data else ""
+            prefix = "\nNormalised " if self.normalise_data else "\n"
             print(prefix + "Dataset Statistics")
             print(
                 "Train Data \n \t Mean Score:{:.2f} \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
@@ -425,10 +419,10 @@ class DataHandler:
 
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            prefix = "Normalised " if self.normalise_data else ""
+            prefix = "\nNormalised " if self.normalise_data else "\n"
             print(prefix + "Updated Dataset Statistics")
             print(
-                "Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                "\n Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.train_stats["mean"],
                     self.train_stats["std"],
                     self.train_stats["min"],
@@ -437,7 +431,7 @@ class DataHandler:
             )
             if self.test_stats is not None:
                 print(
-                    "Test \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                    "\n Test \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                         self.test_stats["mean"],
                         self.test_stats["std"],
                         self.test_stats["min"],

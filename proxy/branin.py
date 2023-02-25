@@ -14,8 +14,9 @@ class Branin(Proxy):
 
     def plot_true_rewards(self, env, ax, rescale):
         states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
-        oracle_states = states / rescale
-        scores = self(oracle_states).detach().cpu().numpy()
+        states_input_oracle = states.clone()
+        states_oracle = env.statetorch2oracle(states_input_oracle)
+        scores = self(states_oracle).detach().cpu().numpy()
         if hasattr(self, "fid"):
             title = "Oracle Energy (TrainY) with fid {}".format(self.fid)
         else:
