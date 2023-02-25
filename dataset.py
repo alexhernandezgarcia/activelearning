@@ -169,6 +169,7 @@ class DataHandler:
         if self.n_fid > 1 and self.fidelity.do == True:
             states, fidelities = self.generate_fidelities(states)
             # specifically for discrete case (states) are integers
+            fidelities = fidelities.to(states.device)
             states = torch.cat([states, fidelities], dim=1).long()
             state_oracle, fid = self.env.statetorch2oracle(states)
             if scores is None:
@@ -381,7 +382,12 @@ class DataHandler:
         # for fid in range(self.n_fid):
         # fidelity[fidelity == fid] = self.env.oracle[fid].fid
         if self.n_fid > 1:
-            states = [state + [fid.tolist()] for state, fid in zip(states, fidelity)]
+            if isinstance(states, list):
+                states = [
+                    state + [fid.tolist()] for state, fid in zip(states, fidelity)
+                ]
+            else:
+                states = torch.cat((states, fidelity), dim=1)
         # remove duplicate rows from tensor states
         # get indices of unique rows
         # states, index = torch.unique(torch.tensor(states), dim=0, return_inverse=True)

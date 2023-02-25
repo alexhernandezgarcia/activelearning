@@ -55,6 +55,23 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.rescale = rescale
         self.reset()
 
+    def set_proxy(self, proxy):
+        self.proxy = proxy
+        if hasattr(self, "proxy_factor"):
+            return
+        if self.proxy is not None and self.proxy.maximize is not None:
+            # can be None for dropout regressor/UCB
+            maximize = self.proxy.maximize
+        elif self.oracle is not None:
+            maximize = self.oracle[0].maximize
+            print("Assumed that all Oracles have same maximize value.")
+        else:
+            raise ValueError("Proxy and Oracle cannot be None together.")
+        if maximize:
+            self.proxy_factor = 1.0
+        else:
+            self.proxy_factor = -1.0
+
     def state_from_statefid(self, state):
         states = state[:, :-1]
         states = states / self.rescale
@@ -74,7 +91,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         return states
 
     def state_tensor_from_list(self, state):
-        states = torch.tensor(state, dtype=self.float, device=self.device)
+        if isinstance(state, TensorType) == False:
+            states = torch.tensor(state, dtype=self.float, device=self.device)
+        else:
+            states = state.to(self.float).to(self.device)
         # replace all ones in the last column of tensor state with 0.75
         for fid in range(self.n_fid):
             states[states[:, -1] == fid, -1] = self.oracle[fid].fid
@@ -400,13 +420,13 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         if hasattr(self.env, "get_pairwise_distance"):
             return self.env.get_pairwise_distance(samples)
         else:
-            return None
+            return torch.zeros_like(samples)
 
     def get_distance_from_D0(self, samples, dataset_obs):
         if hasattr(self.env, "get_distance_from_D0"):
             return self.env.get_distance_from_D0(samples, dataset_obs)
         else:
-            return None
+            return torch.zeros_like(samples)
 
     def get_trajectories(
         self, traj_list, traj_actions_list, current_traj, current_actions

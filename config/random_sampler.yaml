@@ -3,7 +3,9 @@
 defaults:
   # - _self_
   - env: grid
-  - oracle@_oracle_dict.1: branin3
+  - oracle@_oracle_dict.1: branin1
+  - oracle@_oracle_dict.2: branin2
+  - oracle@_oracle_dict.3: branin3
   # - oracle: amp
   - gflownet: random
   - user: nikita
@@ -51,8 +53,8 @@ env:
 dataset:
 # TODO can we get rid of "do"
   fidelity: 
-    do: False #add dependance on N_FID
-    mixed: null
+    do: True #add dependance on N_FID
+    mixed: True
   n_samples: 30
   split: all_train #random
   dataloader:
@@ -77,6 +79,7 @@ al_n_rounds: 15
 multifidelity:
   toy: True
   rescale: 1
+  proxy: True
 
 # Hydra config
 hydra:

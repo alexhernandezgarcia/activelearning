@@ -28,7 +28,8 @@ class RandomSampler:
         energies = torch.sort(energies, descending=True)[0]
         if hasattr(self.env, "get_pairwise_distance"):
             pairwise_dists = self.env.get_pairwise_distance(samples)
-            pairwise_dists = torch.sort(pairwise_dists, descending=True)[0]
+            if pairwise_dists is not None:
+                pairwise_dists = torch.sort(pairwise_dists, descending=True)[0]
         else:
             pairwise_dists = torch.zeros_like(energies)
         dict_topk = {}

@@ -71,10 +71,11 @@ class MultitaskGPRegressor:
     def get_metrics(self, env, states):
         y_mean, y_std = self.get_predictions(states)
         if hasattr(env, "call_oracle_per_fidelity"):
-            raise NotImplementedError("MultiFidelity Scoring not Implemented Yet")
+            states, fidelity = env.statebatch2oracle(states)
+            targets = env.call_oracle_per_fidelity(states, fidelity).detach().cpu()
         elif hasattr(env, "oracle"):
             targets = env.oracle(states).detach().cpu()
-            targets_numpy = targets.detach().cpu().numpy()
+        targets_numpy = targets.detach().cpu().numpy()
         # compute rmse between two numpy arrays
         rmse = np.sqrt(np.mean((y_mean - targets_numpy) ** 2))
         nll = (
@@ -84,10 +85,11 @@ class MultitaskGPRegressor:
         )
         return rmse, nll
 
-    def plot_predictions(self, states, n_states, length, rescale=None):
+    def plot_predictions(self, states, length, rescale=None):
         n_fid = self.n_fid
-        states = states[:n_states]
         scores, _ = self.get_predictions(states)
+        n_states = int(length * length)
+        states = states[:n_states]
         width = (n_fid) * 5
         fig, axs = plt.subplots(1, n_fid, figsize=(width, 5))
         for fid in range(0, n_fid):
@@ -115,32 +117,34 @@ class MultitaskGPRegressor:
 
     def evaluate_model(self, env, rescale):
         n_fid = self.n_fid
-        if n_fid == 1:
-            env = env
-        else:
-            env = env.env
-        if hasattr(env, "get_all_terminating_states") == False:
-            return None
+        # if n_fid == 1:
+        #     sfenv = env
+        # else:
+        #     mfenv = env
+        #     env = env.env
+        # if hasattr(env, "get_all_terminating_states") == False:
+        #     return None
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
-        n_states = states.shape[0]
+        # n_states = states.shape[0]
         if n_fid > 1:
-            fidelities = torch.zeros((len(states) * n_fid, 1)).to("cuda")
-            for i in range(n_fid):
-                fidelities[i * len(states) : (i + 1) * len(states), 0] = env.oracle[
-                    i
-                ].fid
-            states = states.repeat(n_fid, 1)
-            state_fid = torch.cat([states, fidelities], dim=1)
+            # fidelities = torch.zeros((len(states) * n_fid, 1)).to("cuda")
+            # for i in range(n_fid):
+            #     fidelities[i * len(states) : (i + 1) * len(states), 0] = mfenv.oracle[
+            #         i
+            #     ].fid
+            # states = states.repeat(n_fid, 1)
+            # state_fid = torch.cat([states, fidelities], dim=1)
+            state_fid = states
             state_fid_proxy = env.statetorch2proxy(state_fid)
-            if isinstance(state_fid_proxy, tuple):
-                state_fid_proxy = torch.concat(
-                    (state_fid_proxy[0], state_fid_proxy[1]), dim=1
-                )
+            # if isinstance(state_fid_proxy, tuple):
+            #     state_fid_proxy = torch.concat(
+            #         (state_fid_proxy[0], state_fid_proxy[1]), dim=1
+            #     )
         else:
             state_fid = states
             state_fid_proxy = env.statetorch2proxy(state_fid)
             # fidelities = torch.ones((len(states), 1)).to(states.device) * env.oracle.fid
             # state_fid_proxy = torch.cat([state_fid_proxy, fidelities], dim=1)
-        figure = self.plot_predictions(state_fid_proxy, n_states, env.length, rescale)
+        figure = self.plot_predictions(state_fid_proxy, env.length, rescale)
         rmse, nll = self.get_metrics(env, state_fid_proxy)
         return figure, rmse, nll
