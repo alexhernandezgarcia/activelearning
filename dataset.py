@@ -24,7 +24,6 @@ class Data(Dataset):
         return len(self.X_data)
 
 
-# TODO: Rename samples to states
 class DataHandler:
     """
     Intialises the train data using env-specific train function
@@ -81,18 +80,15 @@ class DataHandler:
             fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1)).to(
                 self.float
             )
-            # for i in range(self.n_fid):
-            # fidelities[fidelities[:, 0] == i, 0] = self.env.oracle[i].fid
         else:
+            raise NotImplementedError(
+                "Logic not verified for when fidelity.mixed == False"
+            )
             # One for each sample
             fidelities = torch.zeros((n_samples * self.n_fid, 1)).to(self.device)
             for i in range(self.n_fid):
                 fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
-                # self.env.oracle[
-                # i
-                # ].fid
             states = [states for _ in range(self.n_fid)]
-            # TODO: return tensor states here instead of list
         return states, fidelities
 
     def initialise_dataset(self):
@@ -102,7 +98,7 @@ class DataHandler:
         OR
         Initialises the dataset using env-specific make_train_set function (returns a dataframe that is converted to a dictionary)
 
-        - dataset['samples']: list of arrays
+        - dataset['states']: list of arrays
         - dataset['energies']: list of float values
 
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
@@ -169,7 +165,8 @@ class DataHandler:
             states, fidelities = self.generate_fidelities(states)
             fidelities = fidelities.to(states.device)
             states = torch.cat([states, fidelities], dim=1)  # .long()
-            state_oracle, fid = self.env.statetorch2oracle(states)
+            states_oracle_input = states.clone()
+            state_oracle, fid = self.env.statetorch2oracle(states_oracle_input)
             if scores is None:
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
             # Grid
@@ -180,8 +177,13 @@ class DataHandler:
                 self.logger.log_figure("train_dataset", fig, use_context=True)
         # TODO: add clause for when n_fid> 1 but fidelity.do=False
         elif self.n_fid == 1 and scores is None:
+            states_oracle_input = states.clone()
             state_oracle = self.env.statetorch2oracle(states)
             scores = self.env.oracle(state_oracle)
+        else:
+            raise NotImplementedError(
+                "Not implemented for when n_fid>1 and fidelity.do == False"
+            )
 
         if hasattr(self.sfenv, "plot_reward_distribution"):
             fig = self.sfenv.plot_reward_distribution(scores=scores, title="Dataset")
@@ -237,11 +239,11 @@ class DataHandler:
             }
         # Save the raw (un-normalised) dataset
         self.logger.save_dataset(readable_train_dataset, "train")
-        self.train_dataset = {"samples": train_states, "energies": train_scores}
+        self.train_dataset = {"states": train_states, "energies": train_scores}
 
         self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
         self.train_data = Data(
-            self.train_dataset["samples"], self.train_dataset["energies"]
+            self.train_dataset["states"], self.train_dataset["energies"]
         )
 
         if len(test_states) > 0:
@@ -262,11 +264,11 @@ class DataHandler:
                     "energies": test_scores.tolist(),
                 }
             self.logger.save_dataset(readable_test_dataset, "test")
-            self.test_dataset = {"samples": test_states, "energies": test_scores}
+            self.test_dataset = {"states": test_states, "energies": test_scores}
 
             self.test_dataset, self.test_stats = self.preprocess(self.test_dataset)
             self.test_data = Data(
-                self.test_dataset["samples"], self.test_dataset["energies"]
+                self.test_dataset["states"], self.test_dataset["energies"]
             )
         else:
             self.test_dataset = None
@@ -298,28 +300,24 @@ class DataHandler:
 
     def preprocess(self, dataset):
         """
-        - converts samples to proxy space
+        - converts states to proxy space
         - normalises the energies
         - shuffles the data
         - splits the data into train and test
         """
-        samples = dataset["samples"]
+        states = dataset["states"]
         scores = dataset["energies"]
-        # Following is not needed in AMP. Not sure where it is needed
-        # if self.n_fid == 1 and self.path.oracle_dataset:
-        # state_batch = [self.env.readable2state(sample) for sample in samples]
-        # else:
-        state_batch = samples
-        state_proxy = self.env.statetorch2proxy(state_batch)
+        state_input_proxy = states.clone()
+        state_proxy = self.env.statetorch2proxy(state_input_proxy)
         # for when oracle is proxy and grid setup when oracle state is tensor
         if isinstance(state_proxy, tuple):
             state_proxy = torch.concat((state_proxy[0], state_proxy[1]), dim=1)
         if isinstance(state_proxy, list):
-            samples = torch.tensor(state_proxy, device=self.device)
+            states = torch.tensor(state_proxy, device=self.device)
         else:
-            samples = state_proxy
+            states = state_proxy
 
-        dataset = {"samples": samples, "energies": scores}
+        dataset = {"states": states, "energies": scores}
 
         stats = self.get_statistics(scores)
         if self.normalise_data:
@@ -412,8 +410,8 @@ class DataHandler:
         self.train_dataset["energies"] = torch.cat(
             (self.train_dataset["energies"], energies), dim=0
         )
-        self.train_dataset["samples"] = torch.cat(
-            (self.train_dataset["samples"], states), dim=0
+        self.train_dataset["states"] = torch.cat(
+            (self.train_dataset["states"], states), dim=0
         )
 
         self.train_stats = self.get_statistics(self.train_dataset["energies"])
@@ -422,7 +420,7 @@ class DataHandler:
                 self.train_dataset["energies"], self.train_stats
             )
         self.train_data = Data(
-            self.train_dataset["samples"], self.train_dataset["energies"]
+            self.train_dataset["states"], self.train_dataset["energies"]
         )
 
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
@@ -453,15 +451,15 @@ class DataHandler:
         dataset = pd.concat([dataset, pd.DataFrame(readable_dataset)])
         self.logger.save_dataset(dataset, "train")
 
-    def reshuffle(self):
-        # TODO: Deprecated. Remove once sure it's not used.
-        """
-        Reshuffle the entire dataset (called before creating train and test subsets)
-        """
-        self.samples, self.targets = shuffle(
-            self.samples.numpy(),
-            self.targets.numpy(),
-        )
+    # def reshuffle(self):
+    #     # TODO: Deprecated. Remove once sure it's not used.
+    #     """
+    #     Reshuffle the entire dataset (called before creating train and test subsets)
+    #     """
+    #     self.samples, self.targets = shuffle(
+    #         self.samples.numpy(),
+    #         self.targets.numpy(),
+    #     )
 
     def collate_batch(self, batch):
         """

@@ -4,14 +4,16 @@ from botorch.acquisition.monte_carlo import qUpperConfidenceBound
 from botorch.sampling import SobolQMCNormalSampler
 from .dropout_regressor import DropoutRegressor
 import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 class UCB(DropoutRegressor):
     def __init__(self, kappa, **kwargs) -> None:
         super().__init__(**kwargs)
         self.kappa = kappa
-        if not self.regressor.load_model():
-            raise FileNotFoundError
+        # if hasattr(self.regressor, "load_model") and not self.regressor.load_model():
+        # raise FileNotFoundError
 
     def __call__(self, inputs):
         # TODO: modify this. input arg would never be fids
@@ -35,8 +37,8 @@ class BotorchUCB(UCB):
     def __init__(self, sampler, **kwargs):
         super().__init__(**kwargs)
         self.sampler_config = sampler
-        if not self.regressor.load_model():
-            raise FileNotFoundError
+        # if not self.regressor.load_model():
+        # raise FileNotFoundError
         model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
         sampler = SobolQMCNormalSampler(
             sample_shape=torch.Size([self.sampler_config.num_samples]),
@@ -50,3 +52,72 @@ class BotorchUCB(UCB):
         inputs = inputs.unsqueeze(-2)
         acq_values = self.acqf(inputs)
         return acq_values
+
+
+class GaussianProcessUCB(UCB):
+    def __init__(self, sampler, env, logger, **kwargs):
+        super().__init__(**kwargs)
+        model = self.regressor.model
+        self.sampler_config = sampler
+        self.logger = logger
+        self.env = env
+        sampler = SobolQMCNormalSampler(
+            sample_shape=torch.Size([self.sampler_config.num_samples]),
+            seed=self.sampler_config.seed,
+        )
+        self.acqf = qUpperConfidenceBound(model=model, beta=self.kappa, sampler=sampler)
+        fig = self.plot_acquisition_rewards()
+        if fig is not None:
+            self.logger.log_figure("acquisition_rewards", fig, use_context=True)
+
+    def __call__(self, inputs):
+        if isinstance(inputs, np.ndarray):
+            inputs = torch.tensor(inputs, device=self.device, dtype=self.float)
+        else:
+            inputs = inputs.to(self.device)
+        inputs = inputs.unsqueeze(-2)
+        acq_values = self.acqf(inputs)
+        return acq_values
+
+    def plot_acquisition_rewards(self, **kwargs):
+        if hasattr(self.env, "get_all_terminating_states") == False:
+            return None
+        states = torch.tensor(
+            self.env.get_all_terminating_states(), dtype=self.float
+        ).to(self.device)
+        states_input_proxy = states.clone()
+        states_proxy = self.env.statetorch2proxy(states_input_proxy)
+        scores = self(states_proxy).detach().cpu().numpy()
+        width = 5
+        fig, axs = plt.subplots(1, 1, figsize=(width, 5))
+        if self.env.rescale != 1:
+            step = int(self.env.length / self.env.rescale)
+        else:
+            step = 1
+        index = states.long().detach().cpu().numpy()
+        grid_scores = np.zeros((self.env.length, self.env.length))
+        grid_scores[index[:, 0], index[:, 1]] = scores
+        axs.set_xticks(
+            np.arange(
+                start=0,
+                stop=self.env.length,
+                step=step,
+            )
+        )
+        axs.set_yticks(
+            np.arange(
+                start=0,
+                stop=self.env.length,
+                step=step,
+            )
+        )
+        axs.imshow(grid_scores)
+        axs.set_title("GP-UCB Reward")
+        im = axs.imshow(grid_scores)
+        divider = make_axes_locatable(axs)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig

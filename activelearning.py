@@ -12,19 +12,11 @@ import torch
 from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import make_dataset, plot_gp_predictions
 import matplotlib.pyplot as plt
-from regressor.gp import MultitaskGPRegressor
-
-# ToyOracle,
-# ,
-#     plot_acquisition,
-#     plot_context_points,
-#     plot_predictions_oracle,
-# )
 from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="random_sampler")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -71,7 +63,7 @@ def main(config):
     for fid in range(1, N_FID + 1):
         oracle = hydra.utils.instantiate(
             config._oracle_dict[str(fid)],
-            # required for toy oracle setups
+            # required for toy grid oracle setups
             oracle=true_oracle,
             env=env,
             device=config.device,
@@ -106,15 +98,10 @@ def main(config):
         oracle = oracles[0]
         env.oracle = oracle
 
-    # states = [[12, 5, 7], [3, 5, 12, 15]]
-    # states_tensor = torch.tensor([[12, 5, 7, -2], [3, 5, 12, 15]])
-    # tensor_policy_ohe = env.statetorch2policy(states_tensor)
-    # numpy_policy_ohe = env.statebatch2policy(states)
-    # print(tensor_policy_ohe)
-    # print(numpy_policy_ohe)
-    # torch_numpy_policy_ohe = torch.from_numpy(numpy_policy_ohe)
-    # # check tensor_policy_ohe and numpy_policy_ohe for equality
-    # assert torch.all(torch.eq(tensor_policy_ohe.detach().cpu(), torch_numpy_policy_ohe))
+    if "model" in config:
+        config_model = config.model
+    else:
+        config_model = None
 
     if N_FID == 1 or config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
@@ -129,7 +116,7 @@ def main(config):
         regressor = hydra.utils.instantiate(
             config.regressor,
             config_env=config.env,
-            config_model=config.model,
+            config_model=config_model,
             dataset=data_handler,
             device=config.device,
             float_precision=config.float_precision,
@@ -278,7 +265,7 @@ def main(config):
 
             if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
-                    picked_samples, energies, data_handler.train_dataset["samples"]
+                    picked_samples, energies, data_handler.train_dataset["states"]
                 )
 
             df = pd.DataFrame(
@@ -291,10 +278,6 @@ def main(config):
             path = logger.logdir / Path("gfn_samples.csv")
             df.to_csv(path)
             if N_FID == 1 or config.multifidelity.proxy == True:
-                # if isinstance(picked_states[0], torch.Tensor): #NOT USED
-                #     picked_states = torch.vstack(picked_states)
-                # else:
-                #     picked_states = list(picked_states)
                 data_handler.update_dataset(
                     picked_states, energies.tolist(), picked_fidelity
                 )

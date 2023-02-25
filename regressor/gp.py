@@ -4,19 +4,21 @@ from tqdm import tqdm
 import hydra
 from botorch.models.gp_regression_fidelity import (
     SingleTaskMultiFidelityGP,
+    SingleTaskGP,
 )
 from botorch.models.transforms.outcome import Standardize
 from botorch.fit import fit_gpytorch_mll
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from abc import abstractmethod
 
 """
 Assumes that in single fidelity, fid =1
 """
 
 
-class MultitaskGPRegressor:
+class SingleTaskGPRegressor:
     def __init__(self, logger, device, dataset, **kwargs):
 
         self.logger = logger
@@ -30,20 +32,15 @@ class MultitaskGPRegressor:
         # Logger
         self.progress = self.logger.progress
 
+    @abstractmethod
     def init_model(self, train_x, train_y):
         # m is output dimension
         # TODO: if standardize is the desired operation
-        self.model = SingleTaskMultiFidelityGP(
-            train_x,
-            train_y,
-            outcome_transform=Standardize(m=1),
-            # fid column
-            data_fidelity=self.n_fid - 1,
-        )
+        pass
 
     def fit(self):
         train = self.dataset.train_dataset
-        train_x = train["samples"]
+        train_x = train["states"]
         train_y = train["energies"].unsqueeze(-1)
         # HACK: we want to maximise the energy, so we multiply by -1
         train_y = train_y * (-1)
@@ -90,6 +87,10 @@ class MultitaskGPRegressor:
 
     def plot_predictions(self, states, scores, length, rescale=None):
         n_fid = self.n_fid
+        if n_fid == 1:
+            title = "GP Predictions"
+        else:
+            title = "GP Predictions with fid {}/{}".format(0, n_fid)
         n_states = int(length * length)
         states = states[:n_states]
         width = (n_fid) * 5
@@ -107,7 +108,7 @@ class MultitaskGPRegressor:
             ax.set_xticks(np.arange(start=0, stop=length, step=int(length / rescale)))
             ax.set_yticks(np.arange(start=0, stop=length, step=int(length / rescale)))
             ax.imshow(grid_scores)
-            ax.set_title("GP Predictions with fid {}/{}".format(fid, n_fid))
+            ax.set_title(title)
             im = ax.imshow(grid_scores)
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -123,3 +124,30 @@ class MultitaskGPRegressor:
         rmse, nll = self.get_metrics(y_mean, y_std, env, states)
         figure = self.plot_predictions(states, y_mean, env.length, rescale)
         return figure, rmse, nll
+
+
+class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
+    def __init__(self, logger, device, dataset, **kwargs):
+        super().__init__(logger, device, dataset, **kwargs)
+
+    def init_model(self, train_x, train_y):
+        self.model = SingleTaskMultiFidelityGP(
+            train_x,
+            train_y,
+            outcome_transform=Standardize(m=1),
+            # fid column
+            data_fidelity=self.n_fid - 1,
+        )
+
+
+class SingleFidelitySingleTaskRegressor(SingleTaskGPRegressor):
+    def __init__(self, logger, device, dataset, **kwargs):
+        super().__init__(logger, device, dataset, **kwargs)
+
+    def init_model(self, train_x, train_y):
+        self.model = SingleTaskGP(
+            train_x,
+            train_y,
+            outcome_transform=Standardize(m=1),
+            # fid column
+        )

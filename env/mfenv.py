@@ -75,31 +75,44 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             states = torch.tensor(states, dtype=self.float, device=self.device)
         else:
             states = states.to(self.float).to(self.device)
-        # states =
-        # replace all ones in the last column of tensor state with 0.75
+        fidelities = states[:, -1]
+        states = states[:, :-1]
+        states = self.env.statebatch2state(states)
+        # assert torch.eq(
+        #     torch.unique(fidelities).sort()[0], torch.arange(self.n_fid).to(fidelities.device).sort()[0]
+        # ).all()
+        # TODO: Assertion breaks when all fidelities aren't sampled by the gflownet
         for fid in range(self.n_fid):
-            states_fid = states[states[:, -1] == fid]
-            states_oracle = self.env.statebatch2state(states_fid, self.oracle[fid].fid)
-            states[states[:, -1] == fid] = states_oracle
-        # states[:, :-1] = states[:, :-1] / self.rescale
+            idx_fid = torch.where(fidelities == fid)[0]
+            fidelities[idx_fid] = self.oracle[fid].fid
+        states = torch.cat([states, fidelities.unsqueeze(-1)], dim=-1)
         return states
 
     def state_from_statefid(self, states):
         if isinstance(states, TensorType) == False:
             states = torch.tensor(states, dtype=self.float, device=self.device)
+        else:
+            states = states.to(self.float).to(self.device)
         fidelities = states[:, -1]
+        transformed_fidelities = torch.zeros_like(fidelities)
+        states = states[:, :-1]
+        states = self.env.statebatch2state(states)
         assert torch.eq(
-            torch.unique(fidelities), torch.arange(self.n_fid).to(fidelities.device)
+            torch.unique(fidelities).sort()[0],
+            torch.arange(self.n_fid)
+            .to(fidelities.device)
+            .to(fidelities.dtype)
+            .sort()[0],
         ).all()
         for fid in range(self.n_fid):
-            states_fid = states[states[:, -1] == fid]
-            states_oracle = self.env.statebatch2state(states_fid, self.oracle[fid].fid)
-            states[states[:, -1] == fid] = states_oracle
-        return states[:, :-1], states[:, -1].unsqueeze(-1)
+            idx_fid = torch.where(fidelities == fid)[0]
+            transformed_fidelities[idx_fid] = self.oracle[fid].fid
+        return states, transformed_fidelities.unsqueeze(-1)
 
     def set_fidelity_costs(self):
         fidelity_costs = {}
         if hasattr(self.oracle[0], "fid") == False:
+            print("\n Oracle1 does not have fid. Re-assigning fid to all oracles")
             # if anyone of the oracles dont have fid, fid is reassigned to all oracles
             for idx in range(self.n_fid):
                 setattr(self.oracle[idx], "fid", idx)
@@ -114,13 +127,18 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         return MultiFidelityEnvWrapper(**class_var, env=env_copy)
 
     def call_oracle_per_fidelity(self, state_oracle, fidelities):
-        assert torch.eq(
-            torch.unique(fidelities),
-            torch.tensor(
-                [self.oracle[fid].fid for fid in range(self.n_fid)],
-                device=fidelities.device,
-            ),
-        ).all()
+        if fidelities.ndim == 2:
+            fidelities = fidelities.squeeze(-1)
+        xx = torch.unique(fidelities).sort()[0]
+        yy = torch.tensor(
+            [self.oracle[fid].fid for fid in range(self.n_fid)],
+            device=fidelities.device,
+            dtype=fidelities.dtype,
+        ).sort()[0]
+        # TODO: Assertion breaks when all fidelities aren't sampled by gflownet
+        # assert torch.eq(
+        #     xx,
+        #     yy).all()
         scores = torch.zeros(
             (fidelities.shape[0]), dtype=self.float, device=self.device
         )
@@ -220,6 +238,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         return readable_state + ";" + fid
 
     def statetorch2readable(self, state=None):
+        assert torch.eq(state.to(torch.long), state).all()
+        state = state.to(torch.long)
         readable_state = self.env.statetorch2readable(state[:-1])
         fid = str(state[-1].detach().cpu().numpy())
         # if isinstance(readable_state, list):
