@@ -67,6 +67,7 @@ def main(config):
 
     if hasattr(env, "vocab"):
         tokenizer = Tokenizer(env.vocab)
+        env.set_tokenizer(tokenizer)
     else:
         tokenizer = None
 

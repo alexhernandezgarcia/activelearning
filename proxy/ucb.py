@@ -19,7 +19,6 @@ class UCB(DropoutRegressor):
             raise FileNotFoundError
 
     def __call__(self, inputs):
-        # TODO: modify this. input arg would never be fids
         """
         Args
             inputs: batch x obs_dim
@@ -56,14 +55,14 @@ class BotorchUCB(UCB):
         if isinstance(inputs, np.ndarray):
             inputs = torch.tensor(inputs, device=self.device, dtype=self.float)
         if isinstance(self.regressor, SurrogateDropoutRegressor) == False:
-            if inputs[0][0] != self.regressor.tokenizer.bos_idx:
-                input_tok = self.regressor.tokenizer.transform(inputs)
-            else:
-                input_tok = inputs
+            # if inputs[0][0] != self.regressor.tokenizer.bos_idx:
+            #     input_tok = self.regressor.tokenizer.transform(inputs)
+            # else:
+            #     input_tok = inputs
             (
                 input_tok_features,
                 input_mask,
-            ) = self.regressor.language_model.get_token_features(input_tok)
+            ) = self.regressor.language_model.get_token_features(inputs)
             _, pooled_features = self.regressor.language_model.pool_features(
                 input_tok_features, input_mask
             )

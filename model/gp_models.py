@@ -9,11 +9,8 @@ from gpytorch.mlls import ExactMarginalLogLikelihood, VariationalELBO
 from gpytorch.utils.memoize import clear_cache_hook
 from gpytorch import likelihoods, kernels
 
-# from lambo.models.base_surrogate import BaseSurrogate
-# from lambo import transforms as gfp_transforms
 from model.metrics import quantile_calibration
 
-# from .base_surrogate import fit_gp_surrogate
 from gpytorch.variational import IndependentMultitaskVariationalStrategy
 from gpytorch.settings import cholesky_jitter
 from gpytorch.lazy import ConstantDiagLazyTensor
@@ -371,7 +368,7 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         # if isinstance(X, np.ndarray)
         # else X
         return self.base_cls.posterior(
-            self, features, output_indices, observation_noise, **kwargs
+            self, X, output_indices, observation_noise, **kwargs
         )
 
     def set_train_data(self, inputs=None, targets=None, strict=True):

@@ -136,9 +136,9 @@ class DataHandler:
             states = [
                 torch.LongTensor(self.sfenv.readable2state(sample)) for sample in states
             ]
-            if self.tokenizer is not None:
-                states = torch.stack(states)
-                states = self.tokenizer.transform(states)
+            # if self.tokenizer is not None:
+            states = torch.stack(states)
+            # states = self.tokenizer.transform(states)
         else:
             # for AMP this is the implementation
             # dataset = self.env.load_dataset()
@@ -172,7 +172,9 @@ class DataHandler:
                 self.logger.log_figure("train_dataset", fig, use_context=True)
         # TODO: add clause for when n_fid> 1 but fidelity.do=False
         elif self.n_fid == 1 and scores is None:
-            state_oracle = self.env.statetorch2oracle(states)
+            state_oracle = self.env.statetorch2oracle(
+                states, bos_idx=self.tokenizer.bos_idx
+            )
             scores = self.env.oracle(state_oracle)
 
         if hasattr(self.sfenv, "plot_reward_distribution"):
@@ -213,7 +215,9 @@ class DataHandler:
         # TODO: make general to sf
         if hasattr(self.sfenv, "statetorch2readable"):
             readable_train_samples = [
-                self.env.statetorch2readable(sample, self.tokenizer.inverse_lookup, self.tokenizer.lookup)
+                self.env.statetorch2readable(
+                    sample, self.tokenizer.inverse_lookup, self.tokenizer.lookup
+                )
                 for sample in train_states
             ]
             readable_train_dataset = {
@@ -240,7 +244,11 @@ class DataHandler:
         if len(test_states) > 0:
             if hasattr(self.sfenv, "statetorch2readable"):
                 readable_test_samples = [
-                    self.env.statetorch2readable(sample, inverse_lookup = self.tokenizer.inverse_lookup, lookup=self.tokenizer.lookup)
+                    self.env.statetorch2readable(
+                        sample,
+                        inverse_lookup=self.tokenizer.inverse_lookup,
+                        lookup=self.tokenizer.lookup,
+                    )
                     for sample in test_states
                 ]
                 readable_test_dataset = {
