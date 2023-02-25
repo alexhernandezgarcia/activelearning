@@ -367,7 +367,7 @@ class DeepKernelRegressor:
             metrics.update(dict(best_score=best_score, best_epoch=best_score_epoch))
 
             # use train loss to determine convergence
-            stop_crit_key = "train_loss"
+            stop_crit_key = "test_nll"
             stop_crit = metrics.get(stop_crit_key, None)
             if stop_crit is not None:
                 best_loss, best_loss_epoch, _, stop = check_early_stopping(
