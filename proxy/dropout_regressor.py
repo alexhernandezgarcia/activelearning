@@ -8,7 +8,7 @@ class DropoutRegressor(Proxy):
         super().__init__(**kwargs)
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
-        if not self.regressor.load_model():
+        if hasattr(self.regressor, "load_model") and not self.regressor.load_model():
             raise FileNotFoundError
 
     def __call__(self, inputs):

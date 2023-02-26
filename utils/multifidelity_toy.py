@@ -139,8 +139,6 @@ def plot_gp_predictions(env, regressor, rescale):
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
         posterior = model.posterior(state_fid_proxy)
         mean = posterior.mean
-        # predictions = model.likelihood(model(state_fid_proxy))
-        # mean = predictions.mean
     scores = mean.detach().cpu().numpy().squeeze(-1)
     width = (n_fid) * 5
     fig, axs = plt.subplots(1, n_fid, figsize=(width, 5))

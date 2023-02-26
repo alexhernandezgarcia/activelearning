@@ -24,7 +24,6 @@ class Data(Dataset):
         return len(self.X_data)
 
 
-# TODO: Rename samples to states
 class DataHandler:
     """
     Intialises the train data using env-specific train function
@@ -81,18 +80,15 @@ class DataHandler:
             fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1)).to(
                 self.float
             )
-            # for i in range(self.n_fid):
-            # fidelities[fidelities[:, 0] == i, 0] = self.env.oracle[i].fid
         else:
+            raise NotImplementedError(
+                "Logic not verified for when fidelity.mixed == False"
+            )
             # One for each sample
             fidelities = torch.zeros((n_samples * self.n_fid, 1)).to(self.device)
             for i in range(self.n_fid):
                 fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
-                # self.env.oracle[
-                # i
-                # ].fid
             states = [states for _ in range(self.n_fid)]
-            # TODO: return tensor states here instead of list
         return states, fidelities
 
     def initialise_dataset(self):
@@ -102,7 +98,7 @@ class DataHandler:
         OR
         Initialises the dataset using env-specific make_train_set function (returns a dataframe that is converted to a dictionary)
 
-        - dataset['samples']: list of arrays
+        - dataset['states']: list of arrays
         - dataset['energies']: list of float values
 
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
@@ -132,7 +128,7 @@ class DataHandler:
             if scores == []:
                 scores = None
             states = [
-                torch.LongTensor(self.sfenv.readable2state(sample)) for sample in states
+                torch.tensor(self.sfenv.readable2state(sample)) for sample in states
             ]
             # AMP readable2state returns a list of tensors and can take a batch
             # So maybe it would be worthwhile to use that directly
@@ -149,11 +145,14 @@ class DataHandler:
             # dataset = self.env.load_dataset()
             # for grid, I call uniform states. Need to make it uniform
             if self.progress:
-                print("Creating dataset of size: ", self.n_samples)
+                print("\nCreating dataset of size: ", self.n_samples)
             if self.n_samples is not None:
-                states = torch.Tensor(
-                    self.sfenv.get_uniform_terminating_states(self.n_samples)
-                ).long()
+                states = (
+                    torch.tensor(
+                        self.sfenv.get_uniform_terminating_states(self.n_samples)
+                    ).to(self.device)
+                    # .to(self.float)
+                )
             else:
                 raise ValueError(
                     "Train Dataset size is not provided. n_samples is None"
@@ -163,10 +162,12 @@ class DataHandler:
         if scores is not None:
             scores = torch.tensor(scores, dtype=self.float, device=self.device)
         if self.n_fid > 1 and self.fidelity.do == True:
+            # TODO: Use mfenv.get_uniform_terminating_states instead
             states, fidelities = self.generate_fidelities(states)
-            # specifically for discrete case (states) are integers
-            states = torch.cat([states, fidelities], dim=1).long()
-            state_oracle, fid = self.env.statetorch2oracle(states)
+            fidelities = fidelities.to(states.device)
+            states = torch.cat([states, fidelities], dim=1)  # .long()
+            states_oracle_input = states.clone()
+            state_oracle, fid = self.env.statetorch2oracle(states_oracle_input)
             if scores is None:
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
             # Grid
@@ -177,8 +178,13 @@ class DataHandler:
                 self.logger.log_figure("train_dataset", fig, use_context=True)
         # TODO: add clause for when n_fid> 1 but fidelity.do=False
         elif self.n_fid == 1 and scores is None:
+            states_oracle_input = states.clone()
             state_oracle = self.env.statetorch2oracle(states)
             scores = self.env.oracle(state_oracle)
+        elif self.n_fid > 1 and self.fidelity.do == False:
+            raise NotImplementedError(
+                "Not implemented for when n_fid>1 and fidelity.do == False"
+            )
 
         if hasattr(self.sfenv, "plot_reward_distribution"):
             fig = self.sfenv.plot_reward_distribution(scores=scores, title="Dataset")
@@ -198,8 +204,8 @@ class DataHandler:
                     train_scores = scores[train_index]
                     test_scores = scores[test_index]
                 # TODO: can we change this to dtype = self.float and device = cuda
-                train_states = train_states.long().to(self.device)
-                test_states = test_states.long().to(self.device)
+                train_states = train_states.to(self.device)  # long()
+                test_states = test_states.to(self.device)  # .long()
                 train_scores = train_scores.to(self.float).to(self.device)
                 test_scores = test_scores.to(self.float).to(self.device)
 
@@ -208,13 +214,6 @@ class DataHandler:
             train_scores = scores.to(self.device)
             test_states = torch.Tensor([])
             test_scores = torch.Tensor([])
-            # else:
-            # train_samples, test_samples = (
-            #     dataset[0],
-            #     dataset[1],
-            # )
-            # train_targets = self.oracle(train_samples)
-            # test_targets = self.oracle(test_samples)
         # TODO: make general to sf
         if hasattr(self.sfenv, "statetorch2readable"):
             readable_train_samples = [
@@ -234,11 +233,11 @@ class DataHandler:
             }
         # Save the raw (un-normalised) dataset
         self.logger.save_dataset(readable_train_dataset, "train")
-        self.train_dataset = {"samples": train_states, "energies": train_scores}
+        self.train_dataset = {"states": train_states, "energies": train_scores}
 
         self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
         self.train_data = Data(
-            self.train_dataset["samples"], self.train_dataset["energies"]
+            self.train_dataset["states"], self.train_dataset["energies"]
         )
 
         if len(test_states) > 0:
@@ -259,11 +258,11 @@ class DataHandler:
                     "energies": test_scores.tolist(),
                 }
             self.logger.save_dataset(readable_test_dataset, "test")
-            self.test_dataset = {"samples": test_states, "energies": test_scores}
+            self.test_dataset = {"states": test_states, "energies": test_scores}
 
             self.test_dataset, self.test_stats = self.preprocess(self.test_dataset)
             self.test_data = Data(
-                self.test_dataset["samples"], self.test_dataset["energies"]
+                self.test_dataset["states"], self.test_dataset["energies"]
             )
         else:
             self.test_dataset = None
@@ -273,7 +272,7 @@ class DataHandler:
         # Log the dataset statistics
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            prefix = "Normalised " if self.normalise_data else ""
+            prefix = "\nNormalised " if self.normalise_data else "\n"
             print(prefix + "Dataset Statistics")
             print(
                 "Train Data \n \t Mean Score:{:.2f} \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
@@ -295,28 +294,24 @@ class DataHandler:
 
     def preprocess(self, dataset):
         """
-        - converts samples to proxy space
+        - converts states to proxy space
         - normalises the energies
         - shuffles the data
         - splits the data into train and test
         """
-        samples = dataset["samples"]
+        states = dataset["states"]
         scores = dataset["energies"]
-        # Following is not needed in AMP. Not sure where it is needed
-        # if self.n_fid == 1 and self.path.oracle_dataset:
-        # state_batch = [self.env.readable2state(sample) for sample in samples]
-        # else:
-        state_batch = samples
-        state_proxy = self.env.statetorch2proxy(state_batch)
+        state_input_proxy = states.clone()
+        state_proxy = self.env.statetorch2proxy(state_input_proxy)
         # for when oracle is proxy and grid setup when oracle state is tensor
         if isinstance(state_proxy, tuple):
             state_proxy = torch.concat((state_proxy[0], state_proxy[1]), dim=1)
         if isinstance(state_proxy, list):
-            samples = torch.tensor(state_proxy, device=self.device, dtype=self.float)
+            states = torch.tensor(state_proxy, device=self.device)
         else:
-            samples = state_proxy
+            states = state_proxy
 
-        dataset = {"samples": samples, "energies": scores}
+        dataset = {"states": states, "energies": scores}
 
         stats = self.get_statistics(scores)
         if self.normalise_data:
@@ -368,20 +363,6 @@ class DataHandler:
         Updates the dataset stats
         Saves the updated dataset if save_data=True
         """
-        # TODO: Deprecate the "if" statement
-        # if self.save_data:
-        #     # load the saved dataset
-        #     dataset = np.load(self.data_path, allow_pickle=True)
-        #     self.dataset = dataset.item()
-        #     # index_col=False
-        # for fid in range(self.n_fid):
-        # fidelity[fidelity == fid] = self.env.oracle[fid].fid
-        if self.n_fid > 1:
-            states = [state + [fid.tolist()] for state, fid in zip(states, fidelity)]
-        # remove duplicate rows from tensor states
-        # get indices of unique rows
-        # states, index = torch.unique(torch.tensor(states), dim=0, return_inverse=True)
-        # energies = energies[index]
         readable_dataset = {
             "samples": [self.env.state2readable(state) for state in states],
             "energies": energies,
@@ -409,8 +390,10 @@ class DataHandler:
         states = self.env.statebatch2proxy(states)
         if isinstance(states, TensorType) == False:
             states = torch.tensor(
-                np.array(states), dtype=self.float, device=self.device
-            )
+                np.array(states), device=self.device
+            )  # dtype=self.float,
+        else:
+            states = states.to(self.device)  # dtype=self.float
         energies = torch.tensor(energies, dtype=self.float, device=self.device)
 
         if self.normalise_data:
@@ -421,8 +404,8 @@ class DataHandler:
         self.train_dataset["energies"] = torch.cat(
             (self.train_dataset["energies"], energies), dim=0
         )
-        self.train_dataset["samples"] = torch.cat(
-            (self.train_dataset["samples"], states), dim=0
+        self.train_dataset["states"] = torch.cat(
+            (self.train_dataset["states"], states), dim=0
         )
 
         self.train_stats = self.get_statistics(self.train_dataset["energies"])
@@ -431,15 +414,15 @@ class DataHandler:
                 self.train_dataset["energies"], self.train_stats
             )
         self.train_data = Data(
-            self.train_dataset["samples"], self.train_dataset["energies"]
+            self.train_dataset["states"], self.train_dataset["energies"]
         )
 
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            prefix = "Normalised " if self.normalise_data else ""
+            prefix = "\nNormalised " if self.normalise_data else "\n"
             print(prefix + "Updated Dataset Statistics")
             print(
-                "Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                "\n Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.train_stats["mean"],
                     self.train_stats["std"],
                     self.train_stats["min"],
@@ -448,7 +431,7 @@ class DataHandler:
             )
             if self.test_stats is not None:
                 print(
-                    "Test \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
+                    "\n Test \n \t Mean Score:{:.2f}  \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                         self.test_stats["mean"],
                         self.test_stats["std"],
                         self.test_stats["min"],
@@ -462,15 +445,15 @@ class DataHandler:
         dataset = pd.concat([dataset, pd.DataFrame(readable_dataset)])
         self.logger.save_dataset(dataset, "train")
 
-    def reshuffle(self):
-        # TODO: Deprecated. Remove once sure it's not used.
-        """
-        Reshuffle the entire dataset (called before creating train and test subsets)
-        """
-        self.samples, self.targets = shuffle(
-            self.samples.numpy(),
-            self.targets.numpy(),
-        )
+    # def reshuffle(self):
+    #     # TODO: Deprecated. Remove once sure it's not used.
+    #     """
+    #     Reshuffle the entire dataset (called before creating train and test subsets)
+    #     """
+    #     self.samples, self.targets = shuffle(
+    #         self.samples.numpy(),
+    #         self.targets.numpy(),
+    #     )
 
     def collate_batch(self, batch):
         """

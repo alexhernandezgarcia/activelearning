@@ -16,4 +16,5 @@ wandb/
 logs/
 *.dat
 config/experiment/
-storage/amp/
+storage/
+previous_code/
