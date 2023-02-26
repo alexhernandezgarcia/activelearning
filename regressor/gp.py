@@ -106,13 +106,17 @@ class SingleTaskGPRegressor:
                 ax = axs
             else:
                 ax = axs[fid]
-            ax.set_xticks(np.arange(start=0, stop=length, step=int(length / rescale)))
-            ax.set_yticks(np.arange(start=0, stop=length, step=int(length / rescale)))
+            if self.rescale != 1:
+                step = int(length / rescale)
+            else:
+                step = 1
+            ax.set_xticks(np.arange(start=0, stop=length, step=step))
+            ax.set_yticks(np.arange(start=0, stop=length, step=step))
             ax.imshow(grid_scores)
             if n_fid == 1:
                 title = "GP Predictions"
             else:
-                title = "GP Predictions with fid {}/{}".format(fid, n_fid)
+                title = "GP Predictions with fid {}/{}".format(fid + 1, n_fid)
             ax.set_title(title)
             im = ax.imshow(grid_scores)
             divider = make_axes_locatable(ax)

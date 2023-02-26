@@ -218,14 +218,18 @@ class OracleMultiFidelityMES(MES):
         states = states[:n_states]
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        if self.env.env.rescale != 1:
+            step = int(self.env.env.length / self.env.env.rescale)
+        else:
+            step = 1
         for fid in range(0, self.n_fid):
             index = states.long().detach().cpu().numpy()
             grid_scores = np.zeros((self.env.env.length, self.env.env.length))
             grid_scores[index[:, 0], index[:, 1]] = scores[
                 fid * len(states) : (fid + 1) * len(states)
             ]
-            axs[fid].set_xticks(np.arange(self.env.env.length))
-            axs[fid].set_yticks(np.arange(self.env.env.length))
+            axs[fid].set_xticks(np.arange(start=0, stop=self.env.env.length, step=step))
+            axs[fid].set_yticks(np.arange(start=0, stop=self.env.env.length, step=step))
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
                 "Oracle-MES Reward with fid {}".format(self.env.oracle[fid].fid)
