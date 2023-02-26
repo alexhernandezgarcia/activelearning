@@ -216,27 +216,6 @@ class OracleMultiFidelityMES(MES):
         # states_proxy = torch.cat((states_proxy[0], states_proxy[1].unsqueeze(-1)), dim=1)
         scores = self(states_proxy).detach().cpu().numpy()
         states = states[:n_states]
-        # TODO: Update with MF -> get_all_terminating_states
-        # states = torch.tensor(
-        #     self.env.env.get_all_terminating_states(), dtype=self.float
-        # ).to(self.device)
-        # n_states = states.shape[0]
-        # fidelities = torch.zeros((len(states) * self.n_fid, 1), dtype=self.float).to(
-        #     self.device
-        # )
-        # for i in range(self.n_fid):
-        #     fidelities[i * len(states) : (i + 1) * len(states), 0] = self.env.oracle[
-        #         i
-        #     ].fid
-        # states = states.repeat(self.n_fid, 1)
-        # state_fid = torch.cat([states, fidelities], dim=1)
-        # states_oracle, fid = self.env.statetorch2oracle(state_fid)
-        # # Specific to grid as the states are transformed to oracle space on feeding to MES
-        # if isinstance(states_oracle, torch.Tensor):
-        #     states_fid_oracle = torch.cat([states_oracle, fid], dim=1)
-        # states = states[:n_states]
-
-        # scores = self(states_fid_oracle).detach().cpu().numpy()
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
         for fid in range(0, self.n_fid):
