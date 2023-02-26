@@ -35,8 +35,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.random_policy_output = self.fixed_policy_output
         if proxy_state_format == "oracle":
             # Assumes that all oracles required the same kind of transformed dtata
-            self.statebatch2proxy = self.statebatch2oracle
-            self.statetorch2proxy = self.statetorch2oracle
+            self.statebatch2proxy = self.statebatch2oracle_joined
+            self.statetorch2proxy = self.statetorch2oracle_joined
         elif proxy_state_format == "ohe":
             self.statebatch2proxy = self.statebatch2policy
             self.statetorch2proxy = self.statetorch2policy
@@ -69,6 +69,36 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             self.proxy_factor = 1.0
         else:
             self.proxy_factor = -1.0
+
+    def statebatch2oracle_joined(self, states):
+        # Specifically for Oracle MES and Oracle based MF Experiments
+        states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
+        state_oracle = self.env.statebatch2oracle(states)
+        fidelities = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
+        transformed_fidelities = torch.zeros_like(fidelities)
+        for fid in range(self.n_fid):
+            idx_fid = torch.where(fidelities == fid)[0]
+            if idx_fid.shape[0] > 0:
+                transformed_fidelities[idx_fid] = self.oracle[fid].fid
+        states = torch.cat([state_oracle, transformed_fidelities], dim=-1)
+        return states
+
+    def statetorch2oracle_joined(
+        self, states: TensorType["batch", "state_dim"]
+    ) -> TensorType["batch", "oracle_dim"]:
+        state_oracle = states[:, :-1]
+        state_oracle = self.env.statetorch2oracle(state_oracle)
+        fidelities = states[:, -1]
+        transformed_fidelities = torch.zeros_like(fidelities)
+        # assert torch.eq(
+        #     torch.unique(fidelities), torch.arange(self.n_fid).to(fidelities.device)
+        # ).all()
+        for fid in range(self.n_fid):
+            idx_fid = torch.where(fidelities == fid)[0]
+            if idx_fid.shape[0] > 0:
+                transformed_fidelities[idx_fid] = self.oracle[fid].fid
+        states = torch.cat([state_oracle, transformed_fidelities.unsqueeze(-1)], dim=-1)
+        return states
 
     def statebatch2state(self, states):
         if isinstance(states, TensorType) == False:
@@ -204,7 +234,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def state2policy(self, state: List = None):
         if state is None:
-            state = self.state.copy()
+            if isinstance(self.state, list):
+                state = self.state.copy()
+            elif isinstance(self.state, TensorType):
+                state = self.state.clone()
         state_policy = self.env.state2policy(state[:-1])
         fid_policy = np.zeros((self.n_fid), dtype=np.float32)
         if len(state) > 0 and state[-1] != -1:
