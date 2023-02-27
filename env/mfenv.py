@@ -328,7 +328,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 parents = [parent + [-1] for parent in parents_no_fid]
             else:
                 parents_tensor = torch.vstack(parents_no_fid)
-                fid_tensor = torch.ones_like(parents_tensor) * -1
+                fid_tensor = torch.ones((parents_tensor.shape[0], 1)) * -1
                 parents = torch.cat([parents_tensor, fid_tensor], dim=-1)
                 parents = list(parents)
         elif state[-1] != -1:
