@@ -15,9 +15,11 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from torchtyping import TensorType
+from typing import List, Tuple
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_amp_test")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -187,11 +189,6 @@ def main(config):
                 env, config.n_samples * 5, train=False
             )
             if proxy is not None:
-                if env.do_state_padding == False:
-                    # TODO: only possible if all states are same length
-                    states_tensor = torch.tensor(states)
-                    states_tensor = states_tensor.unique(dim=0)
-                    states = states_tensor.tolist()
                 state_proxy = env.statebatch2proxy(states)
                 if isinstance(state_proxy, list):
                     state_proxy = torch.FloatTensor(state_proxy).to(config.device)
