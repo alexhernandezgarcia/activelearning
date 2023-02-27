@@ -23,12 +23,13 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # TODO: super init kwargs
         super().__init__(**kwargs)
         self.env = env
+        self.is_state_list = True
+        if isinstance(self.env.source, TensorType):
+            self.is_state_list = False
         self.n_fid = n_fid
         self.fid = self.env.eos + 1
-        # Member variables of env are also member variables of MFENV
-        # function variables of mfenv are not updated with that of env
-        # TODO: can we skip this?
         vars(self).update(vars(self.env))
+        self.reset()
         self.action_space = self.get_actions_space()
         self.fixed_policy_output = self.get_fixed_policy_output()
         self.policy_input_dim = len(self.state2policy())
@@ -50,8 +51,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self._test_traj_list = []
         self._test_traj_actions_list = []
         # rescale is used to rescale the state to the range of the oracle
+        # TODO: might not be needed as is already member of env
         self.rescale = rescale
-        self.reset()
 
     def set_proxy(self, proxy):
         self.proxy = proxy
@@ -212,7 +213,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.env = self.env.reset(env_id)
         # If fid is required as a member variable
         # then it should not be named self.fid as self.fid represents fidelity action
-        self.state = self.env.state + [fid]
+        if self.is_state_list:
+            self.state = self.env.state + [fid]
+        else:
+            self.state = torch.cat([self.env.state, torch.tensor([fid])], dim=-1)
+        # self.state = self.env.state + [fid]
         # Update the variables that were reset and are required in mf
         self.fid_done = self.state[-1] != -1
         self.done = self.env.done and self.fid_done
@@ -222,7 +227,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_mask_invalid_actions_forward(self, state=None, done=None):
         if state is None:
-            state = self.state.copy()
+            if self.is_state_list:
+                state = self.state.copy()
+            else:
+                state = self.state.clone()
         if done is None:
             done = self.done
         if done:
@@ -234,14 +242,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def state2policy(self, state: List = None):
         if state is None:
-            if isinstance(self.state, list):
+            if self.is_state_list:
                 state = self.state.copy()
-            elif isinstance(self.state, TensorType):
+            else:
                 state = self.state.clone()
         state_policy = self.env.state2policy(state[:-1])
         fid_policy = np.zeros((self.n_fid), dtype=np.float32)
         if len(state) > 0 and state[-1] != -1:
             fid_policy[state[-1]] = 1
+        if self.is_state_list == False:
+            state_policy = state_policy.squeeze(0).detach().cpu().numpy()
         state_fid_policy = np.concatenate((state_policy, fid_policy), axis=0)
         return state_fid_policy
 
@@ -255,6 +265,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         index = np.where(fid_array != -1)[0]
         if index.size:
             fid_policy[index, fid_array[index]] = 1
+        if self.is_state_list == False:
+            state_policy = state_policy.squeeze(1).detach().cpu().numpy()
         state_fid_policy = np.concatenate((state_policy, fid_policy), axis=1)
         return state_fid_policy
 
@@ -267,7 +279,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def state2readable(self, state=None):
         readable_state = self.env.state2readable(state[:-1])
-        fid = str(state[-1])
+        if self.is_state_list:
+            fid = str(state[-1])
+        else:
+            fid = str(state[-1].detach().cpu().numpy())
         return readable_state + ";" + fid
 
     def statetorch2readable(self, state=None):
@@ -284,13 +299,22 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         fid = readable.split(";")[-1]
         readable_state = ";".join(readable.split(";")[:-1])
         state = self.env.readable2state(readable_state)
-        state = state + [int(fid)]
+        if self.is_state_list:
+            state = state + [int(fid)]
+        else:
+            state = torch.cat([state, torch.tensor([int(fid)])], dim=-1)
         return state
 
     def get_parents(self, state=None, done=None, action=None):
-        assert self.state[:-1] == self.env.state
+        if self.is_state_list:
+            assert self.state[:-1] == self.env.state
+        else:
+            assert torch.eq(self.state[:-1], self.env.state).all()
         if state is None:
-            state = self.state.copy()
+            if self.is_state_list:
+                state = self.state.copy()
+            else:
+                state = self.state.clone()
         if done is None:
             done = self.done
         parents_no_fid, actions = self.env.get_parents(state[:-1])
@@ -300,27 +324,43 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 for action in actions
             ]
         if state[-1] == -1:
-            parents = [parent + [-1] for parent in parents_no_fid]
+            if self.is_state_list:
+                parents = [parent + [-1] for parent in parents_no_fid]
+            else:
+                parents_tensor = torch.vstack(parents_no_fid)
+                fid_tensor = torch.ones_like(parents_tensor) * -1
+                parents = torch.cat([parents_tensor, fid_tensor], dim=-1)
+                parents = list(parents)
         elif state[-1] != -1:
             fid = state[-1]
-            parents = [parent + [fid] for parent in parents_no_fid]
-            parent = state[:-1] + [-1]
+            if self.is_state_list:
+                parents = [parent + [fid] for parent in parents_no_fid]
+                fid_parent = state[:-1] + [-1]
+            else:
+                fid = torch.tensor([fid], device=state.device)
+                parents = [
+                    torch.cat([parent, fid], dim=-1) for parent in parents_no_fid
+                ]
+                fid_parent = torch.cat([state[:-1], torch.tensor([-1])], dim=-1)
             actions.append(tuple([self.fid, fid] + [0] * (self.action_max_length - 2)))
-            parents.append(parent)
+            parents.append(fid_parent)
         # each parent must be of the same length for self.tfloat to work
         # Can we have getparents return tensor instead of list?
-        if self.env.do_state_padding and len(parents) > 0:
-            max_parent_length = max([len(parent) for parent in parents])
-            parents = [
-                parent[:-1]
-                + [self.env.invalid_state_element] * (max_parent_length - len(parent))
-                + [parent[-1]]
-                for parent in parents
-            ]
+        # if self.env.do_state_padding and len(parents) > 0:
+        #     max_parent_length = max([len(parent) for parent in parents])
+        #     parents = [
+        #         parent[:-1]
+        #         + [self.env.invalid_state_element] * (max_parent_length - len(parent))
+        #         + [parent[-1]]
+        #         for parent in parents
+        #     ]
         return parents, actions
 
     def step(self, action):
-        assert self.state[:-1] == self.env.state
+        if self.is_state_list:
+            assert self.state[:-1] == self.env.state
+        else:
+            assert torch.eq(self.state[:-1], self.env.state).all()
         assert self.done == (self.env.done and self.fid_done)
         if self.state[-1] == -1:
             assert self.n_actions == self.env.n_actions
@@ -344,7 +384,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             state, action, valid = self.env.step(env_action)
             if valid:
                 self.n_actions += 1
-            self.state = state + [fid]
+            if self.is_state_list:
+                self.state = state + [fid]
+            else:
+                fid = torch.tensor([fid], device=state.device)
+                self.state = torch.cat([state, fid], dim=-1)
             self.done = self.env.done and self.fid_done
             padded_action = tuple(list(action) + [0] * (self.action_pad_length))
             return self.state, padded_action, valid
@@ -503,47 +547,47 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         else:
             return torch.zeros_like(samples)
 
-    def get_trajectories(
-        self, traj_list, traj_actions_list, current_traj, current_actions
-    ):
-        # TODO: Optimize
-        mf_traj_list = []
-        mf_traj_actions_list = []
-        traj_with_fidelity = current_traj[0]
-        fidelity = traj_with_fidelity[-1]
-        action_fidelity = (self.fid, fidelity)
-        action = tuple(
-            list(action_fidelity)
-            + [0] * (self.action_max_length - len(action_fidelity))
-        )
-        current_traj = traj_with_fidelity[:-1]
-        single_fid_traj_list, single_fid_traj_actions_list = self.env.get_trajectories(
-            [], [], [current_traj], current_actions
-        )
-        for idx in range(len(single_fid_traj_actions_list)):
-            for action_idx in range(len(single_fid_traj_actions_list[idx])):
-                action = single_fid_traj_actions_list[idx][action_idx]
-                action = tuple(
-                    list(action) + [0] * (self.action_max_length - len(action))
-                )
-                single_fid_traj_actions_list[idx][action_idx] = action
-        mf_traj_list = []
-        mf_traj_actions_list = []
-        for traj_idx in range(len(single_fid_traj_list)):
-            num_traj_states = len(single_fid_traj_list[traj_idx])
-            for idx in range(num_traj_states):
-                trajs = copy.deepcopy(single_fid_traj_list[traj_idx])
-                traj_actions = single_fid_traj_actions_list[traj_idx].copy()
-                fidelity_traj = trajs[idx].copy()
-                fidelity_traj.append(fidelity)
-                trajs.insert(idx, fidelity_traj)
-                traj_actions.insert(idx, action_fidelity)
-                for j in range(idx):
-                    trajs[j].append(fidelity)
-                for k in range(idx + 1, len(trajs)):
-                    trajs[k].append(-1)
-                mf_traj_list.append(trajs)
-                mf_traj_actions_list.append(traj_actions)
-        # self._test_traj_list.append(mf_traj_list)
-        # self._test_traj_actions_list.append(mf_traj_actions_list)
-        return mf_traj_list, mf_traj_actions_list
+    # def get_trajectories(
+    #     self, traj_list, traj_actions_list, current_traj, current_actions
+    # ):
+    #     # TODO: Optimize
+    #     mf_traj_list = []
+    #     mf_traj_actions_list = []
+    #     traj_with_fidelity = current_traj[0]
+    #     fidelity = traj_with_fidelity[-1]
+    #     action_fidelity = (self.fid, fidelity)
+    #     action = tuple(
+    #         list(action_fidelity)
+    #         + [0] * (self.action_max_length - len(action_fidelity))
+    #     )
+    #     current_traj = traj_with_fidelity[:-1]
+    #     single_fid_traj_list, single_fid_traj_actions_list = self.env.get_trajectories(
+    #         [], [], [current_traj], current_actions
+    #     )
+    #     for idx in range(len(single_fid_traj_actions_list)):
+    #         for action_idx in range(len(single_fid_traj_actions_list[idx])):
+    #             action = single_fid_traj_actions_list[idx][action_idx]
+    #             action = tuple(
+    #                 list(action) + [0] * (self.action_max_length - len(action))
+    #             )
+    #             single_fid_traj_actions_list[idx][action_idx] = action
+    #     mf_traj_list = []
+    #     mf_traj_actions_list = []
+    #     for traj_idx in range(len(single_fid_traj_list)):
+    #         num_traj_states = len(single_fid_traj_list[traj_idx])
+    #         for idx in range(num_traj_states):
+    #             trajs = copy.deepcopy(single_fid_traj_list[traj_idx])
+    #             traj_actions = single_fid_traj_actions_list[traj_idx].copy()
+    #             fidelity_traj = trajs[idx].copy()
+    #             fidelity_traj.append(fidelity)
+    #             trajs.insert(idx, fidelity_traj)
+    #             traj_actions.insert(idx, action_fidelity)
+    #             for j in range(idx):
+    #                 trajs[j].append(fidelity)
+    #             for k in range(idx + 1, len(trajs)):
+    #                 trajs[k].append(-1)
+    #             mf_traj_list.append(trajs)
+    #             mf_traj_actions_list.append(traj_actions)
+    #     # self._test_traj_list.append(mf_traj_list)
+    #     # self._test_traj_actions_list.append(mf_traj_actions_list)
+    #     return mf_traj_list, mf_traj_actions_list
