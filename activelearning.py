@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="mf_corners_oracle_only")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -56,7 +56,11 @@ def main(config):
         device=config.device,
         float_precision=config.float_precision,
     )
-
+    if hasattr(env, "rescale"):
+        rescale = env.rescale
+    else:
+        rescale = 1.0
+    # TODO: Get rid of config.multifidelit.rescale and use env.rescale instead
     oracles = []
     width = (N_FID) * 5
     fig, axs = plt.subplots(1, N_FID, figsize=(width, 5))
@@ -72,13 +76,9 @@ def main(config):
         )
         oracles.append(oracle)
         if hasattr(oracle, "plot_true_rewards") and N_FID > 1:
-            axs[fid - 1] = oracle.plot_true_rewards(
-                env, axs[fid - 1], rescale=config.multifidelity.rescale
-            )
+            axs[fid - 1] = oracle.plot_true_rewards(env, axs[fid - 1], rescale=rescale)
         elif hasattr(oracle, "plot_true_rewards") and N_FID == 1:
-            axs = oracle.plot_true_rewards(
-                env, axs, rescale=config.multifidelity.rescale
-            )
+            axs = oracle.plot_true_rewards(env, axs, rescale=rescale)
         else:
             do_figure = False
     if do_figure:
@@ -93,7 +93,7 @@ def main(config):
             n_fid=N_FID,
             oracle=oracles,
             proxy_state_format=config.env.proxy_state_format,
-            rescale=config.multifidelity.rescale,
+            rescale=rescale,
         )
     else:
         oracle = oracles[0]
@@ -112,7 +112,7 @@ def main(config):
             oracle=oracle,
             device=config.device,
             float_precision=config.float_precision,
-            rescale=config.multifidelity.rescale,
+            rescale=rescale,
         )
         regressor = hydra.utils.instantiate(
             config.regressor,
@@ -145,9 +145,7 @@ def main(config):
             regressor.fit()
             if hasattr(regressor, "evaluate_model"):
                 metrics = {}
-                fig, rmse, nll = regressor.evaluate_model(
-                    env, config.multifidelity.rescale
-                )
+                fig, rmse, nll = regressor.evaluate_model(env)
                 metrics.update(
                     {
                         "proxy_rmse": rmse,

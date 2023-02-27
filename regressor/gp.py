@@ -106,7 +106,7 @@ class SingleTaskGPRegressor:
                 ax = axs
             else:
                 ax = axs[fid]
-            if self.rescale != 1:
+            if rescale != 1:
                 step = int(length / rescale)
             else:
                 step = 1
@@ -127,11 +127,11 @@ class SingleTaskGPRegressor:
         plt.close()
         return fig
 
-    def evaluate_model(self, env, rescale):
+    def evaluate_model(self, env):
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
         y_mean, y_std = self.get_predictions(env, states)
         rmse, nll = self.get_metrics(y_mean, y_std, env, states)
-        figure = self.plot_predictions(states, y_mean, env.length, rescale)
+        figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
         return figure, rmse, nll
 
 
