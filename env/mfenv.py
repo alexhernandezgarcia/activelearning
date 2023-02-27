@@ -18,7 +18,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     """
 
     def __init__(
-        self, env, n_fid, oracle, proxy_state_format=False, rescale=1, **kwargs
+        self, env, n_fid, oracle, proxy_state_format=False, **kwargs
     ):
         # TODO: super init kwargs
         super().__init__(**kwargs)
@@ -50,9 +50,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.fidelity_costs = self.set_fidelity_costs()
         self._test_traj_list = []
         self._test_traj_actions_list = []
-        # rescale is used to rescale the state to the range of the oracle
-        # TODO: might not be needed as is already member of env
-        self.rescale = rescale
 
     def set_proxy(self, proxy):
         self.proxy = proxy
@@ -344,16 +341,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 fid_parent = torch.cat([state[:-1], torch.tensor([-1])], dim=-1)
             actions.append(tuple([self.fid, fid] + [0] * (self.action_max_length - 2)))
             parents.append(fid_parent)
-        # each parent must be of the same length for self.tfloat to work
-        # Can we have getparents return tensor instead of list?
-        # if self.env.do_state_padding and len(parents) > 0:
-        #     max_parent_length = max([len(parent) for parent in parents])
-        #     parents = [
-        #         parent[:-1]
-        #         + [self.env.invalid_state_element] * (max_parent_length - len(parent))
-        #         + [parent[-1]]
-        #         for parent in parents
-        #     ]
         return parents, actions
 
     def step(self, action):
