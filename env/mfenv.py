@@ -19,7 +19,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def __init__(self, env, n_fid, oracle, proxy_state_format=None, **kwargs):
         # TODO: super init kwargs
-        super().__init__(oracle, **kwargs)
+        super().__init__(**kwargs)
         self.env = env
         self.is_state_list = True
         if isinstance(self.env.source, TensorType):
