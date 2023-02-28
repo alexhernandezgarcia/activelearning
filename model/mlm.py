@@ -42,12 +42,14 @@ def mlm_eval_epoch(model, eval_loader, mask_ratio):
         perplexity=0.0,
     )
     model.eval()  # LanguageModel
+    # print("\nUser-Defined Warning: Converting states in test loader to integer for mlm evaluation.")
     for minibatch in eval_loader:
         if isinstance(minibatch, tuple):
             token_batch = minibatch[0]  # torch.Size([32, 36])
         else:
             assert torch.is_tensor(minibatch)
             token_batch = minibatch
+        token_batch = token_batch.long()
         # token_batch is padded states
         # replace random tokens with mask token
         mask_idxs = sample_mask(token_batch, model.tokenizer, mask_ratio)  # (32, 5)

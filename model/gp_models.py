@@ -82,7 +82,9 @@ class BaseGPSurrogate(abc.ABC):
         # else:
         #     enc_seq_array = seq_array
 
-        enc_seq_array = seq_array.to(self.device)  # torch.Size([32, 36]), padded states
+        enc_seq_array = seq_array.to(self.device).to(
+            torch.long
+        )  # torch.Size([32, 36]), padded states
         features = self.encoder(
             enc_seq_array
         )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
@@ -129,6 +131,7 @@ class BaseGPSurrogate(abc.ABC):
     def evaluate(self, loader, *args, **kwargs):
         self.eval()
         targets, y_mean, y_std, f_std = [], [], [], []
+        # print("\nUser-Defined Warning: Converting states in test loader to integer for surrogate evaluation.")
         with torch.no_grad():
             for (
                 input_batch,
@@ -136,6 +139,7 @@ class BaseGPSurrogate(abc.ABC):
             ) in loader:
                 # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
+                input_batch = input_batch.to(torch.long)
                 features = self.get_features(
                     input_batch.to(self.device), transform=False
                 )  # torch.Size([45, 16])
@@ -352,6 +356,7 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
             clear_cache_hook(self.model.variational_strategy.base_variational_strategy)
 
     def forward(self, inputs):
+        assert isinstance(inputs, torch.Tensor)
         features = (
             self.get_features(inputs, self.bs)
             if isinstance(inputs, np.ndarray)
@@ -506,3 +511,20 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
             self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
                 1
             )
+
+
+# class SingleTaskSVGPMultiFidelity(BaseGPSurrogate, SingleTaskMultiFidelityVariationalGP, SingleTaskSVGP):
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+
+#     # def fit(self, Xs, Ys, Yvars=None, **kwargs):
+#     #     """Fit the surrogate model to the data.
+
+#     #     Args:
+#     #         Xs (list of np.ndarray): A list of input arrays.
+#     #         Ys (list of np.ndarray): A list of output arrays.
+#     #         Yvars (list of np.ndarray): A list of output variance arrays.
+#     #     """
+#     #     Xs = [Xs] if not isinstance(Xs, list) else Xs
+#     #     Ys = [Ys] if not isinstance(Ys, list) else Ys
+#     #     Yvars = [Yvars] if not isinstance(Yvars, list) else Yvars

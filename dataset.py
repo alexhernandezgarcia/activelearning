@@ -214,12 +214,19 @@ class DataHandler:
             # test_targets = self.oracle(test_samples)
         # TODO: make general to sf
         if hasattr(self.sfenv, "statetorch2readable"):
-            readable_train_samples = [
-                self.env.statetorch2readable(
-                    sample, self.tokenizer.inverse_lookup, self.tokenizer.lookup
-                )
-                for sample in train_states
-            ]
+            if self.tokenizer is not None:
+                readable_train_samples = [
+                    self.env.statetorch2readable(
+                        sample,
+                        inverse_lookup=self.tokenizer.inverse_lookup,
+                        lookup=self.tokenizer.lookup,
+                    )
+                    for sample in train_states
+                ]
+            else:
+                readable_train_samples = [
+                    self.env.statetorch2readable(sample) for sample in train_states
+                ]
             readable_train_dataset = {
                 "samples": readable_train_samples,
                 "energies": train_scores.tolist(),
