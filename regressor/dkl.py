@@ -62,6 +62,12 @@ class Tokenizer:
             else len(sequence)
             for sequence in sequence_tensor
         ]
+        # Padding element is added to all sequences so that [EOS] token can be added post the sequence, i.e, at index 50 (assuming 0 indexing) if the sequence is of max length 50
+        pad_tensor = (
+            torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
+            * self.padding_idx
+        )
+        sequence_tensor = torch.cat([sequence_tensor, pad_tensor], dim=-1)
         eos_tensor = (
             torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
             * self.eos_idx
