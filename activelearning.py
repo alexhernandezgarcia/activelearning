@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="random_sampler")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -202,7 +202,8 @@ def main(config):
                 picked_states = [states[i] for i in idx_pick]
             else:
                 print(
-                    "\nSince there is no proxy, we simply take the first {n_samples} number of states sampled (instead of sorting by energy)."
+                    "\nUser-Defined Warning: Since there is no proxy, we simply take the first {n_samples} \n \
+                        number of states sampled (instead of sorting by energy)."
                 )
                 picked_states = states[: config.n_samples]
 
@@ -242,8 +243,8 @@ def main(config):
                 )
             else:
                 print(
-                    "\n User-Defined Warning: Maximum cost in the single fidelity case is assumed to be 1 \
-                       for the calculation of mean and cumulative cost over active learning rounds."
+                    "\nUser-Defined Warning: Maximum cost in the single fidelity case is assumed to be 1 \n \
+                    for the calculation of mean and cumulative cost over active learning rounds."
                 )
                 cost_al_round = torch.ones(len(picked_states))
                 avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
