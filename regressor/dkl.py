@@ -55,7 +55,7 @@ class Tokenizer:
     def transform(self, sequence_tensor):
         # for each tensor in tensor of tensors
         # find the index of the first [PAD] token
-        #  replace that index with [EOS] token
+        # replace that index with [EOS] token
         index = [
             torch.where(sequence == self.padding_idx)[0][0]
             if sequence[-1] == self.padding_idx
