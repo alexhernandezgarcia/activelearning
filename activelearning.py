@@ -136,7 +136,7 @@ def main(config):
                 device=config.device,
                 path=config.multifidelity.candidate_set_path,
             )
-
+    cumulative_cost = 0.0
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\nStarting iteration {iter} of active learning")
         if logger:
@@ -233,8 +233,26 @@ def main(config):
                     picked_states, energies.tolist(), picked_fidelity
                 )
             if hasattr(env, "get_cost"):
-                avg_cost = np.mean(env.get_cost(picked_states, picked_fidelity))
-                logger.log_metrics({"post_al_cost": avg_cost}, use_context=False)
+                cost_al_round = env.get_cost(picked_states, picked_fidelity)
+                cumulative_cost += np.sum(cost_al_round)
+                avg_cost = np.mean(cost_al_round)
+                logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
+                logger.log_metrics(
+                    {"post_al_cum_cost": cumulative_cost}, use_context=False
+                )
+            else:
+                print(
+                    "\n User-Defined Warning: Maximum cost in the single fidelity case is assumed to be 1 \
+                       for the calculation of mean and cumulative cost over active learning rounds."
+                )
+                cost_al_round = torch.ones(len(picked_states))
+                avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
+                cumulative_cost += torch.sum(cost_al_round).detach().cpu().numpy()
+                logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
+                logger.log_metrics(
+                    {"post_al_cum_cost": cumulative_cost}, use_context=False
+                )
+
         del gflownet
         del proxy
 
