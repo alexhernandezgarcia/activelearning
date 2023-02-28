@@ -15,6 +15,7 @@ from gpytorch.variational import IndependentMultitaskVariationalStrategy
 from gpytorch.settings import cholesky_jitter
 from gpytorch.lazy import ConstantDiagLazyTensor
 from gpytorch import lazify
+from botorch_models import SingleTaskMultiFidelityVariationalGP
 
 
 class BaseGPSurrogate(abc.ABC):
@@ -513,18 +514,252 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
             )
 
 
-# class SingleTaskSVGPMultiFidelity(BaseGPSurrogate, SingleTaskMultiFidelityVariationalGP, SingleTaskSVGP):
-#     def __init__(self, **kwargs):
-#         super().__init__(**kwargs)
+# TODO: Adopt inheritance
+# If it doesn't work, change SingleTaskSVGP to BaseGPSurrogate
+# And implement clear_cache(), forward(), posterior(), set_train_data(), reshape_targets()
+class SingleTaskMultiFidelitySVGP(
+    BaseGPSurrogate, SingleTaskMultiFidelityVariationalGP
+):
+    def __init__(
+        self,
+        feature_dim,
+        out_dim,
+        num_inducing_points,
+        encoder,
+        device,
+        float_precision,
+        noise_constraint=None,
+        lengthscale_prior=None,
+        outcome_transform=None,
+        input_transform=None,
+        learn_inducing_points=True,
+        mll_beta=1.0,
+        *args,
+        **kwargs,
+    ):
+        self.device = device
+        self.float = float_precision
+        # bootstrap_ratio = None, bs = 32, early_stopping = True, enc_lr = 1e-3, encoder_wd = 1e-4, lengthscale_init = 0.7, num_epochs = 128, min_num_train = 128, task_noise_init = 0.5
+        # initialize common attributes
+        BaseGPSurrogate.__init__(self, encoder=encoder, *args, **kwargs)
+        self.num_inducing_points = num_inducing_points  # 64
 
-#     # def fit(self, Xs, Ys, Yvars=None, **kwargs):
-#     #     """Fit the surrogate model to the data.
+        if out_dim == 1:
+            covar_module_x = kernels.MaternKernel(
+                ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+            )
+            covar_module_x.initialize(lengthscale=self.lengthscale_init)
+            covar_module_fidelity = kernels.IndexKernel(num_tasks=2, rank=1)
+            # covar_module_fidelity.initialize(lengthscale=self.lengthscale_init)
+            # covar_module = kernels.ProductKernel(
+            #     covar_module_x, covar_module_fidelity
+            # )  # ProductKernel(
+            likelihood = likelihoods.GaussianLikelihood(
+                noise_constraint=noise_constraint
+            )
+            likelihood.initialize(noise=self.task_noise_init)
+        else:
+            raise NotImplementedError(
+                "More than one output dim not supported. Refer to lambo repo if you really wanna"
+            )
+        # else:
+        #     covar_module = kernels.MaternKernel(
+        #         batch_shape=(out_dim,), ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+        #     )
+        #     covar_module.initialize(lengthscale=self.lengthscale_init)
+        #     likelihood = likelihoods.MultitaskGaussianLikelihood(
+        #         num_tasks=out_dim, has_global_noise=False, noise_constraint=noise_constraint
+        #     ) #
+        #     likelihood.initialize(task_noises=self.task_noise_init) #output_dim = 3, task_noise_init = 0.5
 
-#     #     Args:
-#     #         Xs (list of np.ndarray): A list of input arrays.
-#     #         Ys (list of np.ndarray): A list of output arrays.
-#     #         Yvars (list of np.ndarray): A list of output variance arrays.
-#     #     """
-#     #     Xs = [Xs] if not isinstance(Xs, list) else Xs
-#     #     Ys = [Ys] if not isinstance(Ys, list) else Ys
-#     #     Yvars = [Yvars] if not isinstance(Yvars, list) else Yvars
+        # initialize GP
+        dummy_X = 2 * (
+            torch.rand(num_inducing_points, feature_dim).to(self.device, self.float)
+            - 0.5
+        )  # torch.Size([64, 16])
+        dummy_Y = torch.randn(num_inducing_points, out_dim).to(self.device, self.float)
+        covar_module_x = (
+            covar_module_x
+            if covar_module_x is None
+            else covar_module_x.to(self.device, self.float)
+        )
+        covar_module_fidelity = (
+            covar_module_fidelity
+            if covar_module_fidelity is None
+            else covar_module_fidelity.to(self.device, self.float)
+        )
+
+        self.base_cls = SingleTaskMultiFidelityVariationalGP
+        self.base_cls.__init__(
+            self,
+            dummy_X,
+            dummy_Y,
+            likelihood,
+            out_dim,
+            learn_inducing_points,
+            covar_module_x=covar_module_x,
+            covar_module_fidelity=covar_module_fidelity,
+            inducing_points=dummy_X,
+            outcome_transform=outcome_transform,
+            input_transform=input_transform,
+        )
+        self.encoder = encoder.to(self.device, self.float)
+        self.mll_beta = mll_beta  # 0.01
+
+    def clear_cache(self):
+        clear_cache_hook(self)
+        clear_cache_hook(self.model)
+        clear_cache_hook(self.model.variational_strategy)
+        if hasattr(
+            self.model.variational_strategy, "base_variational_strategy"
+        ):  # True
+            clear_cache_hook(self.model.variational_strategy.base_variational_strategy)
+
+    def forward(self, inputs):
+        assert isinstance(inputs, torch.Tensor)
+        features = (
+            self.get_features(inputs, self.bs)
+            if isinstance(inputs, np.ndarray)
+            else inputs
+        )  # torch.Size([32, 16]) --> ita a tensor whenever it is called so far
+        res = self.base_cls.forward(
+            self, features
+        )  # MultivariateNormal(loc: torch.Size([32]), covariance_matrix: torch.Size([32, 32]), precision_matrix: torch.Size([32, 32]), scale_tril: torch.Size([32, 32]))
+        return res
+
+    def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
+        self.clear_cache()
+        # features = self.get_features(X.to(torch.long))
+        # if isinstance(X, np.ndarray)
+        # else X
+        return self.base_cls.posterior(
+            self, X, output_indices, observation_noise, **kwargs
+        )
+
+    def set_train_data(self, inputs=None, targets=None, strict=True):
+        self.clear_cache()
+
+    @property
+    def num_outputs(self) -> int:
+        return self._num_outputs
+
+    @property
+    def batch_shape(self):
+        """
+        This is a batch shape from an I/O perspective. For a model with `m` outputs, a `test_batch_shape x q x d`-shaped input `X`
+        to the `posterior` method returns a Posterior object over an output of
+        shape `broadcast(test_batch_shape, model.batch_shape) x q x m`.
+        """
+        return torch.Size([])
+
+    def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
+        """
+        This is only intended for whitened variational distributions and gaussian likelihoods
+        at present.
+
+        \bar m = L^{-1} m
+        \bar S = L^{-1} S L^{-T}
+
+        where $LL^T = K_{uu}$.
+
+        Thus, the optimal \bar m, \bar S are given by
+        \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
+        \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
+        """
+
+        if isinstance(
+            self.model.variational_strategy, IndependentMultitaskVariationalStrategy
+        ):  # True in lambo code but False for me
+            ind_pts = (
+                self.model.variational_strategy.base_variational_strategy.inducing_points
+            )  # Parameter containing: torch.Size([64, 16])
+            train_y = train_y.transpose(-1, -2).unsqueeze(-1)
+            is_batch_model = True
+        else:
+            ind_pts = self.model.variational_strategy.inducing_points
+            is_batch_model = False
+
+        with cholesky_jitter(1e-4):
+            # TODO: Check dimension of ind_points
+            kuu_x = self.model.covar_module_x(
+                ind_pts[..., :-1]
+            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+            kuu_fidelity = self.model.covar_module_fidelity(
+                ind_pts[..., -1:]
+            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+            kuu = kuu_x.mul(
+                kuu_fidelity
+            )  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+            kuu_chol = (
+                kuu.cholesky()
+            )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
+            kuv_x = self.model.covar_module_x(
+                ind_pts[..., :-1], train_x[..., :-1]
+            ).double()
+            kuv_fidelity = self.model.covar_module_fidelity(
+                ind_pts[..., -1:], train_x[..., -1:]
+            ).double()
+            kuv = kuv_x.mul(
+                kuv_fidelity
+            )  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+
+            # noise = model.likelihood.noise if not is_batch_model else model.likelihood.task_noises.unsqueeze(-1).unsqueeze(-1)
+
+            if hasattr(self.likelihood, "noise"):  # False
+                noise = self.likelihood.noise
+            elif hasattr(self.likelihood, "task_noises"):
+                noise = self.likelihood.task_noises.view(-1, 1, 1)
+            else:
+                raise AttributeError
+            noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
+
+            if len(train_y.shape) < len(kuv.shape):
+                train_y = train_y.unsqueeze(-1)
+            if len(noise.shape) < len(kuv.shape):
+                noise = noise.unsqueeze(-1)
+
+            data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
+            # mean_term = kuu_chol.inv_matmul(data_term)
+            if is_batch_model:  # True
+                # TODO: clean this up a bit more
+                # User Defined Remark: Might have to change to linear_operator based
+                noise_as_lt = ConstantDiagLazyTensor(
+                    noise.squeeze(-1), diag_shape=kuv.shape[-1]
+                )
+                inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
+                inner_term = inner_prod + kuu
+            else:
+                inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
+
+            s_mat = kuu_chol.transpose(-1, -2).matmul(
+                inner_term.inv_matmul(kuu_chol.evaluate())
+            )  # torch.Size([3, 64, 64])
+            # TODO: Replace gpytorch.lazy.lazify with linear_operator.to_linear_operato
+            s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
+            # mean_param = s_mat.matmul(mean_term)
+            # the expression below is less efficient but probably more stable
+            mean_param = kuu_chol.transpose(-1, -2).matmul(
+                inner_term.inv_matmul(data_term)
+            )
+
+        mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
+        s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
+
+        if not is_batch_model:
+            self.model.variational_strategy._variational_distribution.variational_mean.data = (
+                mean_param.data.detach().squeeze()
+            )
+            self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
+                s_root.data.detach()
+            )
+            self.model.variational_strategy.variational_params_initialized.fill_(1)
+        else:  # True
+            self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
+                mean_param.data.detach().squeeze()
+            )
+            self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
+                s_root.data.detach()
+            )
+            self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
+                1
+            )
