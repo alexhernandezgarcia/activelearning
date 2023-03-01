@@ -262,9 +262,19 @@ class DeepKernelMultiFidelityMES(MES):
         samples = data["samples"]
         state = [self.env.readable2state(sample) for sample in samples]
         state_proxy = self.env.statebatch2proxy(state)  # [: self.regressor.n_samples]
-        if isinstance(state_proxy, torch.Tensor):
-            return state_proxy.to(self.device)
-        return torch.LongTensor(state_proxy).to(self.device)
+        fid_proxy = state_proxy[..., -1]
+        state_proxy = state_proxy[..., :-1]
+        (
+            state_tok_features,
+            state_mask,
+        ) = self.regressor.language_model.get_token_features(state_proxy)
+        _, pooled_state_proxy_features = self.regressor.language_model.pool_features(
+            state_tok_features, state_mask
+        )
+        candidate_set = torch.cat(
+            [pooled_state_proxy_features, fid_proxy.unsqueeze(-1)], dim=1
+        )
+        return candidate_set
 
     def project(self, states):
         input_dim = states.ndim
@@ -281,14 +291,18 @@ class DeepKernelMultiFidelityMES(MES):
         return states
 
     def __call__(self, states):
+        inputs = states.clone()
+        fid = inputs[..., -1]
+        inputs = inputs[..., :-1]
         (
             input_tok_features,
             input_mask,
-        ) = self.regressor.language_model.get_token_features(states)
+        ) = self.regressor.language_model.get_token_features(inputs)
         _, pooled_features = self.regressor.language_model.pool_features(
             input_tok_features, input_mask
         )
         inputs = pooled_features
+        inputs = torch.cat([inputs, fid.unsqueeze(-1)], dim=1)
         inputs = inputs.unsqueeze(-2)
         acq_values = self.acqf(inputs)
         return acq_values
