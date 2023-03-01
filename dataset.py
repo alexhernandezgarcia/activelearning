@@ -161,7 +161,8 @@ class DataHandler:
             states, fidelities = self.generate_fidelities(states)
             # specifically for discrete case (states) are integers
             states = torch.cat([states, fidelities], dim=1).long()
-            state_oracle, fid = self.env.statetorch2oracle(states)
+            states_oracle_input = states.clone()
+            state_oracle, fid = self.env.statetorch2oracle(states_oracle_input)
             if scores is None:
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
             # Grid
@@ -172,8 +173,9 @@ class DataHandler:
                 self.logger.log_figure("train_dataset", fig, use_context=True)
         # TODO: add clause for when n_fid> 1 but fidelity.do=False
         elif self.n_fid == 1 and scores is None:
+            states_oracle_input = states.clone()
             state_oracle = self.env.statetorch2oracle(
-                states, bos_idx=self.tokenizer.bos_idx
+                states_oracle_input, bos_idx=self.tokenizer.bos_idx
             )
             scores = self.env.oracle(state_oracle)
 
@@ -318,8 +320,9 @@ class DataHandler:
         # if self.n_fid == 1 and self.path.oracle_dataset:
         # state_batch = [self.env.readable2state(sample) for sample in samples]
         # else:
-        state_batch = samples
-        state_proxy = self.env.statetorch2proxy(state_batch)
+        state_input_proxy = samples.clone()
+        state_proxy = self.env.statetorch2proxy(state_input_proxy)
+        # state_proxy = self.env.statetorch2proxy(state_batch)
         # if self.tokenizer is not None:
         # Inout must be a tensor
         # state_proxy = self.tokenizer.transform(state_proxy)
