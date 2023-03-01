@@ -495,13 +495,13 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         if hasattr(self.env, "get_pairwise_distance"):
             return self.env.get_pairwise_distance(samples)
         else:
-            return torch.zeros_like(samples)
+            return torch.zeros(len(samples))
 
     def get_distance_from_D0(self, samples, dataset_obs):
         if hasattr(self.env, "get_distance_from_D0"):
             return self.env.get_distance_from_D0(samples, dataset_obs)
         else:
-            return torch.zeros_like(samples)
+            return torch.zeros(len(samples))
 
     def get_trajectories(
         self, traj_list, traj_actions_list, current_traj, current_actions

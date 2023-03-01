@@ -24,8 +24,11 @@ class RandomSampler:
     def train(self, **kwargs):
         pass
 
-    def evaluate(self, samples, energies, initial_data, **kwargs):
-        energies = torch.sort(energies, descending=True)[0]
+    def evaluate(self, samples, energies, maximize, initial_data, **kwargs):
+        if maximize:
+            energies = torch.sort(energies, descending=True)[0]
+        else:
+            energies = torch.sort(energies)[0]
         if hasattr(self.env, "get_pairwise_distance"):
             pairwise_dists = self.env.get_pairwise_distance(samples)
             if pairwise_dists is not None:

@@ -170,12 +170,6 @@ class DataHandler:
             state_oracle, fid = self.env.statetorch2oracle(states_oracle_input)
             if scores is None:
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
-            # Grid
-            if hasattr(self.sfenv, "plot_samples_frequency"):
-                fig = self.sfenv.plot_samples_frequency(
-                    states, title="Train Dataset", rescale=self.rescale
-                )
-                self.logger.log_figure("train_dataset", fig, use_context=True)
         # TODO: add clause for when n_fid> 1 but fidelity.do=False
         elif self.n_fid == 1 and scores is None:
             states_oracle_input = states.clone()
@@ -186,6 +180,11 @@ class DataHandler:
                 "Not implemented for when n_fid>1 and fidelity.do == False"
             )
 
+        if hasattr(self.sfenv, "plot_samples_frequency"):
+            fig = self.sfenv.plot_samples_frequency(
+                    states, title="Initial Dataset", rescale=self.rescale
+                )
+            self.logger.log_figure("inital_dataset", fig, use_context=True)
         if hasattr(self.sfenv, "plot_reward_distribution"):
             fig = self.sfenv.plot_reward_distribution(scores=scores, title="Dataset")
             self.logger.log_figure("initial_dataset", fig, use_context=True)

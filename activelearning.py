@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="random_sampler")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -104,7 +104,7 @@ def main(config):
     else:
         config_model = None
 
-    if N_FID == 1 or config.multifidelity.proxy == True:
+    if config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
             config.dataset,
             env=env,
@@ -137,6 +137,8 @@ def main(config):
                 path=config.multifidelity.candidate_set_path,
             )
     cumulative_cost = 0.0
+    cumulative_sampled_states = []
+    cumulative_sampled_energies = torch.tensor([], device = env.device, dtype = env.float)
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\nStarting iteration {iter} of active learning")
         if logger:
@@ -145,11 +147,13 @@ def main(config):
             regressor.fit()
             if hasattr(regressor, "evaluate_model"):
                 metrics = {}
-                fig, rmse, nll = regressor.evaluate_model(env)
+                fig, entire_rmse, entire_nll, mode_rmse, mode_nll = regressor.evaluate_model(env)
                 metrics.update(
                     {
-                        "proxy_rmse": rmse,
-                        "proxy_nll": nll,
+                        "proxy_rmse_entire_data": entire_rmse,
+                        "proxy_nll_entire_data": entire_nll,
+                        "proxy_rmse_modes": mode_rmse,
+                        "proxy_nll_modes": mode_nll,
                     }
                 )
                 if fig is not None:
@@ -186,52 +190,70 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
+            states_tensor = torch.tensor(states)
+            states_tensor = states_tensor.unique(dim=0)
+            states = states_tensor.tolist()
+            state_proxy = env.statebatch2proxy(states)
+            if isinstance(state_proxy, list):
+                state_proxy = torch.FloatTensor(state_proxy).to(config.device)
             if proxy is not None:
-                if env.do_state_padding == False:
-                    # TODO: only possible if all states are same length
-                    states_tensor = torch.tensor(states)
-                    states_tensor = states_tensor.unique(dim=0)
-                    states = states_tensor.tolist()
-                state_proxy = env.statebatch2proxy(states)
-                if isinstance(state_proxy, list):
-                    state_proxy = torch.FloatTensor(state_proxy).to(config.device)
                 scores = env.proxy(state_proxy)
-                # to change desc/asc wrt higherIsBetter, and that should depend on proxy
-                num_pick = min(config.n_samples, len(states))
-                idx_pick = torch.argsort(scores, descending=True)[:num_pick].tolist()
-                picked_states = [states[i] for i in idx_pick]
             else:
-                print(
-                    "\nUser-Defined Warning: Since there is no proxy, we simply take the first {n_samples} \n \
-                        number of states sampled (instead of sorting by energy)."
-                )
-                picked_states = states[: config.n_samples]
-
+                scores, _ = regressor.get_predictions(env, states)   
+            num_pick = min(config.n_samples, len(states))
+            # to change desc/asc wrt higherIsBetter, and that should depend on proxy
+            if proxy is not None:
+                maximize = proxy.maximize
+            else:
+                if regressor.target_factor == -1:
+                    maximize = not oracle.maximize
+                else:
+                    maximize = oracle.maximize
+            idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
+            picked_states = [states[i] for i in idx_pick]
+            
             if N_FID > 1:
                 picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
-                energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
+                picked_energies = env.call_oracle_per_fidelity(picked_samples, picked_fidelity)
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
-                energies = env.oracle(picked_samples)
+                picked_energies = env.oracle(picked_samples)
                 picked_fidelity = None
+
+            cumulative_sampled_states.extend(picked_states)
+            cumulative_sampled_energies = torch.cat((cumulative_sampled_energies, picked_energies))
+            if (hasattr(env, "env") and  hasattr(env.env, "plot_samples_frequency")) or (hasattr(env, "env")  == False and hasattr(env, "plot_samples_frequency")):
+                fig = env.plot_samples_frequency(
+                cumulative_sampled_states, title="Cumulative Sampled Dataset", rescale=env.rescale)
+                logger.log_figure(
+                    "cum_sampled_dataset", fig, use_context=True
+                )
+
+            if (hasattr(env, "env") and  hasattr(env.env, "plot_reward_distribution")) or (hasattr(env, "env")  == False and hasattr(env, "plot_reward_distribution")):
+                fig = env.plot_reward_distribution(
+                scores=cumulative_sampled_energies.tolist(), title="Cumulative Sampled Dataset (over AL Interations)"
+            )
+                logger.log_figure(
+                "cum_sampled_dataset", fig, use_context=True
+            )
 
             if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
-                    picked_samples, energies, data_handler.train_dataset["states"]
+                    cumulative_sampled_states, cumulative_sampled_energies, oracle.maximize, data_handler.train_dataset["states"]
                 )
 
-            df = pd.DataFrame(
-                {
-                    "readable": [env.state2readable(s) for s in picked_states],
-                    "energies": energies.cpu().numpy(),
-                }
-            )
-            df = df.sort_values(by=["energies"])
-            path = logger.logdir / Path("gfn_samples.csv")
-            df.to_csv(path)
+            # df = pd.DataFrame(
+            #     {
+            #         "readable": [env.state2readable(s) for s in picked_states],
+            #         "energies": picked_energies.tolist(),
+            #     }
+            # )
+            # df = df.sort_values(by=["energies"])
+            # path = logger.logdir / Path("gfn_samples.csv")
+            # df.to_csv(path)
             if N_FID == 1 or config.multifidelity.proxy == True:
                 data_handler.update_dataset(
-                    picked_states, energies.tolist(), picked_fidelity
+                    picked_states, picked_energies.tolist(), picked_fidelity
                 )
             if hasattr(env, "get_cost"):
                 cost_al_round = env.get_cost(picked_states, picked_fidelity)
