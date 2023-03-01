@@ -50,6 +50,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # Needs to be re-initialised despite initialisation inGflowNetEnv because line 31 updates this to single fidelity oracle
         self.oracle = oracle
         self.fidelity_costs = self.set_fidelity_costs()
+        if self.is_state_list:
+            self.source = self.env.source + [-1]
+        else:
+            self.source = torch.cat((self.env.source, torch.tensor([-1])))
         self._test_traj_list = []
         self._test_traj_actions_list = []
 
@@ -300,7 +304,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         state_policy, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
         state_policy = self.env.statebatch2policy(state_policy)
         fid_policy = np.zeros((len(states), self.n_fid), dtype=np.float32)
-        fid_array = np.array(fid_list)
+        fid_array = np.array(fid_list, dtype=np.int32)
         index = np.where(fid_array != -1)[0]
         if index.size:
             fid_policy[index, fid_array[index]] = 1
@@ -356,12 +360,15 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 state = self.state.clone()
         if done is None:
             done = self.done
+        if torch.eq(state, self.source).all():
+            return [], []
         parents_no_fid, actions = self.env.get_parents(state[:-1])
         if self.action_pad_length > 0:
             actions = [
                 tuple(list(action) + [0] * (self.action_pad_length))
                 for action in actions
             ]
+        # If fidelity has not been chosen in the state, then fidelity has not been chosen in the parent as well
         if state[-1] == -1:
             if self.is_state_list:
                 parents = [parent + [-1] for parent in parents_no_fid]
@@ -370,6 +377,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 fid_tensor = torch.ones((parents_tensor.shape[0], 1)) * -1
                 parents = torch.cat([parents_tensor, fid_tensor], dim=-1)
                 parents = list(parents)
+        # If fidelity has been chosen, then possible parents incliude:
+        # 1. The parent state with fidelity set to state's fidelity
+        # 2. The parent with action as choosing that fidelity
         elif state[-1] != -1:
             fid = state[-1]
             if self.is_state_list:

@@ -291,7 +291,8 @@ class DeepKernelMultiFidelityMES(MES):
         return states
 
     def __call__(self, states):
-        inputs = states.clone()
+        assert torch.eq(states.to(torch.long), states).all()
+        inputs = states.clone().to(torch.long)
         fid = inputs[..., -1]
         inputs = inputs[..., :-1]
         (

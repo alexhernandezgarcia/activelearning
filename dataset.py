@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from gflownet.utils.common import set_device, set_float_precision
 from torch.nn.utils.rnn import pad_sequence
 from torchtyping import TensorType
+from typing import List
 
 
 class Data(Dataset):
@@ -387,7 +388,15 @@ class DataHandler:
         Saves the updated dataset if save_data=True
         """
         if self.n_fid > 1:
-            states = [state + [fid.tolist()] for state, fid in zip(states, fidelity)]
+            if isinstance(states[0], List):
+                states = [
+                    state + [fid.tolist()] for state, fid in zip(states, fidelity)
+                ]
+            else:
+                states = torch.vstack(states)
+                states = torch.cat(
+                    (states, fidelity.unsqueeze(-1).to(states.device)), dim=1
+                )
         # remove duplicate rows from tensor states
         # get indices of unique rows
         # states, index = torch.unique(torch.tensor(states), dim=0, return_inverse=True)
