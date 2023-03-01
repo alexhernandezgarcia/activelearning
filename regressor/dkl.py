@@ -112,6 +112,7 @@ class DeepKernelRegressor:
 
         # Dataset
         self.dataset = dataset
+        self.n_fid = self.dataset.n_fid
 
         self.tokenizer = tokenizer
         # config_model.model["tokenizer"] = self.tokenizer
@@ -132,6 +133,7 @@ class DeepKernelRegressor:
             encoder=self.language_model,
             device=self.device,
             float_precision=self.float,
+            n_fid=self.n_fid,
         )
 
         self.batch_size = batch_size
@@ -171,6 +173,8 @@ class DeepKernelRegressor:
     def mlm_train_step(self, optimizer, token_batch, mask_ratio, loss_scale=1.0):
         optimizer.zero_grad(set_to_none=True)
 
+        if self.n_fid > 1:
+            token_batch = token_batch[..., :-1]
         # replace random tokens with mask token
         mask_idxs = sample_mask(token_batch, self.tokenizer, mask_ratio)  # (32, 5)
         masked_token_batch = token_batch.clone().to(self.language_model.device)
@@ -257,6 +261,7 @@ class DeepKernelRegressor:
                 self.language_model,
                 test_loader,
                 self.language_model.mask_ratio,
+                self.n_fid,
             )
         )
 

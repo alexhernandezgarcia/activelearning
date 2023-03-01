@@ -15,7 +15,7 @@ from gpytorch.variational import IndependentMultitaskVariationalStrategy
 from gpytorch.settings import cholesky_jitter
 from gpytorch.lazy import ConstantDiagLazyTensor
 from gpytorch import lazify
-from botorch_models import SingleTaskMultiFidelityVariationalGP
+from .botorch_models import SingleTaskMultiFidelityVariationalGP
 
 
 class BaseGPSurrogate(abc.ABC):
@@ -515,8 +515,6 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
 
 
 # TODO: Adopt inheritance
-# If it doesn't work, change SingleTaskSVGP to BaseGPSurrogate
-# And implement clear_cache(), forward(), posterior(), set_train_data(), reshape_targets()
 class SingleTaskMultiFidelitySVGP(
     BaseGPSurrogate, SingleTaskMultiFidelityVariationalGP
 ):
@@ -528,6 +526,7 @@ class SingleTaskMultiFidelitySVGP(
         encoder,
         device,
         float_precision,
+        n_fid,
         noise_constraint=None,
         lengthscale_prior=None,
         outcome_transform=None,
@@ -549,7 +548,7 @@ class SingleTaskMultiFidelitySVGP(
                 ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
             )
             covar_module_x.initialize(lengthscale=self.lengthscale_init)
-            covar_module_fidelity = kernels.IndexKernel(num_tasks=2, rank=1)
+            covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
             # covar_module_fidelity.initialize(lengthscale=self.lengthscale_init)
             # covar_module = kernels.ProductKernel(
             #     covar_module_x, covar_module_fidelity
@@ -573,8 +572,9 @@ class SingleTaskMultiFidelitySVGP(
         #     likelihood.initialize(task_noises=self.task_noise_init) #output_dim = 3, task_noise_init = 0.5
 
         # initialize GP
+        # +1 for the fidelity dimension
         dummy_X = 2 * (
-            torch.rand(num_inducing_points, feature_dim).to(self.device, self.float)
+            torch.rand(num_inducing_points, feature_dim + 1).to(self.device, self.float)
             - 0.5
         )  # torch.Size([64, 16])
         dummy_Y = torch.randn(num_inducing_points, out_dim).to(self.device, self.float)
@@ -615,6 +615,43 @@ class SingleTaskMultiFidelitySVGP(
         ):  # True
             clear_cache_hook(self.model.variational_strategy.base_variational_strategy)
 
+    def get_features(
+        self, seq_array, batch_size=None, transform=True
+    ):  # batch_size not used
+        # if transform:
+        #     original_shape = seq_array.shape
+        #     flat_seq_array = seq_array.reshape(-1)
+        # else:
+        original_shape = seq_array.shape[:-1]
+        flat_seq_array = seq_array.flatten(end_dim=-2)
+
+        # Train transform = data augmentations + test transform
+
+        # if self.training and transform:
+        #     enc_seq_array = gfp_transforms.padding_collate_fn(
+        #         [self.train_transform(seq) for seq in flat_seq_array],
+        #         self.tokenizer.padding_idx,
+        #     )
+        # elif transform:  # transforms from string to int
+        #     enc_seq_array = gfp_transforms.padding_collate_fn(
+        #         [self.test_transform(seq) for seq in flat_seq_array],
+        #         self.tokenizer.padding_idx,
+        #     )
+        # else:
+        #     enc_seq_array = seq_array
+        fid_array = seq_array[..., -1].to(self.device).to(torch.long)
+        enc_seq_array = (
+            seq_array[..., :-1].to(self.device).to(torch.long)
+        )  # torch.Size([32, 36]), padded states
+        features = self.encoder(
+            enc_seq_array
+        )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
+        features = torch.cat(
+            [features, fid_array.unsqueeze(-1)], dim=-1
+        )  # torch.Size([32, 17])
+        # original shape = batch_shape
+        return features.view(*original_shape, -1)
+
     def forward(self, inputs):
         assert isinstance(inputs, torch.Tensor)
         features = (
@@ -629,6 +666,12 @@ class SingleTaskMultiFidelitySVGP(
 
     def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
         self.clear_cache()
+        # TODO: fix this hard condition
+        if X.shape[1] == 52:
+            enc_X = X[:, :-1]
+            fid_X = X[:, -1]
+            features_X = self.get_features(enc_X.to(torch.long))
+            X = torch.cat([enc_X, fid_X.unsqueeze(-1)], dim=-1)
         # features = self.get_features(X.to(torch.long))
         # if isinstance(X, np.ndarray)
         # else X
@@ -651,6 +694,111 @@ class SingleTaskMultiFidelitySVGP(
         shape `broadcast(test_batch_shape, model.batch_shape) x q x m`.
         """
         return torch.Size([])
+
+    def evaluate(self, loader, *args, **kwargs):
+        self.eval()
+        targets, y_mean, y_std, f_std = [], [], [], []
+        # print("\nUser-Defined Warning: Converting states in test loader to integer for surrogate evaluation.")
+        with torch.no_grad():
+            for (
+                input_batch,
+                target_batch,
+            ) in loader:
+                # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
+                # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
+                input_batch = input_batch.to(torch.long)
+                features = self.get_features(
+                    input_batch.to(self.device), transform=False
+                )  # torch.Size([45, 16])
+                f_dist = self(
+                    features
+                )  # MultitaskMultivariateNormal(loc: torch.Size([96]), covariance_matrix: torch.Size([96, 96]), precision_matrix: torch.Size([96, 96]), scale_tril: torch.Size([96, 96])) for VGP
+                y_dist = self.likelihood(
+                    f_dist
+                )  # MultitaskMultivariateNormal(loc: torch.Size([96]))
+
+                target_batch = self.reshape_targets(target_batch)  # torch.Size([3, 45])
+                targets.append(
+                    target_batch.to(features.device).cpu()
+                )  # targets was an empty list
+                # import pdb; pdb.set_trace()
+                if y_dist.mean.shape == target_batch.shape:  # True
+                    f_std.append(f_dist.variance.sqrt().cpu())
+                    y_mean.append(y_dist.mean.cpu())
+                    y_std.append(y_dist.variance.sqrt().cpu())
+                else:
+                    f_std.append(f_dist.variance.sqrt().cpu().transpose(-1, -2))
+                    y_mean.append(y_dist.mean.cpu().transpose(-1, -2))
+                    y_std.append(y_dist.variance.sqrt().cpu().transpose(-1, -2))
+
+        # TODO: figure out why these are getting flipped
+        try:
+            targets = torch.cat(targets).view(len(loader.dataset), -1)
+            cat_dim = 0
+        except:
+            targets = torch.cat(targets, -1).view(len(loader.dataset), -1)
+            cat_dim = -1
+        # cat_dim = 0, targets = torch.Size([45, 3])
+        f_std = torch.cat(f_std, cat_dim).view(
+            len(loader.dataset), -1
+        )  # torch.Size([45, 3])
+        y_mean = torch.cat(y_mean, cat_dim).view(
+            len(loader.dataset), -1
+        )  # torch.Size([45, 3])
+        y_std = torch.cat(y_std, cat_dim).view(
+            len(loader.dataset), -1
+        )  # torch.Size([45, 3])
+
+        assert y_mean.shape == targets.shape
+
+        rmse = (y_mean - targets).pow(2).mean().sqrt()
+        nll = -torch.distributions.Normal(y_mean, y_std).log_prob(targets).mean()
+        cal_metrics = quantile_calibration(y_mean, y_std, targets)
+        ece = cal_metrics["ece"]
+        occ_diff = cal_metrics["occ_diff"]
+
+        spearman_rho = 0
+        for idx in range(targets.size(-1)):
+            spearman_rho += spearmanr(
+                targets[..., idx], y_mean[..., idx]
+            ).correlation / targets.size(-1)
+
+        metrics = {
+            f"test_nll": nll.item(),
+            f"test_rmse": rmse.item(),
+            f"test_s_rho": spearman_rho,
+            f"test_ece": ece,
+            f"test_occ_diff": occ_diff,
+            f"test_post_var": (f_std**2).mean().item(),
+        }
+
+        if hasattr(self.likelihood, "task_noises"):
+            metrics["noise"] = self.likelihood.task_noises.mean().item()
+        elif hasattr(self.likelihood, "noise"):
+            metrics["noise"] = self.likelihood.noise.mean().item()
+        else:
+            pass
+
+        covar_module = (
+            self.model.covar_module_x if hasattr(self, "model") else self.covar_module
+        )
+        if hasattr(covar_module, "base_kernel") and hasattr(
+            covar_module.base_kernel, "lengthscale"
+        ):
+            metrics["lengthscale"] = covar_module.base_kernel.lengthscale.mean().item()
+        elif hasattr(covar_module, "data_covar_module"):
+            metrics[
+                "lengthscale"
+            ] = covar_module.data_covar_module.lengthscale.mean().item()
+        elif hasattr(covar_module, "lengthscale"):
+            metrics["lengthscale"] = covar_module.lengthscale.mean().item()
+        else:
+            pass
+
+        if hasattr(covar_module, "outputscale"):
+            metrics["outputscale"] = covar_module.outputscale.mean().item()
+
+        return metrics
 
     def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
         """

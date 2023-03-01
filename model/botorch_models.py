@@ -69,6 +69,9 @@ class SingleTaskMultiFidelityVariationalGP(ApproximateGPyTorchModel):
         self._aug_batch_shape = aug_batch_shape
 
         if likelihood is None:
+            raise NotImplementedError(
+                "Likelihood must be provided while initalising user-defined SingleTaskMultiFidelityVariationalGP."
+            )
             if num_outputs == 1:
                 noise_prior = GammaPrior(1.1, 0.05)
                 noise_prior_mode = (noise_prior.concentration - 1) / noise_prior.rate
@@ -170,8 +173,8 @@ def _select_inducing_points(
         A (*batch_shape, m, d)-dim tensor of inducing point locations.
     """
 
-    x_output = covar_module_x(inputs[:, :, :-1])
-    f_output = covar_module_fidelity(inputs[:, :, -1])
+    x_output = covar_module_x(inputs[..., :-1])
+    f_output = covar_module_fidelity(inputs[..., -1])
     output = x_output.mul(f_output)
     train_train_kernel = output.evaluate_kernel()
     # train_train_kernel = x_output.evaluate_kernel() + f_output.evaluate_kernel()
@@ -254,7 +257,6 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
         self._aug_batch_shape = aug_batch_shape
 
         if mean_module is None:
-            raise NotImplementedError("UserDefinedError: Mean module must be provided.")
             mean_module = ConstantMean(batch_shape=self._aug_batch_shape).to(train_X)
 
         if covar_module_x is None or covar_module_fidelity is None:
@@ -281,6 +283,9 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
 
         # initialize inducing points with a pivoted cholesky init if they are not given
         if not isinstance(inducing_points, Tensor):
+            raise NotImplementedError(
+                "UserDefinedError: Inducing points must be provided."
+            )
             if inducing_points is None:
                 # number of inducing points is 25% the number of data points
                 # as a heuristic
@@ -323,9 +328,9 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
         self.covar_module_fidelity = covar_module_fidelity
 
     def forward(self, X) -> MultivariateNormal:
-        mean_x = self.mean_module(X[:, :, :-1])
-        covar_x = self.covar_module_x(X[:, :, :-1])
-        covar_fidelity = self.covar_module_fidelity(X[:, :, -1:])
+        mean_x = self.mean_module(X[..., :-1])
+        covar_x = self.covar_module_x(X[..., :-1])
+        covar_fidelity = self.covar_module_fidelity(X[..., -1:])
         covar = covar_x.mul(covar_fidelity)
         latent_dist = MultivariateNormal(mean_x, covar)
         return latent_dist

@@ -37,7 +37,7 @@ def sample_mask(
     return mask_idxs.detach().cpu().numpy()
 
 
-def mlm_eval_epoch(model, eval_loader, mask_ratio):
+def mlm_eval_epoch(model, eval_loader, mask_ratio, n_fid=1):
     metrics = dict(
         perplexity=0.0,
     )
@@ -49,6 +49,8 @@ def mlm_eval_epoch(model, eval_loader, mask_ratio):
         else:
             assert torch.is_tensor(minibatch)
             token_batch = minibatch
+        if n_fid > 1:
+            token_batch = token_batch[..., :-1]
         token_batch = token_batch.long()
         # token_batch is padded states
         # replace random tokens with mask token
