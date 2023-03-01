@@ -68,11 +68,11 @@ class Tokenizer:
             else len(sequence)
             for sequence in sequence_tensor
         ]
-        # pad_tensor = (
-        #     torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
-        #     * self.padding_idx
-        # )
-        # sequence_tensor = torch.cat([pad_tensor, sequence_tensor], dim=1)
+        pad_tensor = (
+            torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
+            * self.padding_idx
+        )
+        sequence_tensor = torch.cat([sequence_tensor, pad_tensor], dim=1)
         eos_tensor = (
             torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
             * self.eos_idx
