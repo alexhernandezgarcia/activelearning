@@ -90,7 +90,7 @@ class DeepKernelRegressor:
         dataset,
         config_model,
         surrogate,
-        float_precision,
+        float,
         tokenizer,
         checkpoint,
         encoder_obj="mlm",
@@ -103,7 +103,7 @@ class DeepKernelRegressor:
         # Device
         self.device = set_device(device)
         # Float precision
-        self.float = set_float_precision(float_precision)
+        self.float = set_float_precision(float)
 
         # Dataset
         self.dataset = dataset
