@@ -549,7 +549,6 @@ class SingleTaskMultiFidelitySVGP(
             )
             covar_module_x.initialize(lengthscale=self.lengthscale_init)
             covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
-            # covar_module_fidelity.initialize(lengthscale=self.lengthscale_init)
             # covar_module = kernels.ProductKernel(
             #     covar_module_x, covar_module_fidelity
             # )  # ProductKernel(
@@ -639,9 +638,9 @@ class SingleTaskMultiFidelitySVGP(
         #     )
         # else:
         #     enc_seq_array = seq_array
-        fid_array = seq_array[..., -1].to(self.device).to(torch.long)
+        fid_array = seq_array[..., -1].to(self.device) # N.to(torch.long)
         enc_seq_array = (
-            seq_array[..., :-1].to(self.device).to(torch.long)
+            seq_array[..., :-1].to(self.device)
         )  # torch.Size([32, 36]), padded states
         features = self.encoder(
             enc_seq_array
@@ -706,7 +705,7 @@ class SingleTaskMultiFidelitySVGP(
             ) in loader:
                 # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
-                input_batch = input_batch.to(torch.long)
+                input_batch = input_batch # N.to(torch.long)
                 features = self.get_features(
                     input_batch.to(self.device), transform=False
                 )  # torch.Size([45, 16])
@@ -722,6 +721,7 @@ class SingleTaskMultiFidelitySVGP(
                     target_batch.to(features.device).cpu()
                 )  # targets was an empty list
                 # import pdb; pdb.set_trace()
+                target_batch = target_batch.squeeze(-1) # N
                 if y_dist.mean.shape == target_batch.shape:  # True
                     f_std.append(f_dist.variance.sqrt().cpu())
                     y_mean.append(y_dist.mean.cpu())

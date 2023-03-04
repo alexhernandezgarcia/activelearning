@@ -172,9 +172,10 @@ def _select_inducing_points(
     Returns:
         A (*batch_shape, m, d)-dim tensor of inducing point locations.
     """
-
-    x_output = covar_module_x(inputs[..., :-1])
-    f_output = covar_module_fidelity(inputs[..., -1])
+    x_input = inputs[..., :-1]
+    f_input = inputs[..., -1].long()
+    x_output = covar_module_x(x_input)
+    f_output = covar_module_fidelity(f_input)
     output = x_output.mul(f_output)
     train_train_kernel = output.evaluate_kernel()
     # train_train_kernel = x_output.evaluate_kernel() + f_output.evaluate_kernel()
@@ -327,10 +328,12 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
         self.covar_module_x = covar_module_x
         self.covar_module_fidelity = covar_module_fidelity
 
-    def forward(self, X) -> MultivariateNormal:
-        mean_x = self.mean_module(X[..., :-1])
-        covar_x = self.covar_module_x(X[..., :-1])
-        covar_fidelity = self.covar_module_fidelity(X[..., -1:])
+    def forward(self, input) -> MultivariateNormal:
+        i = input[..., -1].long()
+        x = input[..., :-1]
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module_x(x)
+        covar_fidelity = self.covar_module_fidelity(i)
         covar = covar_x.mul(covar_fidelity)
         latent_dist = MultivariateNormal(mean_x, covar)
         return latent_dist
