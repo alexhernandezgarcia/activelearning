@@ -61,18 +61,19 @@ class Tokenizer:
     def transform(self, sequence_tensor):
         # for each tensor in tensor of tensors
         # find the index of the first [PAD] token
-        #  replace that index with [EOS] token
+        # replace that index with [EOS] token
         index = [
             torch.where(sequence == self.padding_idx)[0][0]
             if sequence[-1] == self.padding_idx
             else len(sequence)
             for sequence in sequence_tensor
         ]
+        # Padding element is added to all sequences so that [EOS] token can be added post the sequence, i.e, at index 50 (assuming 0 indexing) if the sequence is of max length 50
         pad_tensor = (
             torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
             * self.padding_idx
         )
-        sequence_tensor = torch.cat([sequence_tensor, pad_tensor], dim=1)
+        sequence_tensor = torch.cat([sequence_tensor, pad_tensor], dim=-1)
         eos_tensor = (
             torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
             * self.eos_idx
