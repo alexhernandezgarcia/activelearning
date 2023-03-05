@@ -22,7 +22,8 @@ class Branin(Proxy):
         else:
             title = "Oracle Energy (TrainY)"
         # what the GP is trained on
-        scores = scores * (-1)
+        if self.maximize == False:
+            scores = scores * (-1)
         index = states.long().detach().cpu().numpy()
         grid_scores = np.zeros((env.length, env.length))
         grid_scores[index[:, 0], index[:, 1]] = scores

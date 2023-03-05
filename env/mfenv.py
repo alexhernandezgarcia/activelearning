@@ -307,16 +307,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             parent = state[:-1] + [-1]
             actions.append(tuple([self.fid, fid] + [0] * (self.action_max_length - 2)))
             parents.append(parent)
-        # each parent must be of the same length for self.tfloat to work
-        # Can we have getparents return tensor instead of list?
-        if self.env.do_state_padding and len(parents) > 0:
-            max_parent_length = max([len(parent) for parent in parents])
-            parents = [
-                parent[:-1]
-                + [self.env.invalid_state_element] * (max_parent_length - len(parent))
-                + [parent[-1]]
-                for parent in parents
-            ]
         return parents, actions
 
     def step(self, action):

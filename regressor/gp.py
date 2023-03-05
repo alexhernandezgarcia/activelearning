@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from abc import abstractmethod
+from botorch.models.approximate_gp import SingleTaskVariationalGP
+from gpytorch.mlls import VariationalELBO
 
 """
 Assumes that in single fidelity, fid =1
@@ -19,7 +21,7 @@ Assumes that in single fidelity, fid =1
 
 
 class SingleTaskGPRegressor:
-    def __init__(self, logger, device, dataset, **kwargs):
+    def __init__(self, logger, device, dataset, maximize, **kwargs):
 
         self.logger = logger
         self.device = device
@@ -31,7 +33,8 @@ class SingleTaskGPRegressor:
 
         # Logger
         self.progress = self.logger.progress
-        self.target_factor = -1
+        if maximize == False:
+            self.target_factor = -1
 
     @abstractmethod
     def init_model(self, train_x, train_y):
@@ -43,16 +46,11 @@ class SingleTaskGPRegressor:
         train = self.dataset.train_dataset
         train_x = train["states"]
         train_y = train["energies"].unsqueeze(-1)
-        # HACK: we want to maximise the energy, so we multiply by -1
         train_y = train_y * self.target_factor
 
         self.init_model(train_x, train_y)
 
-        mll = gpytorch.mlls.ExactMarginalLogLikelihood(
-            self.model.likelihood, self.model
-        )
-        mll.to(train_x)
-        mll = fit_gpytorch_mll(mll)
+        self.mll = fit_gpytorch_mll(self.mll)
 
     def get_predictions(self, env, states):
         """Input is states
@@ -71,7 +69,7 @@ class SingleTaskGPRegressor:
             y_mean = posterior.mean
             y_std = posterior.variance.sqrt()
         if detach == True:
-        # we don't want to detach when called after AL round
+            # we don't want to detach when called after AL round
             y_mean = y_mean.detach().cpu().numpy().squeeze(-1)
             y_std = y_std.detach().cpu().numpy().squeeze(-1)
         else:
@@ -137,11 +135,15 @@ class SingleTaskGPRegressor:
         plt.tight_layout()
         plt.close()
         return fig
-    
+
     def get_modes(self, states, env):
-        num_pick = int((env.length * env.length)/100) *5
+        num_pick = int((env.length * env.length) / 100) * 5
         percent = num_pick / (env.length * env.length) * 100
-        print("\nUser-Defined Warning: Top {}% of states are picked for GP train metrics".format(percent))
+        print(
+            "\nUser-Defined Warning: Top {}% of states with maximum reward are picked for GP mode metrics".format(
+                percent
+            )
+        )
         state_oracle_input = states.clone()
         if hasattr(env, "call_oracle_per_fidelity"):
             samples, fidelity = env.statebatch2oracle(state_oracle_input)
@@ -162,7 +164,7 @@ class SingleTaskGPRegressor:
             state_pick_fid = torch.cat([states_pick, fidelities], dim=1)
             self._mode = state_pick_fid
 
-    def evaluate_model(self, env):
+    def evaluate_model(self, env, do_figure=True):
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
         y_mean, y_std = self.get_predictions(env, states)
         rmse, nll = self.get_metrics(y_mean, y_std, env, states)
@@ -170,8 +172,12 @@ class SingleTaskGPRegressor:
             self.get_modes(states, env)
         mode_mean, mode_std = self.get_predictions(env, self._mode)
         mode_rmse, mode_nll = self.get_metrics(mode_mean, mode_std, env, self._mode)
-        figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
+        if do_figure:
+            figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
+        else:
+            figure = None
         return figure, rmse, nll, mode_rmse, mode_nll
+
 
 class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
     def __init__(self, logger, device, dataset, **kwargs):
@@ -185,6 +191,10 @@ class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
             # fid column
             data_fidelity=self.n_fid - 1,
         )
+        self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
+            self.model.likelihood, self.model
+        )
+        self.mll.to(train_x)
 
 
 class SingleFidelitySingleTaskRegressor(SingleTaskGPRegressor):
@@ -196,5 +206,26 @@ class SingleFidelitySingleTaskRegressor(SingleTaskGPRegressor):
             train_x,
             train_y,
             outcome_transform=Standardize(m=1),
-            # fid column
+        )
+        self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
+            self.model.likelihood, self.model
+        )
+        self.mll.to(train_x)
+
+
+class VariationalSingleTaskRegressor(SingleTaskGPRegressor):
+    def __init__(self, logger, device, dataset, **kwargs):
+        super().__init__(logger, device, dataset, **kwargs)
+        self.num_inducing_points = 64
+
+    def init_model(self, train_x, train_y):
+        train_x = train_x[: self.num_inducing_points]
+        train_y = train_y[: self.num_inducing_points]
+        self.model = SingleTaskVariationalGP(
+            train_x,
+            train_y,
+            outcome_transform=Standardize(m=1),
+        )
+        self.mll = VariationalELBO(
+            self.model.likelihood, self.model.model, num_data=train_x.shape[-2]
         )

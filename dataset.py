@@ -130,16 +130,7 @@ class DataHandler:
             states = [
                 torch.tensor(self.sfenv.readable2state(sample)) for sample in states
             ]
-            # AMP readable2state returns a list of tensors and can take a batch
-            # So maybe it would be worthwhile to use that directly
-            if hasattr(self.sfenv, "do_state_padding") and self.sfenv.do_state_padding:
-                states = pad_sequence(
-                    states,
-                    batch_first=True,
-                    padding_value=self.sfenv.invalid_state_element,
-                )
-            else:
-                states = torch.stack(states)
+            states = torch.stack(states)
         else:
             # for AMP this is the implementation
             # dataset = self.env.load_dataset()
@@ -182,8 +173,8 @@ class DataHandler:
 
         if hasattr(self.sfenv, "plot_samples_frequency"):
             fig = self.sfenv.plot_samples_frequency(
-                    states, title="Initial Dataset", rescale=self.rescale
-                )
+                states, title="Initial Dataset", rescale=self.rescale
+            )
             self.logger.log_figure("inital_dataset", fig, use_context=True)
         if hasattr(self.sfenv, "plot_reward_distribution"):
             fig = self.sfenv.plot_reward_distribution(scores=scores, title="Dataset")
