@@ -178,8 +178,6 @@ def _select_inducing_points(
     f_output = covar_module_fidelity(f_input)
     output = x_output.mul(f_output)
     train_train_kernel = output.evaluate_kernel()
-    # train_train_kernel = x_output.evaluate_kernel() + f_output.evaluate_kernel()
-    # train_train_kernel = covar_module(inputs).evaluate_kernel()
 
     # base case
     if train_train_kernel.ndimension() == 2:
@@ -264,41 +262,41 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
             raise NotImplementedError(
                 "UserDefinedError: Covariance module of x and fidelity must be provided."
             )
-            covar_module = (
-                MaternKernel(
-                    nu=2.5,
-                    ard_num_dims=train_X.shape[-1],
-                    batch_shape=self._aug_batch_shape,
-                    lengthscale_prior=GammaPrior(3.0, 6.0),
-                ).to(train_X),
-            )
-            # batch_shape=self._aug_batch_shape,
-            # outputscale_prior=GammaPrior(2.0, 0.15),
+            # covar_module = (
+            #     MaternKernel(
+            #         nu=2.5,
+            #         ard_num_dims=train_X.shape[-1],
+            #         batch_shape=self._aug_batch_shape,
+            #         lengthscale_prior=GammaPrior(3.0, 6.0),
+            #     ).to(train_X),
             # )
-            self._subset_batch_dict = {
-                "mean_module.constant": -2,
-                "covar_module.raw_outputscale": -1,
-                "covar_module.base_kernel.raw_lengthscale": -3,
-            }
-            task_covar_module = IndexKernel(num_tasks=num_fidelity, rank=1)
+            # # batch_shape=self._aug_batch_shape,
+            # # outputscale_prior=GammaPrior(2.0, 0.15),
+            # # )
+            # self._subset_batch_dict = {
+            #     "mean_module.constant": -2,
+            #     "covar_module.raw_outputscale": -1,
+            #     "covar_module.base_kernel.raw_lengthscale": -3,
+            # }
+            # task_covar_module = IndexKernel(num_tasks=num_fidelity, rank=1)
 
         # initialize inducing points with a pivoted cholesky init if they are not given
         if not isinstance(inducing_points, Tensor):
             raise NotImplementedError(
                 "UserDefinedError: Inducing points must be provided."
             )
-            if inducing_points is None:
-                # number of inducing points is 25% the number of data points
-                # as a heuristic
-                inducing_points = int(0.25 * train_X.shape[-2])
+            # if inducing_points is None:
+            #     # number of inducing points is 25% the number of data points
+            #     # as a heuristic
+            #     inducing_points = int(0.25 * train_X.shape[-2])
 
-            inducing_points = _select_inducing_points(
-                inputs=train_X,
-                covar_module_x=covar_module_x,
-                covar_module_fidelity=covar_module_fidelity,
-                num_inducing=inducing_points,
-                input_batch_shape=input_batch_shape,
-            )
+            # inducing_points = _select_inducing_points(
+            #     inputs=train_X,
+            #     covar_module_x=covar_module_x,
+            #     covar_module_fidelity=covar_module_fidelity,
+            #     num_inducing=inducing_points,
+            #     input_batch_shape=input_batch_shape,
+            # )
 
         if variational_distribution is None:
             variational_distribution = CholeskyVariationalDistribution(
@@ -318,11 +316,11 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
             raise NotImplementedError(
                 "UserDefinedError: Multi-output in _SingleTaskMultiFidelityVariationalGP not yet supported."
             )
-            variational_strategy = IndependentMultitaskVariationalStrategy(
-                base_variational_strategy=variational_strategy,
-                num_tasks=num_outputs,
-                task_dim=-1,
-            )
+            # variational_strategy = IndependentMultitaskVariationalStrategy(
+            #     base_variational_strategy=variational_strategy,
+            #     num_tasks=num_outputs,
+            #     task_dim=-1,
+            # )
         super().__init__(variational_strategy=variational_strategy)
         self.mean_module = mean_module
         self.covar_module_x = covar_module_x

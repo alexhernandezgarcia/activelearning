@@ -141,7 +141,6 @@ class BaseGPSurrogate(abc.ABC):
             ) in loader:
                 # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
-                # input_batch = input_batch.to(torch.long)
                 features = self.get_features(
                     input_batch.to(self.device), transform=False
                 )  # torch.Size([45, 16])
@@ -381,38 +380,6 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
     def set_train_data(self, inputs=None, targets=None, strict=True):
         self.clear_cache()
 
-    # def fit(
-    #     self,
-    #     X_train,
-    #     Y_train,
-    #     X_val,
-    #     Y_val,
-    #     X_test,
-    #     Y_test,
-    #     reset=False,
-    #     log_prefix="single_task_svgp",
-    #     **kwargs,
-    # ):
-    #     if reset:
-    #         raise NotImplementedError
-
-    #     fit_kwargs = dict(
-    #         surrogate=self,
-    #         mll=VariationalELBO(self.likelihood, self.model, num_data=X_train.shape[0]),
-    #         X_train=X_train,
-    #         Y_train=Y_train,
-    #         X_val=X_val,
-    #         Y_val=Y_val,
-    #         X_test=X_test,
-    #         Y_test=Y_test,
-    #         train_bs=self.bs,
-    #         eval_bs=self.bs,
-    #         shuffle_train=True,
-    #         log_prefix=log_prefix,
-    #     )
-    #     fit_kwargs.update(kwargs)
-    #     return fit_gp_surrogate(**fit_kwargs)
-
     def reshape_targets(self, targets):
         if targets.shape[-1] > 1:
             return targets
@@ -545,10 +512,10 @@ class SingleTaskMultiFidelitySVGP(
         self.num_inducing_points = num_inducing_points  # 64
 
         if out_dim == 1:
-            covar_module_x = kernels.RBFKernel()
-            # covar_module_x = kernels.MaternKernel(
-            #     ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
-            # )
+            # covar_module_x = kernels.RBFKernel()
+            covar_module_x = kernels.MaternKernel(
+                ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+            )
             covar_module_x.initialize(lengthscale=self.lengthscale_init)
             covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
             # covar_module = kernels.ProductKernel(
@@ -831,27 +798,17 @@ class SingleTaskMultiFidelitySVGP(
 
         with cholesky_jitter(1e-4):
             # TODO: Check dimension of ind_points
-            kuu_x = self.model.covar_module_x(
-                ind_pts[..., :-1]
-            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
-            kuu_fidelity = self.model.covar_module_fidelity(
-                ind_pts[..., -1:]
-            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
-            kuu = kuu_x.mul(
-                kuu_fidelity
-            )  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
-            kuu_chol = (
-                kuu.cholesky()
-            )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
+            kuu_x = self.model.covar_module_x(ind_pts[..., :-1]).double()
+            kuu_fidelity = self.model.covar_module_fidelity(ind_pts[..., -1:]).double()
+            kuu = kuu_x.mul(kuu_fidelity)
+            kuu_chol = kuu.cholesky()
             kuv_x = self.model.covar_module_x(
                 ind_pts[..., :-1], train_x[..., :-1]
             ).double()
             kuv_fidelity = self.model.covar_module_fidelity(
                 ind_pts[..., -1:], train_x[..., -1:]
             ).double()
-            kuv = kuv_x.mul(
-                kuv_fidelity
-            )  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+            kuv = kuv_x.mul(kuv_fidelity)
 
             # noise = model.likelihood.noise if not is_batch_model else model.likelihood.task_noises.unsqueeze(-1).unsqueeze(-1)
 
