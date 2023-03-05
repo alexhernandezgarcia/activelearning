@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_hartmann")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -120,6 +120,7 @@ def main(config):
             config_model=config_model,
             dataset=data_handler,
             device=config.device,
+            maximize = oracle.maximize,
             float_precision=config.float_precision,
             _recursive_=False,
             logger=logger,
@@ -136,6 +137,7 @@ def main(config):
                 device=config.device,
                 path=config.multifidelity.candidate_set_path,
             )
+
     cumulative_cost = 0.0
     cumulative_sampled_states = []
     cumulative_sampled_energies = torch.tensor([], device = env.device, dtype = env.float)
@@ -147,7 +149,7 @@ def main(config):
             regressor.fit()
             if hasattr(regressor, "evaluate_model"):
                 metrics = {}
-                fig, entire_rmse, entire_nll, mode_rmse, mode_nll = regressor.evaluate_model(env)
+                fig, entire_rmse, entire_nll, mode_rmse, mode_nll = regressor.evaluate_model(env, do_figure = config.do_figure)
                 metrics.update(
                     {
                         "proxy_rmse_entire_data": entire_rmse,
