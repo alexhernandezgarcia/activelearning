@@ -83,9 +83,10 @@ class BaseGPSurrogate(abc.ABC):
         # else:
         #     enc_seq_array = seq_array
 
-        enc_seq_array = seq_array.to(self.device).to(
-            torch.long
-        )  # torch.Size([32, 36]), padded states
+        enc_seq_array = seq_array.to(self.device)
+        # .to(
+        # torch.long
+        # )  # torch.Size([32, 36]), padded states
         features = self.encoder(
             enc_seq_array
         )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
@@ -140,7 +141,7 @@ class BaseGPSurrogate(abc.ABC):
             ) in loader:
                 # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
-                input_batch = input_batch.to(torch.long)
+                # input_batch = input_batch.to(torch.long)
                 features = self.get_features(
                     input_batch.to(self.device), transform=False
                 )  # torch.Size([45, 16])
@@ -544,9 +545,10 @@ class SingleTaskMultiFidelitySVGP(
         self.num_inducing_points = num_inducing_points  # 64
 
         if out_dim == 1:
-            covar_module_x = kernels.MaternKernel(
-                ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
-            )
+            covar_module_x = kernels.RBFKernel()
+            # covar_module_x = kernels.MaternKernel(
+            #     ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+            # )
             covar_module_x.initialize(lengthscale=self.lengthscale_init)
             covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
             # covar_module = kernels.ProductKernel(
@@ -638,9 +640,9 @@ class SingleTaskMultiFidelitySVGP(
         #     )
         # else:
         #     enc_seq_array = seq_array
-        fid_array = seq_array[..., -1].to(self.device) # N.to(torch.long)
-        enc_seq_array = (
-            seq_array[..., :-1].to(self.device)
+        fid_array = seq_array[..., -1].to(self.device)  # N.to(torch.long)
+        enc_seq_array = seq_array[..., :-1].to(
+            self.device
         )  # torch.Size([32, 36]), padded states
         features = self.encoder(
             enc_seq_array
@@ -705,7 +707,7 @@ class SingleTaskMultiFidelitySVGP(
             ) in loader:
                 # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
-                input_batch = input_batch # N.to(torch.long)
+                input_batch = input_batch  # N.to(torch.long)
                 features = self.get_features(
                     input_batch.to(self.device), transform=False
                 )  # torch.Size([45, 16])
@@ -721,7 +723,7 @@ class SingleTaskMultiFidelitySVGP(
                     target_batch.to(features.device).cpu()
                 )  # targets was an empty list
                 # import pdb; pdb.set_trace()
-                target_batch = target_batch.squeeze(-1) # N
+                target_batch = target_batch.squeeze(-1)  # N
                 if y_dist.mean.shape == target_batch.shape:  # True
                     f_std.append(f_dist.variance.sqrt().cpu())
                     y_mean.append(y_dist.mean.cpu())

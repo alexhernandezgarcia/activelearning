@@ -329,8 +329,8 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
         self.covar_module_fidelity = covar_module_fidelity
 
     def forward(self, input) -> MultivariateNormal:
-        i = input[..., -1].long()
         x = input[..., :-1]
+        i = input[..., -1].long()
         mean_x = self.mean_module(x)
         covar_x = self.covar_module_x(x)
         covar_fidelity = self.covar_module_fidelity(i)
