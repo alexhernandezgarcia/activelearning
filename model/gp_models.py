@@ -68,8 +68,8 @@ class BaseGPSurrogate(abc.ABC):
         original_shape = seq_array.shape[:-1]
         flat_seq_array = seq_array.flatten(end_dim=-2)
 
-        if transform is not None:
-            seq_array = transform(seq_array)
+        # if transform is not None:
+        #     seq_array = transform(seq_array)
 
         # Train transform = data augmentations + test transform
 
@@ -145,7 +145,7 @@ class BaseGPSurrogate(abc.ABC):
                 # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
                 features = self.get_features(
-                    input_batch.to(self.device), transform=False
+                    input_batch.to(self.device), transform=None
                 )  # torch.Size([45, 16])
                 f_dist = self(
                     features
@@ -545,9 +545,14 @@ class SingleTaskMultiFidelitySVGP(
         # initialize GP
         # +1 for the fidelity dimension
         dummy_X = 2 * (
-            torch.rand(num_inducing_points, feature_dim + 1).to(self.device, self.float)
+            torch.rand(num_inducing_points, feature_dim).to(self.device, self.float)
             - 0.5
-        )  # torch.Size([64, 16])
+        )
+        dummy_fid = torch.randint(0, n_fid, (num_inducing_points, 1)).to(
+            self.device, self.float
+        )
+        dummy_X = torch.cat([dummy_X, dummy_fid], dim=1)
+        # torch.Size([64, 16])
         dummy_Y = torch.randn(num_inducing_points, out_dim).to(self.device, self.float)
         covar_module_x = (
             covar_module_x
@@ -596,8 +601,8 @@ class SingleTaskMultiFidelitySVGP(
         original_shape = seq_array.shape[:-1]
         flat_seq_array = seq_array.flatten(end_dim=-2)
 
-        if transform is not None:
-            seq_array = transform(seq_array)
+        # if transform is not None:
+        #     seq_array = transform(seq_array)
 
         # Train transform = data augmentations + test transform
 
@@ -680,9 +685,8 @@ class SingleTaskMultiFidelitySVGP(
             ) in loader:
                 # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
-                input_batch = input_batch  # N.to(torch.long)
                 features = self.get_features(
-                    input_batch.to(self.device), transform=False
+                    input_batch.to(self.device), transform=None
                 )  # torch.Size([45, 16])
                 f_dist = self(
                     features

@@ -18,8 +18,8 @@ from gpytorch.means import ConstantMean, Mean
 import copy
 import torch
 from gpytorch.priors import GammaPrior
+from botorch.posteriors.gpytorch import GPyTorchPosterior
 
-# from botorch.models.approximate_gp import _select_inducing_points
 from botorch.models.approximate_gp import _pivoted_cholesky_init
 from botorch.models.transforms.outcome import OutcomeTransform
 from botorch.models.transforms.input import InputTransform
@@ -31,7 +31,7 @@ from gpytorch.distributions import MultivariateNormal
 
 MIN_INFERRED_NOISE_LEVEL = 1e-4
 
-# TODO: Adopt inheritance
+
 class SingleTaskMultiFidelityVariationalGP(ApproximateGPyTorchModel):
     def __init__(
         self,
@@ -325,10 +325,12 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
         self.mean_module = mean_module
         self.covar_module_x = covar_module_x
         self.covar_module_fidelity = covar_module_fidelity
+        self.num_inducing_points = inducing_points.shape[-2]
 
     def forward(self, input) -> MultivariateNormal:
         x = input[..., :-1]
-        i = input[..., -1].long()
+        i = input[..., -1]
+        i = i.unsqueeze(-1)
         mean_x = self.mean_module(x)
         covar_x = self.covar_module_x(x)
         covar_fidelity = self.covar_module_fidelity(i)

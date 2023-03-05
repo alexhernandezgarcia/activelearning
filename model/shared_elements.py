@@ -134,6 +134,7 @@ class mCNN(nn.Module):
         # if src_tok_idxs.size(1) > self.max_len:
         # src_tok_idxs = src_tok_idxs[:, : self.max_len + 1]
         # torch.Size([426, 36]) -- max length 36
+        src_tok_idxs = src_tok_idxs.long()
         src_tok_features = self.embedding(src_tok_idxs) * math.sqrt(
             self.embed_dim
         )  # embed_dim 64, src_tok_features= torch.Size([426, 36, 64])
