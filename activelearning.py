@@ -25,7 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 
-@hydra.main(config_path="./config", config_name="sf_dkl")
+@hydra.main(config_path="./config", config_name="mf_dkl")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -105,6 +105,7 @@ def main(config):
             proxy_state_format=config.env.proxy_state_format,
             rescale=config.multifidelity.rescale,
         )
+        env.env.oracle = oracles[0]
     else:
         oracle = oracles[0]
         env.oracle = oracle

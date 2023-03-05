@@ -248,6 +248,67 @@ class OracleMultiFidelityMES(MES):
         return fig
 
 
+class DeepKernelMultiFidelityMES(MES):
+    def __init__(self, regressor, **kwargs):
+        self.regressor = regressor
+        super().__init__(**kwargs)
+
+    def load_model(self):
+        return self.regressor.surrogate
+
+    def load_candidate_set(self):
+        path = self.logger.data_path.parent / Path("data_train.csv")
+        data = pd.read_csv(path, index_col=0)
+        samples = data["samples"]
+        state = [self.env.readable2state(sample) for sample in samples]
+        state_proxy = self.env.statebatch2proxy(state)  # [: self.regressor.n_samples]
+        fid_proxy = state_proxy[..., -1]
+        state_proxy = state_proxy[..., :-1]
+        (
+            state_tok_features,
+            state_mask,
+        ) = self.regressor.language_model.get_token_features(state_proxy)
+        _, pooled_state_proxy_features = self.regressor.language_model.pool_features(
+            state_tok_features, state_mask
+        )
+        candidate_set = torch.cat(
+            [pooled_state_proxy_features, fid_proxy.unsqueeze(-1)], dim=1
+        )
+        return candidate_set
+
+    def project(self, states):
+        input_dim = states.ndim
+        max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
+            self.n_fid - 1
+        )
+        if input_dim == 3:
+            states = states[:, :, :-1]
+            max_fid = max_fid.unsqueeze(1)
+            states = torch.cat([states, max_fid], dim=2)
+        elif input_dim == 2:
+            states = states[:, :-1]
+            states = torch.cat([states, max_fid], dim=1)
+        return states
+
+    def __call__(self, states):
+        assert torch.eq(states.to(torch.long), states).all()
+        inputs = states.clone().to(torch.long)
+        fid = inputs[..., -1]
+        inputs = inputs[..., :-1]
+        (
+            input_tok_features,
+            input_mask,
+        ) = self.regressor.language_model.get_token_features(inputs)
+        _, pooled_features = self.regressor.language_model.pool_features(
+            input_tok_features, input_mask
+        )
+        inputs = pooled_features
+        inputs = torch.cat([inputs, fid.unsqueeze(-1)], dim=1)
+        inputs = inputs.unsqueeze(-2)
+        acq_values = self.acqf(inputs)
+        return acq_values
+
+
 class GaussianProcessMultiFidelityMES(MES):
     def __init__(self, regressor, **kwargs):
         self.regressor = regressor
