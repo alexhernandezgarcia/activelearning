@@ -59,7 +59,7 @@ class BaseGPSurrogate(abc.ABC):
         # self._set_transforms(tokenizer, max_shift, mask_size)
 
     def get_features(
-        self, seq_array, batch_size=None, transform=True
+        self, seq_array, batch_size=None, transform=None
     ):  # batch_size not used
         # if transform:
         #     original_shape = seq_array.shape
@@ -67,6 +67,9 @@ class BaseGPSurrogate(abc.ABC):
         # else:
         original_shape = seq_array.shape[:-1]
         flat_seq_array = seq_array.flatten(end_dim=-2)
+
+        if transform is not None:
+            seq_array = transform(seq_array)
 
         # Train transform = data augmentations + test transform
 
@@ -584,7 +587,7 @@ class SingleTaskMultiFidelitySVGP(
             clear_cache_hook(self.model.variational_strategy.base_variational_strategy)
 
     def get_features(
-        self, seq_array, batch_size=None, transform=True
+        self, seq_array, batch_size=None, transform=None
     ):  # batch_size not used
         # if transform:
         #     original_shape = seq_array.shape
@@ -592,6 +595,9 @@ class SingleTaskMultiFidelitySVGP(
         # else:
         original_shape = seq_array.shape[:-1]
         flat_seq_array = seq_array.flatten(end_dim=-2)
+
+        if transform is not None:
+            seq_array = transform(seq_array)
 
         # Train transform = data augmentations + test transform
 

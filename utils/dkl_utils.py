@@ -20,3 +20,6 @@ def batched_call(
         raise ValueError
     # arg_batches makes batches of the array of sequences, args = (), kwargs = {}
     return [fn(batch, *args, **kwargs) for batch in arg_batches]
+
+def float_to_long(x: torch.Tensor):
+    return torch.LongTensor(x).to(x.device)
