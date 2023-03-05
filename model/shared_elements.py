@@ -83,7 +83,7 @@ class mCNN(nn.Module):
         **kwargs,
     ):
         super().__init__()
-        # one for sep and one for eos
+        # one for bos and one for eos
         # max_len_delta = 2
         max_len = max_len + 2
         vocab_size = len(tokenizer.full_vocab)

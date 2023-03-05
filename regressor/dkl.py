@@ -20,6 +20,12 @@ from torch.nn.utils.rnn import pad_sequence
 import os
 from tqdm import tqdm
 
+"""
+This DKL regressor strictly assumes that the states are integral. 
+If not, the states are converted to integral. 
+This might lead to loss of precision if the states were intended to be fractional for traning purposes. 
+"""
+
 
 class Tokenizer:
     def __init__(self, non_special_vocab):
@@ -107,6 +113,7 @@ class DeepKernelRegressor:
 
         # Dataset
         self.dataset = dataset
+        self.n_fid = self.dataset.n_fid
 
         self.tokenizer = tokenizer
         # config_model.model["tokenizer"] = self.tokenizer
@@ -127,6 +134,7 @@ class DeepKernelRegressor:
             encoder=self.language_model,
             device=self.device,
             float_precision=self.float,
+            n_fid=self.n_fid,
         )
 
         self.batch_size = batch_size
@@ -166,6 +174,8 @@ class DeepKernelRegressor:
     def mlm_train_step(self, optimizer, token_batch, mask_ratio, loss_scale=1.0):
         optimizer.zero_grad(set_to_none=True)
 
+        if self.n_fid > 1:
+            token_batch = token_batch[..., :-1]
         # replace random tokens with mask token
         mask_idxs = sample_mask(token_batch, self.tokenizer, mask_ratio)  # (32, 5)
         masked_token_batch = token_batch.clone().to(self.language_model.device)
@@ -214,14 +224,31 @@ class DeepKernelRegressor:
         return loss
 
     def fit(self):
+        print(
+            "\n\nUser-Defined Warning: DKL regressor strictly assumes that the states are integral. \n \
+            This is because an embedding layer is used to map each state element to a corresponding embedding.\n \
+            If the input states aren't integral, they are forcefully converted to integers. \n \
+            This might lead to loss of precision if the states were intended to be fractional for training and evaluation purposes. \n \
+            Please ensure that you wanted the states to be integral. \n \
+            (For example in 100x100 Branin, the states are not intended to be integral.)"
+        )
         select_crit_key = "test_nll"
 
-        X_train = self.dataset.train_dataset["samples"]
-        Y_train = self.dataset.train_dataset["energies"]
+        if self.progress:
+            print(
+                "\nUser-Defined Warning: Converting states to integer for variational inducing points initialization."
+            )
+        X_train = self.dataset.train_dataset["samples"].long()
+        Y_train = self.dataset.train_dataset["energies"].long()
         Y_train = self.surrogate.reshape_targets(Y_train)
         Y_train = Y_train.to(dtype=list(self.surrogate.parameters())[0].dtype)
 
         train_loader, test_loader = self.dataset.get_dataloader()
+        if self.progress:
+            print(
+                "\nUser-Defined Warning: Converting states in train loader to integer for MLM training.\n \
+                    Similar conversion will be done in test loader for MLM and Surrogate evaluation."
+            )
 
         print("\n---- preparing checkpoint ----")
         self.surrogate.eval()
@@ -235,6 +262,7 @@ class DeepKernelRegressor:
                 self.language_model,
                 test_loader,
                 self.language_model.mask_ratio,
+                self.n_fid,
             )
         )
 
@@ -244,7 +272,7 @@ class DeepKernelRegressor:
         best_weights = copy.deepcopy(self.surrogate.state_dict())
         self.surrogate.to(self.surrogate.device)
         if best_score is not None and self.progress is True:
-            print(f"starting Test NLL: {best_score:.4f}")
+            print(f"\nstarting Test NLL: {best_score:.4f}")
 
         self.initialize_surrogate(X_train, Y_train)
 
@@ -278,7 +306,7 @@ class DeepKernelRegressor:
             avg_train_loss = 0.0
             self.surrogate.train()
             for inputs, targets in train_loader:
-
+                inputs = inputs.to(torch.long)
                 # train encoder through unsupervised MLM objective
                 if self.encoder_obj == "mlm":
                     self.surrogate.encoder.requires_grad_(

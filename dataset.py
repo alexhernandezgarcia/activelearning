@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from gflownet.utils.common import set_device, set_float_precision
 from torch.nn.utils.rnn import pad_sequence
 from torchtyping import TensorType
+from typing import List
 
 
 class Data(Dataset):
@@ -161,7 +162,8 @@ class DataHandler:
             states, fidelities = self.generate_fidelities(states)
             # specifically for discrete case (states) are integers
             states = torch.cat([states, fidelities], dim=1).long()
-            state_oracle, fid = self.env.statetorch2oracle(states)
+            states_oracle_input = states.clone()
+            state_oracle, fid = self.env.statetorch2oracle(states_oracle_input)
             if scores is None:
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
             # Grid
@@ -172,8 +174,9 @@ class DataHandler:
                 self.logger.log_figure("train_dataset", fig, use_context=True)
         # TODO: add clause for when n_fid> 1 but fidelity.do=False
         elif self.n_fid == 1 and scores is None:
+            states_oracle_input = states.clone()
             state_oracle = self.env.statetorch2oracle(
-                states, bos_idx=self.tokenizer.bos_idx
+                states_oracle_input, bos_idx=self.tokenizer.bos_idx
             )
             scores = self.env.oracle(state_oracle)
 
@@ -214,12 +217,19 @@ class DataHandler:
             # test_targets = self.oracle(test_samples)
         # TODO: make general to sf
         if hasattr(self.sfenv, "statetorch2readable"):
-            readable_train_samples = [
-                self.env.statetorch2readable(
-                    sample, self.tokenizer.inverse_lookup, self.tokenizer.lookup
-                )
-                for sample in train_states
-            ]
+            if self.tokenizer is not None:
+                readable_train_samples = [
+                    self.env.statetorch2readable(
+                        sample,
+                        inverse_lookup=self.tokenizer.inverse_lookup,
+                        lookup=self.tokenizer.lookup,
+                    )
+                    for sample in train_states
+                ]
+            else:
+                readable_train_samples = [
+                    self.env.statetorch2readable(sample) for sample in train_states
+                ]
             readable_train_dataset = {
                 "samples": readable_train_samples,
                 "energies": train_scores.tolist(),
@@ -311,8 +321,9 @@ class DataHandler:
         # if self.n_fid == 1 and self.path.oracle_dataset:
         # state_batch = [self.env.readable2state(sample) for sample in samples]
         # else:
-        state_batch = samples
-        state_proxy = self.env.statetorch2proxy(state_batch)
+        state_input_proxy = samples.clone()
+        state_proxy = self.env.statetorch2proxy(state_input_proxy)
+        # state_proxy = self.env.statetorch2proxy(state_batch)
         # if self.tokenizer is not None:
         # Inout must be a tensor
         # state_proxy = self.tokenizer.transform(state_proxy)
@@ -377,7 +388,15 @@ class DataHandler:
         Saves the updated dataset if save_data=True
         """
         if self.n_fid > 1:
-            states = [state + [fid.tolist()] for state, fid in zip(states, fidelity)]
+            if isinstance(states[0], List):
+                states = [
+                    state + [fid.tolist()] for state, fid in zip(states, fidelity)
+                ]
+            else:
+                states = torch.vstack(states)
+                states = torch.cat(
+                    (states, fidelity.unsqueeze(-1).to(states.device)), dim=1
+                )
         # remove duplicate rows from tensor states
         # get indices of unique rows
         # states, index = torch.unique(torch.tensor(states), dim=0, return_inverse=True)
