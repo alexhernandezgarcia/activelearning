@@ -289,6 +289,8 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         input_transform=None,
         learn_inducing_points=True,
         mll_beta=1.0,
+        kernel="matern",
+        noise_prior=None,
         *args,
         **kwargs,
     ):
@@ -300,12 +302,17 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         self.num_inducing_points = num_inducing_points  # 64
 
         if out_dim == 1:
-            covar_module = kernels.MaternKernel(
-                ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
-            )
+            if kernel == "matern":
+                covar_module = kernels.MaternKernel(
+                    ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+                )
+            elif kernel == "rbf":
+                covar_module = kernels.RBFKernel(
+                    ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+                )
             covar_module.initialize(lengthscale=self.lengthscale_init)
             likelihood = likelihoods.GaussianLikelihood(
-                noise_constraint=noise_constraint
+                noise_constraint=noise_constraint, noise_prior=noise_prior
             )
             likelihood.initialize(noise=self.task_noise_init)
         else:
@@ -490,7 +497,8 @@ class SingleTaskMultiFidelitySVGP(
         input_transform=None,
         learn_inducing_points=True,
         mll_beta=1.0,
-        kernel="rbf",
+        kernel="matern",
+        noise_prior=None,
         *args,
         **kwargs,
     ):
@@ -500,20 +508,20 @@ class SingleTaskMultiFidelitySVGP(
         self.num_inducing_points = num_inducing_points  # 64
 
         if out_dim == 1:
-            if kernel == "rbf":
-                covar_module_x = kernels.RBFKernel()
-            elif kernel == "matern":
+            if kernel == "matern":
                 covar_module_x = kernels.MaternKernel(
                     ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
                 )
-                covar_module_x.initialize(lengthscale=self.lengthscale_init)
-            covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
-            if noise_constraint is None:
-                likelihood = likelihoods.GaussianLikelihood()
-            else:
-                likelihood = likelihoods.GaussianLikelihood(
-                    noise_constraint=noise_constraint
+            elif kernel == "rbf":
+                covar_module_x = kernels.RBFKernel(
+                    ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
                 )
+            covar_module_x.initialize(lengthscale=self.lengthscale_init)
+            likelihood = likelihoods.GaussianLikelihood(
+                noise_constraint=noise_constraint, noise_prior=noise_prior
+            )
+            likelihood.initialize(noise=self.task_noise_init)
+            covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
             likelihood.initialize(noise=self.task_noise_init)
         else:
             raise NotImplementedError(
