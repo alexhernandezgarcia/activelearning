@@ -465,7 +465,7 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
         s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
 
-        if not is_batch_model:
+        if not is_batch_model:  # True
             self.model.variational_strategy._variational_distribution.variational_mean.data = (
                 mean_param.data.detach().squeeze()
             )
@@ -473,7 +473,7 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
                 s_root.data.detach()
             )
             self.model.variational_strategy.variational_params_initialized.fill_(1)
-        else:  # True
+        else:
             self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
                 mean_param.data.detach().squeeze()
             )
@@ -515,19 +515,16 @@ class SingleTaskMultiFidelitySVGP(
         self.num_inducing_points = num_inducing_points  # 64
 
         if out_dim == 1:
-            # covar_module_x = kernels.RBFKernel()
-            covar_module_x = kernels.MaternKernel(
-                ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
-            )
-            covar_module_x.initialize(lengthscale=self.lengthscale_init)
+            covar_module_x = kernels.RBFKernel()
+            # covar_module_x = kernels.MaternKernel(
+            # ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+            # )
+            # covar_module_x.initialize(lengthscale=self.lengthscale_init)
             covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
-            # covar_module = kernels.ProductKernel(
-            #     covar_module_x, covar_module_fidelity
-            # )  # ProductKernel(
-            likelihood = likelihoods.GaussianLikelihood(
-                noise_constraint=noise_constraint
-            )
-            likelihood.initialize(noise=self.task_noise_init)
+            likelihood = likelihoods.GaussianLikelihood()
+            # noise_constraint=noise_constraint
+            # )
+            # likelihood.initialize(noise=self.task_noise_init)
         else:
             raise NotImplementedError(
                 "More than one output dim not supported. Refer to lambo repo if you really wanna"
@@ -660,6 +657,12 @@ class SingleTaskMultiFidelitySVGP(
 
     def set_train_data(self, inputs=None, targets=None, strict=True):
         self.clear_cache()
+
+    def reshape_targets(self, targets):
+        if targets.shape[-1] > 1:
+            return targets
+        else:
+            return targets.squeeze(-1)
 
     @property
     def num_outputs(self) -> int:
