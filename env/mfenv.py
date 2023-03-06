@@ -47,6 +47,12 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # UNCOMMENT THE FOLLOWING IN BRANIN
             self.statetorch2oracle = self.state_from_statefid
             self.statebatch2oracle = self.state_from_statefid
+        elif proxy_state_format == "state_fidIdx":
+            self.statebatch2proxy = self.statebatch2state_longFid
+            self.statetorch2proxy = self.statetorch2state_longFid
+            # UNCOMMENT THE FOLLOWING IN BRANIN
+            self.statetorch2oracle = self.state_from_statefid
+            self.statebatch2oracle = self.state_from_statefid
         else:
             raise ValueError("Invalid proxy_state_format")
         self.oracle = oracle
@@ -103,6 +109,25 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             if idx_fid.shape[0] > 0:
                 transformed_fidelities[idx_fid] = self.oracle[fid].fid
         states = torch.cat([state_oracle, transformed_fidelities.unsqueeze(-1)], dim=-1)
+        return states
+
+    def statebatch2state_longFid(self, states):
+        state, fid = zip(*[[state[:-1], state[-1]] for state in states])
+        states = self.env.statebatch2state(list(state))
+        if self.is_state_list:
+            fidelities = torch.tensor(
+                fid, device=states.device, dtype=states.dtype
+            ).unsqueeze(-1)
+        else:
+            fidelities = torch.vstack(fid).to(states.dtype).to(states.device)
+        states = torch.cat([states, fidelities], dim=-1)
+        return states
+
+    def statetorch2state_longFid(self, states: TensorType["batch", "state_dim"]):
+        state = states[:, :-1]
+        state = self.env.statetorch2state(state)
+        fid = states[:, -1].unsqueeze(-1)
+        states = torch.cat([state, fid], dim=-1)
         return states
 
     def statebatch2state(self, states: List[TensorType["state_dim"]]):

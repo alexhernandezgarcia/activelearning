@@ -6,19 +6,11 @@ import os
 import random
 import hydra
 from omegaconf import OmegaConf
-import yaml
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
-from utils.multifidelity_toy import make_dataset, plot_gp_predictions
+from utils.multifidelity_toy import make_dataset
 import matplotlib.pyplot as plt
 from regressor.dkl import Tokenizer
-
-# ToyOracle,
-# ,
-#     plot_acquisition,
-#     plot_context_points,
-#     plot_predictions_oracle,
-#
 from pathlib import Path
 import pandas as pd
 import numpy as np

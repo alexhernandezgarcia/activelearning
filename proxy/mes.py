@@ -421,7 +421,7 @@ class VariationalGPMultiFidelityMES(MES):
         input_dim = states.ndim
         states = states.to(self.device)
         max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
-            self.env.oracle[self.n_fid - 1].fid
+            self.n_fid - 1
         )
         if input_dim == 3:
             states = states[:, :, :-1]
