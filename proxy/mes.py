@@ -274,6 +274,9 @@ class DeepKernelMultiFidelityMES(MES):
 
     def project(self, states):
         input_dim = states.ndim
+        print(
+            "User Defined Warning: In MES-project, fidelity is being replace by the INDEX (not oracle.fid) of the maximum fidelity."
+        )
         max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
             self.n_fid - 1
         )
@@ -390,3 +393,41 @@ class GaussianProcessMultiFidelityMES(MES):
         plt.tight_layout()
         plt.close()
         return fig
+
+
+class VariationalGPMultiFidelityMES(MES):
+    def __init__(self, regressor, **kwargs):
+        self.regressor = regressor
+        super().__init__(**kwargs)
+
+    def load_model(self):
+        return self.regressor.surrogate
+
+    def load_candidate_set(self):
+        path = self.logger.data_path.parent / Path("data_train.csv")
+        data = pd.read_csv(path, index_col=0)
+        samples = data["samples"]
+        state = [self.env.readable2state(sample) for sample in samples]
+        state_proxy = self.env.statebatch2proxy(state)
+        if isinstance(state_proxy, torch.Tensor):
+            candidate_set = state_proxy.to(self.device)
+        else:
+            candidate_set = torch.tensor(
+                state_proxy, device=self.device, dtype=self.float
+            )
+        return candidate_set
+
+    def project(self, states):
+        input_dim = states.ndim
+        states = states.to(self.device)
+        max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
+            self.env.oracle[self.n_fid - 1].fid
+        )
+        if input_dim == 3:
+            states = states[:, :, :-1]
+            max_fid = max_fid.unsqueeze(1)
+            states = torch.cat([states, max_fid], dim=2)
+        elif input_dim == 2:
+            states = states[:, :-1]
+            states = torch.cat([states, max_fid], dim=1)
+        return states

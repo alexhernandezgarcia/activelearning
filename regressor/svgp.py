@@ -69,7 +69,7 @@ class SingleTaskSVGP(DeepKernelRegressor):
 
         train_loader, test_loader = self.dataset.get_dataloader()
 
-        print("\n---- preparing checkpoint ----")
+        print("\nPreparing checkpoint")
         self.surrogate.eval()
         self.surrogate.requires_grad_(False)
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
@@ -99,7 +99,7 @@ class SingleTaskSVGP(DeepKernelRegressor):
             patience=math.ceil(self.surrogate.patience / 2.0),
             threshold=1e-3,
         )
-        print("\n---- fitting all SVGP params ----")
+        print("\nFitting all SVGP params ")
         pbar = tqdm(range(1, self.surrogate.num_epochs + 1))
         for epoch_idx in pbar:
             metrics = {}
@@ -181,7 +181,7 @@ class SingleTaskSVGP(DeepKernelRegressor):
         if self.surrogate.early_stopping:
             print(f"\n---- loading checkpoint from epoch {best_score_epoch} ----")
             self.surrogate.load_state_dict(best_weights)
-            print(f"---- best test NLL: {best_score:.4f} ----")
+            print(f"---- best test NLL: {best_loss:.4f} ----")
             self.best_score = best_score
             self.best_loss = best_loss
         else:
@@ -193,7 +193,38 @@ class SingleTaskSVGP(DeepKernelRegressor):
         self.surrogate.eval()
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
 
-    def evaluate(self, env, do_figure=False):
+    def evaluate(self, **kwargs):
         test_rmse = self.best_score
         test_nll = self.best_loss
         return test_rmse, test_nll, 0.0, 0.0, None
+
+
+class SingleTaskMultiFidelitySVGP(SingleTaskSVGP):
+    def __init__(
+        self, logger, device, dataset, surrogate, float_precision, checkpoint, **kwargs
+    ):
+        self.logger = logger
+        self.progress = self.logger.progress
+
+        # Device
+        self.device = set_device(device)
+        # Float precision
+        self.float = set_float_precision(float_precision)
+
+        # Dataset
+        self.dataset = dataset
+        self.n_fid = self.dataset.n_fid
+
+        self.language_model = AsItIs()
+        self.surrogate_config = surrogate
+        self.surrogate = hydra.utils.instantiate(
+            surrogate,
+            tokenizer=None,
+            encoder=self.language_model,
+            device=self.device,
+            float_precision=self.float,
+            n_fid=self.n_fid,
+        )
+        self.batch_size = self.surrogate.bs
+        if checkpoint:
+            self.logger.set_proxy_path(checkpoint)

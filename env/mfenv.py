@@ -582,11 +582,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         costs = [self.fidelity_costs[fid] for fid in fidelity_of__oracle]
         return costs
 
-    def get_pairwise_distance(self, samples):
+    def get_pairwise_distance(self, samples_set1, samples_set2=None):
         if hasattr(self.env, "get_pairwise_distance"):
-            return self.env.get_pairwise_distance(samples)
+            return self.env.get_pairwise_distance(samples_set1, samples_set2)
         else:
-            return torch.zeros(len(samples))
+            return torch.zeros(len(samples_set1))
 
     def get_distance_from_D0(self, samples, dataset_obs):
         if hasattr(self.env, "get_distance_from_D0"):

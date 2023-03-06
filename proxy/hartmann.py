@@ -68,8 +68,8 @@ class MultiFidelityHartmann(Hartmann):
             states = torch.tensor(states, device=self.device, dtype=self.float)
         else:
             states = states.to(self.device).to(self.float)
-        if states.shape[1] != 2:
-            states = states[:, :2]
+        # if states.shape[1] != 6:
+        # states = states[:, :6]
         state_fid = torch.cat([states, fidelity], dim=1)
         scores = self.task(state_fid)
         # scores = scores.unsqueeze(-1)
