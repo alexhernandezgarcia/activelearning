@@ -34,7 +34,7 @@ class DataHandler:
     def __init__(
         self,
         env,
-        normalise_data,
+        normalize_data,
         train_fraction,
         dataloader,
         path,
@@ -50,7 +50,7 @@ class DataHandler:
         rescale=None,
     ):
         self.env = env
-        self.normalise_data = normalise_data
+        self.normalize_data = normalize_data
         self.train_fraction = train_fraction
         self.n_samples = n_samples
         self.dataloader = dataloader
@@ -104,7 +104,7 @@ class DataHandler:
         - dataset['states']: list of arrays
         - dataset['energies']: list of float values
 
-        If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
+        If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalized data is saved as npy
         """
         if self.path.oracle_dataset:
             # when one dataset without fidelity is given
@@ -234,7 +234,7 @@ class DataHandler:
                 "samples": readable_train_samples,
                 "energies": train_scores.tolist(),
             }
-        # Save the raw (un-normalised) dataset
+        # Save the raw (un-normalized) dataset
         self.logger.save_dataset(readable_train_dataset, "train")
         self.train_dataset = {"states": train_states, "energies": train_scores}
 
@@ -280,7 +280,7 @@ class DataHandler:
         # Log the dataset statistics
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            prefix = "\nNormalised " if self.normalise_data else "\n"
+            prefix = "\nnormalized " if self.normalize_data else "\n"
             print(prefix + "Dataset Statistics")
             print(
                 "Train Data \n \t Mean Score:{:.2f} \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
@@ -303,7 +303,7 @@ class DataHandler:
     def preprocess(self, dataset):
         """
         - converts states to proxy space
-        - normalises the energies
+        - normalizes the energies
         - shuffles the data
         - splits the data into train and test
         """
@@ -322,8 +322,8 @@ class DataHandler:
         dataset = {"states": states, "energies": scores}
 
         stats = self.get_statistics(scores)
-        if self.normalise_data:
-            dataset["energies"] = self.normalise(dataset["energies"], stats)
+        if self.normalize_data:
+            dataset["energies"] = self.normalize(dataset["energies"], stats)
 
         return dataset, stats
 
@@ -338,26 +338,26 @@ class DataHandler:
         dict["min"] = torch.min(y)
         return dict
 
-    def normalise(self, y, stats):
+    def normalize(self, y, stats):
         """
         Args:
-            y: targets to normalise (tensor)
+            y: targets to normalize (tensor)
             mean: mean of targets (tensor)
             std: std of targets (tensor)
         Returns:
-            y: normalised targets (tensor)
+            y: normalized targets (tensor)
         """
         y = (y - stats["mean"]) / stats["std"]
         return y
 
-    def denormalise(self, y, stats):
+    def denormalize(self, y, stats):
         """
         Args:
-            y: targets to denormalise (tensor)
+            y: targets to denormalize (tensor)
             mean: mean of targets (tensor)
             std: std of targets (tensor)
         Returns:
-            y: denormalised targets (tensor)
+            y: denormalized targets (tensor)
         """
         y = y * stats["std"] + stats["mean"]
         return y
@@ -418,8 +418,8 @@ class DataHandler:
             states = states.to(self.device)  # dtype=self.float
         energies = torch.tensor(energies, dtype=self.float, device=self.device)
 
-        if self.normalise_data:
-            self.train_dataset["energies"] = self.denormalise(
+        if self.normalize_data:
+            self.train_dataset["energies"] = self.denormalize(
                 self.train_dataset["energies"], stats=self.train_stats
             )
 
@@ -431,8 +431,8 @@ class DataHandler:
         )
 
         self.train_stats = self.get_statistics(self.train_dataset["energies"])
-        if self.normalise_data:
-            self.train_dataset["energies"] = self.normalise(
+        if self.normalize_data:
+            self.train_dataset["energies"] = self.normalize(
                 self.train_dataset["energies"], self.train_stats
             )
         self.train_data = Data(
@@ -441,7 +441,7 @@ class DataHandler:
 
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            prefix = "\nNormalised " if self.normalise_data else "\n"
+            prefix = "\nnormalized " if self.normalize_data else "\n"
             print(prefix + "Updated Dataset Statistics")
             print(
                 "\n Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
@@ -498,7 +498,7 @@ class DataHandler:
         Build and return the dataloader for the networks
         The dataloader should return x and y such that:
             x: self.env.statebatch2proxy(input)
-            y: normalised (if need be) energies
+            y: normalized (if need be) energies
         """
         train_loader = DataLoader(
             self.train_data,
