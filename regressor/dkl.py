@@ -135,7 +135,7 @@ class DeepKernelRegressor:
             n_fid=self.n_fid,
         )
 
-        self.batch_size = batch_size
+        self.batch_size = self.surrogate.bs
         if checkpoint:
             self.logger.set_proxy_path(checkpoint)
 
@@ -233,8 +233,10 @@ class DeepKernelRegressor:
             print(
                 "\nUser-Defined Warning: Converting states to integer for variational inducing points initialization."
             )
+        # TODO: Is the conversion to long necessary
+        # TODO: Y_train was long -- I removed that
         X_train = self.dataset.train_dataset["states"].long()
-        Y_train = self.dataset.train_dataset["energies"].long()
+        Y_train = self.dataset.train_dataset["energies"]
         Y_train = self.surrogate.reshape_targets(Y_train)
         Y_train = Y_train.to(dtype=list(self.surrogate.parameters())[0].dtype)
 
@@ -423,34 +425,34 @@ class DeepKernelRegressor:
         self.surrogate.eval()
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
 
-    def load_model(self):
-        """
-        Load and returns the model
-        """
-        name = (
-            self.logger.proxy_ckpt_path.stem + self.logger.context + "final" + ".ckpt"
-        )
-        path = self.logger.proxy_ckpt_path.parent / name
+    # def load_model(self):
+    #     """
+    #     Load and returns the model
+    #     """
+    #     name = (
+    #         self.logger.proxy_ckpt_path.stem + self.logger.context + "final" + ".ckpt"
+    #     )
+    #     path = self.logger.proxy_ckpt_path.parent / name
 
-        self.surrogate = hydra.utils.instantiate(
-            self.surrogate_config,
-            tokenizer=self.language_model.tokenizer,
-            encoder=self.language_model,
-            device=self.device,
-            float_precision=self.float,
-        )
-        optimizer = torch.optim.Adam(self.surrogate.param_groups)
+    #     self.surrogate = hydra.utils.instantiate(
+    #         self.surrogate_config,
+    #         tokenizer=self.language_model.tokenizer,
+    #         encoder=self.language_model,
+    #         device=self.device,
+    #         float_precision=self.float,
+    #     )
+    #     optimizer = torch.optim.Adam(self.surrogate.param_groups)
 
-        if os.path.exists(path):
-            # make the following line cpu compatible
-            checkpoint = torch.load(path, map_location="cuda:0")
-            self.surrogate.load_state_dict(checkpoint["model_state_dict"])
-            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-            self.surrogate.to(self.device).to(self.float)
-            for state in optimizer.state.values():  # move optimizer to GPU
-                for k, v in state.items():
-                    if isinstance(v, torch.Tensor):
-                        state[k] = v.to(self.device)
-            return True
-        else:
-            raise FileNotFoundError
+    #     if os.path.exists(path):
+    #         # make the following line cpu compatible
+    #         checkpoint = torch.load(path, map_location="cuda:0")
+    #         self.surrogate.load_state_dict(checkpoint["model_state_dict"])
+    #         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    #         self.surrogate.to(self.device).to(self.float)
+    #         for state in optimizer.state.values():  # move optimizer to GPU
+    #             for k, v in state.items():
+    #                 if isinstance(v, torch.Tensor):
+    #                     state[k] = v.to(self.device)
+    #         return True
+    #     else:
+    #         raise FileNotFoundError

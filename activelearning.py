@@ -24,7 +24,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_hartmann")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -112,6 +112,11 @@ def main(config):
     else:
         config_model = None
 
+    if hasattr(oracle, "modes"):
+        modes = oracle.modes
+    else:
+        modes = None
+
     if config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
             config.dataset,
@@ -150,6 +155,7 @@ def main(config):
 
     cumulative_cost = 0.0
     cumulative_sampled_states = []
+    cumulative_sampled_samples = []
     cumulative_sampled_energies = torch.tensor([], device=env.device, dtype=env.float)
     for iter in range(1, config.al_n_rounds + 1):
         print(f"\nStarting iteration {iter} of active learning")
@@ -161,15 +167,15 @@ def main(config):
                 metrics = {}
                 (
                     fig,
-                    entire_rmse,
-                    entire_nll,
+                    test_rmse,
+                    test_nll,
                     mode_rmse,
                     mode_nll,
                 ) = regressor.evaluate_model(env, do_figure=config.do_figure)
                 metrics.update(
                     {
-                        "proxy_rmse_entire_data": entire_rmse,
-                        "proxy_nll_entire_data": entire_nll,
+                        "proxy_rmse_test": test_rmse,
+                        "proxy_nll_test": test_nll,
                         "proxy_rmse_modes": mode_rmse,
                         "proxy_nll_modes": mode_nll,
                     }
@@ -229,9 +235,12 @@ def main(config):
             num_pick = min(config.n_samples, len(states))
             if proxy is not None:
                 maximize = proxy.maximize
-            else:
-                if regressor.target_factor == -1:
-                    maximize = not oracle.maximize
+            if maximize is None:
+                if hasattr(regressor, "target_factor"):
+                    if regressor.target_factor == -1:
+                        maximize = not oracle.maximize
+                    else:
+                        maximize = oracle.maximize
                 else:
                     maximize = oracle.maximize
             idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
@@ -247,13 +256,20 @@ def main(config):
                 picked_energies = env.oracle(picked_samples)
                 picked_fidelity = None
 
+            if isinstance(picked_samples, torch.Tensor):
+                # For when statebatch2oracle = statebatch2state in Grid and it returns a tensor of states instead
+                picked_samples = picked_samples.tolist()
+
             cumulative_sampled_states.extend(picked_states)
+            cumulative_sampled_samples.extend(picked_samples)
             cumulative_sampled_energies = torch.cat(
                 (cumulative_sampled_energies, picked_energies)
             )
             if (hasattr(env, "env") and hasattr(env.env, "plot_samples_frequency")) or (
                 hasattr(env, "env") == False and hasattr(env, "plot_samples_frequency")
             ):
+                # TODO: send samples instead and do
+                # TODO: rename plot_samples to plot_states if we stick to current algo
                 fig = env.plot_samples_frequency(
                     cumulative_sampled_states,
                     title="Cumulative Sampled Dataset",
@@ -276,10 +292,11 @@ def main(config):
 
             if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
-                    cumulative_sampled_states,
+                    cumulative_sampled_samples,
                     cumulative_sampled_energies,
                     oracle.maximize,
-                    data_handler.train_dataset["states"],
+                    modes=modes,
+                    dataset_states=data_handler.train_dataset["states"],
                 )
 
             # df = pd.DataFrame(

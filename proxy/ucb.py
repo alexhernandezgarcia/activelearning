@@ -6,6 +6,7 @@ from botorch.acquisition.monte_carlo import (
 from botorch.sampling import SobolQMCNormalSampler
 from .dropout_regressor import DropoutRegressor
 import numpy as np
+from regressor.dkl import DeepKernelRegressor
 from regressor.regressor import DropoutRegressor as SurrogateDropoutRegressor
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -38,6 +39,7 @@ class BotorchUCB(UCB):
     """
     1. NN based Proxy
     2. DKL based Proxy (Single Fidelity AMP)
+    3. Stochastic VGP based on DKL Code
     """
 
     def __init__(self, sampler, **kwargs):
@@ -59,19 +61,16 @@ class BotorchUCB(UCB):
     def __call__(self, inputs):
         if isinstance(inputs, np.ndarray):
             inputs = torch.tensor(inputs, device=self.device, dtype=self.float)
-        if isinstance(self.regressor, SurrogateDropoutRegressor) == False:
-            # if inputs[0][0] != self.regressor.tokenizer.bos_idx:
-            #     input_tok = self.regressor.tokenizer.transform(inputs)
-            # else:
-            #     input_tok = inputs
-            (
-                input_tok_features,
-                input_mask,
-            ) = self.regressor.language_model.get_token_features(inputs)
-            _, pooled_features = self.regressor.language_model.pool_features(
-                input_tok_features, input_mask
-            )
-            inputs = pooled_features
+        if isinstance(self.regressor, DeepKernelRegressor) == True:
+            if hasattr(self.regressor.language_model, "get_token_features"):
+                (
+                    input_tok_features,
+                    input_mask,
+                ) = self.regressor.language_model.get_token_features(inputs)
+                _, pooled_features = self.regressor.language_model.pool_features(
+                    input_tok_features, input_mask
+                )
+                inputs = pooled_features
         inputs = inputs.unsqueeze(-2)
         acq_values = self.acqf(inputs)
         return acq_values
@@ -79,7 +78,7 @@ class BotorchUCB(UCB):
 
 class GaussianProcessUCB(UCB):
     """
-    Used for Single Fidelity Branin and Hartmann Experiments where the Proxy is a GP
+    Used for Single Fidelity Branin where the Proxy is a GP and Plotting of Acq Rewards can be done.
     """
 
     def __init__(self, sampler, env, logger, **kwargs):

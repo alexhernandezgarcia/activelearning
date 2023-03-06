@@ -1,2 +1,2 @@
 _target_: proxy.hartmann.SingleFidelityHartmann
-maximize: False
+maximize: True
