@@ -32,6 +32,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.action_space = self.get_actions_space()
         self.fixed_policy_output = self.get_fixed_policy_output()
         self.policy_input_dim = len(self.state2policy())
+        self.policy_output_dim = len(self.fixed_policy_output)
         self.random_policy_output = self.fixed_policy_output
         if proxy_state_format == "oracle":
             # Assumes that all oracles required the same kind of transformed dtata
@@ -43,6 +44,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         elif proxy_state_format == "state":
             self.statebatch2proxy = self.statebatch2state
             self.statetorch2proxy = self.statetorch2state
+            # UNCOMMENT THE FOLLOWING IN BRANIN
             self.statetorch2oracle = self.state_from_statefid
             self.statebatch2oracle = self.state_from_statefid
         else:
@@ -108,21 +110,13 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         Input: List of states where states can be tensors or lists
         """
         state, fid = zip(*[[state[:-1], state[-1]] for state in states])
-        if self.is_state_list:
-            fidelities = torch.tensor(fid, device=self.device).unsqueeze(-1)
-        else:
-            fidelities = torch.vstack(fid)
-        # if self.is_state_list:
-        #     # TODO: Check when these conditions are used and accordingly update the code
-        #     if isinstance(states, TensorType) == False:
-        #         states = torch.tensor(states, dtype=self.float, device=self.device)
-        #     else:
-        #         states = states.to(self.float).to(self.device)
-        # else:
-        #     states = torch.vstack(states).to(self.float).to(self.device)
-        # fidelities = states[:, -1]
-        # states = states[:, :-1]
         states = self.env.statebatch2state(list(state))
+        if self.is_state_list:
+            fidelities = torch.tensor(
+                fid, device=states.device, dtype=states.dtype
+            ).unsqueeze(-1)
+        else:
+            fidelities = torch.vstack(fid).to(states.dtype).to(states.device)
         # assert torch.eq(
         #     torch.unique(fidelities).sort()[0], torch.arange(self.n_fid).to(fidelities.device).sort()[0]
         # ).all()
@@ -130,20 +124,19 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
             fidelities[idx_fid] = self.oracle[fid].fid
-        if self.is_state_list:
-            states = torch.tensor(states)
-        states = torch.cat([states, fidelities.to(states.device)], dim=-1)
+        states = torch.cat([states, fidelities], dim=-1)
         return states
 
     def statetorch2state(self, states):
         if isinstance(states, TensorType) == False:
             raise ValueError("States should be a tensor")
-            states = torch.tensor(states, dtype=self.float, device=self.device)
+            # states = torch.tensor(states, dtype=self.float, device=self.device)
         else:
             states = states.to(self.float).to(self.device)
         fidelities = states[:, -1]
         states = states[:, :-1]
         states = self.env.statetorch2state(states)
+        fidelities = fidelities.to(states.dtype).to(states.device)
         # assert torch.eq(
         #     torch.unique(fidelities).sort()[0], torch.arange(self.n_fid).to(fidelities.device).sort()[0]
         # ).all()
@@ -152,7 +145,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             idx_fid = torch.where(fidelities == fid)[0]
             fidelities[idx_fid] = self.oracle[fid].fid
         states = torch.cat([states, fidelities.unsqueeze(-1)], dim=-1)
-        # Cannot return states.long() here as in the case of branin 100x100 grid, state_proxy can be fractional. for example 9.9
         return states
 
     def state_from_statefid(self, states):
@@ -359,7 +351,13 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 state = self.state.clone()
         if done is None:
             done = self.done
-        if torch.eq(state, self.source).all():
+        if (self.is_state_list and state == self.source and self.env.done == False) or (
+            self.is_state_list == False
+            and torch.eq(state, self.source).all()
+            and self.env.done == False
+        ):
+            # The sf_env.done check has to be added because in the case of grid, sf_env.done can be True even at the source [0, 0]
+            # But the parent_a would be eos
             return [], []
         parents_no_fid, actions = self.env.get_parents(state[:-1])
         if self.action_pad_length > 0:
@@ -451,7 +449,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def statebatch2oracle(self, states: List[List]):
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
-        state_oracle = self.env.statebatch2oracle(states)
+        state_oracle = self.env.statebatch2oracle(list(states))
         fidelities = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
         transformed_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
@@ -549,15 +547,26 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         plt.close()
         return fig
 
-    def plot_reward_distribution(self, states, **kwargs):
+    def plot_reward_distribution(
+        self, states=None, scores=None, fidelity=None, **kwargs
+    ):
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
         for fid in range(0, self.n_fid):
-            samples_fid = [state[:-1] for state in states if state[-1] == fid]
-            if hasattr(self.env, "plot_reward_distribution"):
-                axs[fid] = self.env.plot_reward_distribution(
-                    states=samples_fid, ax=axs[fid], title="Fidelity {}".format(fid)
-                )
+            if states is not None:
+                samples_fid = [state[:-1] for state in states if state[-1] == fid]
+                if hasattr(self.env, "plot_reward_distribution"):
+                    axs[fid] = self.env.plot_reward_distribution(
+                        states=samples_fid, ax=axs[fid], title="Fidelity {}".format(fid)
+                    )
+            elif scores is not None:
+                idx_fid = [i for i in range(len(scores)) if fidelity[i] == fid]
+                if hasattr(self.env, "plot_reward_distribution") and idx_fid is not []:
+                    axs[fid] = self.env.plot_reward_distribution(
+                        scores=scores[idx_fid],
+                        ax=axs[fid],
+                        title="Fidelity {}".format(fid),
+                    )
             else:
                 return None
         fig.suptitle("Rewards of Sequences Sampled")

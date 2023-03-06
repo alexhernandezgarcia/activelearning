@@ -233,7 +233,7 @@ class DeepKernelRegressor:
             print(
                 "\nUser-Defined Warning: Converting states to integer for variational inducing points initialization."
             )
-        X_train = self.dataset.train_dataset["samples"].long()
+        X_train = self.dataset.train_dataset["states"].long()
         Y_train = self.dataset.train_dataset["energies"].long()
         Y_train = self.surrogate.reshape_targets(Y_train)
         Y_train = Y_train.to(dtype=list(self.surrogate.parameters())[0].dtype)

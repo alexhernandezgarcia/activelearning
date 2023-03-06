@@ -213,19 +213,19 @@ class SingleFidelitySingleTaskRegressor(SingleTaskGPRegressor):
         self.mll.to(train_x)
 
 
-class VariationalSingleTaskRegressor(SingleTaskGPRegressor):
-    def __init__(self, logger, device, dataset, **kwargs):
-        super().__init__(logger, device, dataset, **kwargs)
-        self.num_inducing_points = 64
+# class VariationalSingleTaskRegressor(SingleTaskGPRegressor):
+#     def __init__(self, logger, device, dataset, **kwargs):
+#         super().__init__(logger, device, dataset, **kwargs)
+#         self.num_inducing_points = 64
 
-    def init_model(self, train_x, train_y):
-        train_x = train_x[: self.num_inducing_points]
-        train_y = train_y[: self.num_inducing_points]
-        self.model = SingleTaskVariationalGP(
-            train_x,
-            train_y,
-            outcome_transform=Standardize(m=1),
-        )
-        self.mll = VariationalELBO(
-            self.model.likelihood, self.model.model, num_data=train_x.shape[-2]
-        )
+#     def init_model(self, train_x, train_y):
+#         train_x = train_x[: self.num_inducing_points]
+#         train_y = train_y[: self.num_inducing_points]
+#         self.model = SingleTaskVariationalGP(
+#             train_x,
+#             train_y,
+#             outcome_transform=Standardize(m=1),
+#         )
+#         self.mll = VariationalELBO(
+#             self.model.likelihood, self.model.model, num_data=train_x.shape[-2]
+#         )

@@ -23,6 +23,7 @@ class UCB(DropoutRegressor):
             inputs: batch x obs_dim
         Returns:
             score of dim (n_samples,), i.e, ndim=1"""
+        self.regressor.eval()
         if isinstance(inputs, np.ndarray):
             inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
@@ -35,6 +36,11 @@ class UCB(DropoutRegressor):
 
 
 class BotorchUCB(UCB):
+    """
+    1. NN based Proxy
+    2. DKL based Proxy (Single Fidelity AMP)
+    """
+
     def __init__(self, sampler, **kwargs):
         super().__init__(**kwargs)
         self.sampler_config = sampler
@@ -42,6 +48,7 @@ class BotorchUCB(UCB):
             model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
         else:
             model = self.regressor.surrogate
+            model.eval()
         sampler = SobolQMCNormalSampler(
             sample_shape=torch.Size([self.sampler_config.num_samples]),
             seed=self.sampler_config.seed,
@@ -72,9 +79,14 @@ class BotorchUCB(UCB):
 
 
 class GaussianProcessUCB(UCB):
+    """
+    Used for Single Fidelity Branin and Hartmann Experiments where the Proxy is a GP
+    """
+
     def __init__(self, sampler, env, logger, **kwargs):
         super().__init__(**kwargs)
         model = self.regressor.model
+        model.eval()
         self.sampler_config = sampler
         self.logger = logger
         self.env = env

@@ -25,7 +25,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="mf_dkl")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -216,9 +216,17 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
-            states_tensor = torch.tensor(states)
+            if isinstance(states[0], list):
+                states_tensor = torch.tensor(states)
+            else:
+                states_tensor = torch.vstack(states)
             states_tensor = states_tensor.unique(dim=0)
-            states = states_tensor.tolist()
+            if isinstance(states[0], list):
+                # for all other envs, when we want list of lists
+                states = states_tensor.tolist()
+            else:
+                # for AMP, when we want list of tensors
+                states = list(states_tensor)
             state_proxy = env.statebatch2proxy(states)
             if isinstance(state_proxy, list):
                 state_proxy = torch.FloatTensor(state_proxy).to(config.device)
@@ -270,6 +278,7 @@ def main(config):
             ):
                 fig = env.plot_reward_distribution(
                     scores=cumulative_sampled_energies.tolist(),
+                    fidelity=picked_fidelity,
                     title="Cumulative Sampled Dataset (over AL Interations)",
                 )
                 logger.log_figure("cum_sampled_dataset", fig, use_context=True)

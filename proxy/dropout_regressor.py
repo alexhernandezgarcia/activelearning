@@ -12,7 +12,6 @@ class DropoutRegressor(Proxy):
             raise FileNotFoundError
         elif hasattr(self.regressor, "load_model") == False:
             print("Model has not been loaded from path.")
-            self.regressor.eval()
 
     def __call__(self, inputs):
         """
@@ -29,6 +28,7 @@ class DropoutRegressor(Proxy):
         """
         # TODO: Resolve: when called to get rewards, input is tensor
         # But when called to get scores after GFN training, input is numpy array
+        self.regressor.eval()
         if isinstance(inputs, np.ndarray):
             inputs = torch.FloatTensor(inputs).to(self.device)
         self.regressor.model.train()

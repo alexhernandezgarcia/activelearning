@@ -167,9 +167,7 @@ class DataHandler:
         # TODO: add clause for when n_fid> 1 but fidelity.do=False
         elif self.n_fid == 1 and scores is None:
             states_oracle_input = states.clone()
-            state_oracle = self.env.statetorch2oracle(
-                states_oracle_input, bos_idx=self.tokenizer.bos_idx
-            )
+            state_oracle = self.env.statetorch2oracle(states_oracle_input)
             scores = self.env.oracle(state_oracle)
         elif self.n_fid > 1 and self.fidelity.do == False:
             raise NotImplementedError(

@@ -328,6 +328,7 @@ class GaussianProcessMultiFidelityMES(MES):
 
     def project(self, states):
         input_dim = states.ndim
+        states = states.to(self.device)
         max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
             self.env.oracle[self.n_fid - 1].fid
         )
