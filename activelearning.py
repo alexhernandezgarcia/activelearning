@@ -7,7 +7,6 @@ import random
 import hydra
 from omegaconf import OmegaConf
 import yaml
-from gflownet.utils.common import flatten_config
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import make_dataset, plot_gp_predictions
@@ -19,7 +18,7 @@ from regressor.dkl import Tokenizer
 #     plot_acquisition,
 #     plot_context_points,
 #     plot_predictions_oracle,
-# )
+#
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -36,12 +35,6 @@ def main(config):
     # Configure device count to avoid deserialise error
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     # print(torch.cuda.device_count())
-    # Log config
-    # TODO: Move log config to Logger
-    log_config = flatten_config(OmegaConf.to_container(config, resolve=True), sep="/")
-    log_config = {"/".join(("config", key)): val for key, val in log_config.items()}
-    with open(cwd + "/config.yml", "w") as f:
-        yaml.dump(log_config, f, default_flow_style=False)
 
     # Logger
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
@@ -75,7 +68,6 @@ def main(config):
         rescale = env.rescale
     else:
         rescale = 1.0
-    # TODO: Get rid of config.multifidelit.rescale and use env.rescale instead
     oracles = []
     width = (N_FID) * 5
     fig, axs = plt.subplots(1, N_FID, figsize=(width, 5))
@@ -235,7 +227,6 @@ def main(config):
             else:
                 scores, _ = regressor.get_predictions(env, states)
             num_pick = min(config.n_samples, len(states))
-            # to change desc/asc wrt higherIsBetter, and that should depend on proxy
             if proxy is not None:
                 maximize = proxy.maximize
             else:

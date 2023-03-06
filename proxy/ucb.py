@@ -1,7 +1,6 @@
 import torch
 from .botorch_models import ProxyBotorchUCB
 from botorch.acquisition.monte_carlo import (
-    qExpectedImprovement,
     qUpperConfidenceBound,
 )
 from botorch.sampling import SobolQMCNormalSampler
