@@ -116,8 +116,6 @@ class DeepKernelRegressor:
         self.n_fid = self.dataset.n_fid
 
         self.tokenizer = tokenizer
-        # config_model.model["tokenizer"] = self.tokenizer
-        # self.encoder_config = encoder
         self.language_model = hydra.utils.instantiate(
             config_model,
             tokenizer=self.tokenizer,
@@ -142,7 +140,6 @@ class DeepKernelRegressor:
             self.logger.set_proxy_path(checkpoint)
 
     def initialize_surrogate(self, X_train, Y_train):
-        # Is X_train 32 or 426?
         # X_train = torch.Size([5119, 51])
         if (
             hasattr(self.surrogate, "init_inducing_points")
@@ -155,9 +152,7 @@ class DeepKernelRegressor:
                 batched_call(self.surrogate.get_features, X_train, self.batch_size)
             )
             self.surrogate.train()
-            self.surrogate.init_inducing_points(
-                init_features
-            )  # botorch.SingleTaskVariationalGP based function
+            self.surrogate.init_inducing_points(init_features)
             self.surrogate.initialize_var_dist_sgpr(
                 init_features,
                 Y_train.to(init_features),
@@ -294,14 +289,6 @@ class DeepKernelRegressor:
         pbar = tqdm(range(1, self.surrogate.num_epochs + 1), disable=not self.progress)
         for epoch_idx in pbar:  # 128
             metrics = {}
-
-            # train encoder through supervised MLL objective
-            # if has_encoder and encoder_obj == 'mll':
-            #     enc_sup_loss = fit_encoder_only(
-            #         surrogate, gp_optimizer, mll, train_loader, num_epochs=1
-            #     )
-            # else:
-            #     enc_sup_loss = 0.
 
             avg_train_loss = 0.0
             self.surrogate.train()

@@ -312,15 +312,6 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
             raise NotImplementedError(
                 "More than one output dim not supported. Refer to lambo repo if you really wanna"
             )
-        # else:
-        #     covar_module = kernels.MaternKernel(
-        #         batch_shape=(out_dim,), ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
-        #     )
-        #     covar_module.initialize(lengthscale=self.lengthscale_init)
-        #     likelihood = likelihoods.MultitaskGaussianLikelihood(
-        #         num_tasks=out_dim, has_global_noise=False, noise_constraint=noise_constraint
-        #     ) #
-        #     likelihood.initialize(task_noises=self.task_noise_init) #output_dim = 3, task_noise_init = 0.5
 
         # initialize GP
         dummy_X = 2 * (
@@ -425,8 +416,6 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
             )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
             kuv = self.model.covar_module(ind_pts, train_x).double()
 
-            # noise = model.likelihood.noise if not is_batch_model else model.likelihood.task_noises.unsqueeze(-1).unsqueeze(-1)
-
             if hasattr(self.likelihood, "noise"):  # False
                 noise = self.likelihood.noise
             elif hasattr(self.likelihood, "task_noises"):
@@ -441,9 +430,7 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
                 noise = noise.unsqueeze(-1)
 
             data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
-            # mean_term = kuu_chol.inv_matmul(data_term)
             if is_batch_model:  # True
-                # TODO: clean this up a bit more
                 noise_as_lt = ConstantDiagLazyTensor(
                     noise.squeeze(-1), diag_shape=kuv.shape[-1]
                 )
@@ -456,7 +443,6 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
                 inner_term.inv_matmul(kuu_chol.evaluate())
             )  # torch.Size([3, 64, 64])
             s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
-            # mean_param = s_mat.matmul(mean_term)
             # the expression below is less efficient but probably more stable
             mean_param = kuu_chol.transpose(-1, -2).matmul(
                 inner_term.inv_matmul(data_term)
@@ -504,27 +490,31 @@ class SingleTaskMultiFidelitySVGP(
         input_transform=None,
         learn_inducing_points=True,
         mll_beta=1.0,
+        kernel="rbf",
         *args,
         **kwargs,
     ):
         self.device = device
         self.float = float_precision
-        # bootstrap_ratio = None, bs = 32, early_stopping = True, enc_lr = 1e-3, encoder_wd = 1e-4, lengthscale_init = 0.7, num_epochs = 128, min_num_train = 128, task_noise_init = 0.5
-        # initialize common attributes
         BaseGPSurrogate.__init__(self, encoder=encoder, *args, **kwargs)
         self.num_inducing_points = num_inducing_points  # 64
 
         if out_dim == 1:
-            covar_module_x = kernels.RBFKernel()
-            # covar_module_x = kernels.MaternKernel(
-            # ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
-            # )
-            # covar_module_x.initialize(lengthscale=self.lengthscale_init)
+            if kernel == "rbf":
+                covar_module_x = kernels.RBFKernel()
+            elif kernel == "matern":
+                covar_module_x = kernels.MaternKernel(
+                    ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+                )
+                covar_module_x.initialize(lengthscale=self.lengthscale_init)
             covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
-            likelihood = likelihoods.GaussianLikelihood()
-            # noise_constraint=noise_constraint
-            # )
-            # likelihood.initialize(noise=self.task_noise_init)
+            if noise_constraint is None:
+                likelihood = likelihoods.GaussianLikelihood()
+            else:
+                likelihood = likelihoods.GaussianLikelihood(
+                    noise_constraint=noise_constraint
+                )
+            likelihood.initialize(noise=self.task_noise_init)
         else:
             raise NotImplementedError(
                 "More than one output dim not supported. Refer to lambo repo if you really wanna"
@@ -577,7 +567,7 @@ class SingleTaskMultiFidelitySVGP(
             input_transform=input_transform,
         )
         self.encoder = encoder.to(self.device, self.float)
-        self.mll_beta = mll_beta  # 0.01
+        self.mll_beta = mll_beta
 
     def clear_cache(self):
         clear_cache_hook(self)
@@ -591,10 +581,6 @@ class SingleTaskMultiFidelitySVGP(
     def get_features(
         self, seq_array, batch_size=None, transform=None
     ):  # batch_size not used
-        # if transform:
-        #     original_shape = seq_array.shape
-        #     flat_seq_array = seq_array.reshape(-1)
-        # else:
         original_shape = seq_array.shape[:-1]
         flat_seq_array = seq_array.flatten(end_dim=-2)
 
@@ -643,11 +629,11 @@ class SingleTaskMultiFidelitySVGP(
     def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
         self.clear_cache()
         # TODO: fix this hard condition
-        if X.shape[1] == 52:
-            enc_X = X[:, :-1]
-            fid_X = X[:, -1]
-            features_X = self.get_features(enc_X.to(torch.long))
-            X = torch.cat([enc_X, fid_X.unsqueeze(-1)], dim=-1)
+        # if X.shape[1] == 52:
+        #     enc_X = X[:, :-1]
+        #     fid_X = X[:, -1]
+        #     features_X = self.get_features(enc_X.to(torch.long))
+        #     X = torch.cat([enc_X, fid_X.unsqueeze(-1)], dim=-1)
         # features = self.get_features(X.to(torch.long))
         # if isinstance(X, np.ndarray)
         # else X
@@ -699,10 +685,7 @@ class SingleTaskMultiFidelitySVGP(
                 )  # MultitaskMultivariateNormal(loc: torch.Size([96]))
 
                 target_batch = self.reshape_targets(target_batch)  # torch.Size([3, 45])
-                targets.append(
-                    target_batch.to(features.device).cpu()
-                )  # targets was an empty list
-                # import pdb; pdb.set_trace()
+                targets.append(target_batch.to(features.device).cpu())
                 target_batch = target_batch.squeeze(-1)  # N
                 if y_dist.mean.shape == target_batch.shape:  # True
                     f_std.append(f_dist.variance.sqrt().cpu())
@@ -810,7 +793,6 @@ class SingleTaskMultiFidelitySVGP(
             is_batch_model = False
 
         with cholesky_jitter(1e-4):
-            # TODO: Check dimension of ind_points
             kuu_x = self.model.covar_module_x(ind_pts[..., :-1]).double()
             kuu_fidelity = self.model.covar_module_fidelity(ind_pts[..., -1:]).double()
             kuu = kuu_x.mul(kuu_fidelity)
@@ -822,8 +804,6 @@ class SingleTaskMultiFidelitySVGP(
                 ind_pts[..., -1:], train_x[..., -1:]
             ).double()
             kuv = kuv_x.mul(kuv_fidelity)
-
-            # noise = model.likelihood.noise if not is_batch_model else model.likelihood.task_noises.unsqueeze(-1).unsqueeze(-1)
 
             if hasattr(self.likelihood, "noise"):  # False
                 noise = self.likelihood.noise
@@ -839,10 +819,7 @@ class SingleTaskMultiFidelitySVGP(
                 noise = noise.unsqueeze(-1)
 
             data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
-            # mean_term = kuu_chol.inv_matmul(data_term)
             if is_batch_model:  # True
-                # TODO: clean this up a bit more
-                # User Defined Remark: Might have to change to linear_operator based
                 noise_as_lt = ConstantDiagLazyTensor(
                     noise.squeeze(-1), diag_shape=kuv.shape[-1]
                 )
@@ -856,7 +833,6 @@ class SingleTaskMultiFidelitySVGP(
             )  # torch.Size([3, 64, 64])
             # TODO: Replace gpytorch.lazy.lazify with linear_operator.to_linear_operato
             s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
-            # mean_param = s_mat.matmul(mean_term)
             # the expression below is less efficient but probably more stable
             mean_param = kuu_chol.transpose(-1, -2).matmul(
                 inner_term.inv_matmul(data_term)
@@ -865,7 +841,7 @@ class SingleTaskMultiFidelitySVGP(
         mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
         s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
 
-        if not is_batch_model:
+        if not is_batch_model:  # True
             self.model.variational_strategy._variational_distribution.variational_mean.data = (
                 mean_param.data.detach().squeeze()
             )
@@ -873,7 +849,7 @@ class SingleTaskMultiFidelitySVGP(
                 s_root.data.detach()
             )
             self.model.variational_strategy.variational_params_initialized.fill_(1)
-        else:  # True
+        else:
             self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
                 mean_param.data.detach().squeeze()
             )
