@@ -1,0 +1,2 @@
+_target_: proxy.branin.SingleFidelityBranin
+maximize: False

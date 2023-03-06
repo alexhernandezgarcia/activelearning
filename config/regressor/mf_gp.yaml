@@ -1,1 +1,1 @@
-_target_: regressor.gp.MultitaskGPRegressor
+_target_: regressor.gp.MultiFidelitySingleTaskRegressor

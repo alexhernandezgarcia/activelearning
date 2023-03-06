@@ -172,6 +172,9 @@ class OracleMultiFidelityMES(MES):
         state_proxy = self.env.statebatch2proxy(state)
         if isinstance(state_proxy, torch.Tensor):
             return state_proxy.to(self.device)
+        elif isinstance(state_proxy, tuple):
+            state_proxy = torch.cat((state_proxy[0], state_proxy[1]), dim=1)
+            return state_proxy.to(self.device)
         return torch.FloatTensor(state_proxy).to(self.device)
 
     def load_model(self):
@@ -205,38 +208,31 @@ class OracleMultiFidelityMES(MES):
 
     def plot_acquisition_rewards(self, **kwargs):
         states = torch.tensor(
-            self.env.env.get_all_terminating_states(), dtype=self.float
+            self.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
-        n_states = states.shape[0]
-        fidelities = torch.zeros((len(states) * self.n_fid, 1), dtype=self.float).to(
-            self.device
-        )
-        for i in range(self.n_fid):
-            fidelities[i * len(states) : (i + 1) * len(states), 0] = self.env.oracle[
-                i
-            ].fid
-        states = states.repeat(self.n_fid, 1)
-        state_fid = torch.cat([states, fidelities], dim=1)
-        states_oracle, fid = self.env.statetorch2oracle(state_fid)
-        # Specific to grid as the states are transformed to oracle space on feeding to MES
-        if isinstance(states_oracle, torch.Tensor):
-            states_fid_oracle = torch.cat([states_oracle, fid], dim=1)
+        n_states = self.env.env.length**2
+        states_input_proxy = states.clone()
+        states_proxy = self.env.statetorch2proxy(states_input_proxy)
+        # states_proxy = torch.cat((states_proxy[0], states_proxy[1].unsqueeze(-1)), dim=1)
+        scores = self(states_proxy).detach().cpu().numpy()
         states = states[:n_states]
-
-        scores = self(states_fid_oracle).detach().cpu().numpy()
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        if self.env.env.rescale != 1:
+            step = int(self.env.env.length / self.env.env.rescale)
+        else:
+            step = 1
         for fid in range(0, self.n_fid):
             index = states.long().detach().cpu().numpy()
             grid_scores = np.zeros((self.env.env.length, self.env.env.length))
             grid_scores[index[:, 0], index[:, 1]] = scores[
                 fid * len(states) : (fid + 1) * len(states)
             ]
-            axs[fid].set_xticks(np.arange(self.env.env.length))
-            axs[fid].set_yticks(np.arange(self.env.env.length))
+            axs[fid].set_xticks(np.arange(start=0, stop=self.env.env.length, step=step))
+            axs[fid].set_yticks(np.arange(start=0, stop=self.env.env.length, step=step))
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
-                "Oracle-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+                "Oracle-MES Reward with fid {}".format(self.env.oracle[fid].fid)
             )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])
@@ -345,28 +341,16 @@ class GaussianProcessMultiFidelityMES(MES):
         return states
 
     def plot_acquisition_rewards(self, **kwargs):
-        if hasattr(self.env.env, "get_all_terminating_states") == False:
+        if hasattr(self.env, "get_all_terminating_states") == False:
             return None
         states = torch.tensor(
-            self.env.env.get_all_terminating_states(), dtype=self.float
+            self.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
-        n_states = states.shape[0]
-        fidelities = torch.zeros((len(states) * self.n_fid, 1), dtype=self.float).to(
-            self.device
-        )
-        for i in range(self.n_fid):
-            fidelities[i * len(states) : (i + 1) * len(states), 0] = self.env.oracle[
-                i
-            ].fid
-        states = states.repeat(self.n_fid, 1)
-        state_fid = torch.cat([states, fidelities], dim=1)
-        states_oracle, fid = self.env.statetorch2oracle(state_fid)
-        # Specific to grid as the states are transformed to oracle space on feeding to MES
-        if isinstance(states_oracle, torch.Tensor):
-            states_fid_oracle = torch.cat([states_oracle, fid], dim=1)
+        n_states = self.env.env.length**2
+        states_input_proxy = states.clone()
+        states_proxy = self.env.statetorch2proxy(states_input_proxy)
+        scores = self(states_proxy).detach().cpu().numpy()
         states = states[:n_states]
-
-        scores = self(states_fid_oracle).detach().cpu().numpy()
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
         if self.env.rescale != 1:

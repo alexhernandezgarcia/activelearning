@@ -1,4 +1,4 @@
-_target_: proxy.branin.Branin
+_target_: proxy.branin.MultiFidelityBranin
 fid: 1
 cost: 1
-maximize: True
+maximize: False

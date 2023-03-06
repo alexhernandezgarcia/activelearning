@@ -4,20 +4,24 @@ from tqdm import tqdm
 import hydra
 from botorch.models.gp_regression_fidelity import (
     SingleTaskMultiFidelityGP,
+    SingleTaskGP,
 )
 from botorch.models.transforms.outcome import Standardize
 from botorch.fit import fit_gpytorch_mll
+import matplotlib.pyplot as plt
+import numpy as np
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from abc import abstractmethod
+from botorch.models.approximate_gp import SingleTaskVariationalGP
+from gpytorch.mlls import VariationalELBO
+
+"""
+Assumes that in single fidelity, fid =1
+"""
 
 
-# def unique(x, dim=-1):
-#     unique, inverse = torch.unique(x, return_inverse=True, dim=dim)
-#     perm = torch.arange(inverse.size(dim), dtype=inverse.dtype, device=inverse.device)
-#     inverse, perm = inverse.flip([dim]), perm.flip([dim])
-#     return unique, inverse.new_empty(unique.size(dim)).scatter_(dim, inverse, perm)
-
-
-class MultitaskGPRegressor:
-    def __init__(self, logger, device, dataset, **kwargs):
+class SingleTaskGPRegressor:
+    def __init__(self, logger, device, dataset, maximize, **kwargs):
 
         self.logger = logger
         self.device = device
@@ -29,10 +33,157 @@ class MultitaskGPRegressor:
 
         # Logger
         self.progress = self.logger.progress
+        if maximize == False:
+            self.target_factor = -1
 
+    @abstractmethod
     def init_model(self, train_x, train_y):
         # m is output dimension
         # TODO: if standardize is the desired operation
+        pass
+
+    def fit(self):
+        train = self.dataset.train_dataset
+        train_x = train["states"]
+        train_y = train["energies"].unsqueeze(-1)
+        train_y = train_y * self.target_factor
+
+        self.init_model(train_x, train_y)
+
+        self.mll = fit_gpytorch_mll(self.mll)
+
+    def get_predictions(self, env, states):
+        """Input is states
+        Proxy conversion happens within."""
+        detach = True
+        if isinstance(states, torch.Tensor) == False:
+            states = torch.tensor(states, device=self.device, dtype=env.float)
+            detach = False
+        states_proxy_input = states.clone()
+        states_proxy = env.statetorch2proxy(states_proxy_input)
+        model = self.model
+        model.eval()
+        model.likelihood.eval()
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            posterior = model.posterior(states_proxy)
+            y_mean = posterior.mean
+            y_std = posterior.variance.sqrt()
+        if detach == True:
+            # we don't want to detach when called after AL round
+            y_mean = y_mean.detach().cpu().numpy().squeeze(-1)
+            y_std = y_std.detach().cpu().numpy().squeeze(-1)
+        else:
+            y_mean = y_mean.squeeze(-1)
+            y_std = y_std.squeeze(-1)
+        return y_mean, y_std
+
+    def get_metrics(self, y_mean, y_std, env, states):
+        state_oracle_input = states.clone()
+        if hasattr(env, "call_oracle_per_fidelity"):
+            samples, fidelity = env.statebatch2oracle(state_oracle_input)
+            targets = env.call_oracle_per_fidelity(samples, fidelity).detach().cpu()
+        elif hasattr(env, "oracle"):
+            samples = env.statebatch2oracle(state_oracle_input)
+            targets = env.oracle(samples).detach().cpu()
+        targets = targets * self.target_factor
+        targets_numpy = targets.detach().cpu().numpy()
+        targets_numpy = targets_numpy
+        rmse = np.sqrt(np.mean((y_mean - targets_numpy) ** 2))
+        nll = (
+            -torch.distributions.Normal(torch.tensor(y_mean), torch.tensor(y_std))
+            .log_prob(targets)
+            .mean()
+        )
+        return rmse, nll
+
+    def plot_predictions(self, states, scores, length, rescale=1):
+        n_fid = self.n_fid
+        n_states = int(length * length)
+        if states.shape[-1] == 3:
+            states = states[:, :2]
+            states = torch.unique(states, dim=0)
+        # states = states[:n_states]
+        width = (n_fid) * 5
+        fig, axs = plt.subplots(1, n_fid, figsize=(width, 5))
+        for fid in range(0, n_fid):
+            index = states.long().detach().cpu().numpy()
+            grid_scores = np.zeros((length, length))
+            grid_scores[index[:, 0], index[:, 1]] = scores[
+                fid * n_states : (fid + 1) * n_states
+            ]
+            if n_fid == 1:
+                ax = axs
+            else:
+                ax = axs[fid]
+            if rescale != 1:
+                step = int(length / rescale)
+            else:
+                step = 1
+            ax.set_xticks(np.arange(start=0, stop=length, step=step))
+            ax.set_yticks(np.arange(start=0, stop=length, step=step))
+            ax.imshow(grid_scores)
+            if n_fid == 1:
+                title = "GP Predictions"
+            else:
+                title = "GP Predictions with fid {}/{}".format(fid + 1, n_fid)
+            ax.set_title(title)
+            im = ax.imshow(grid_scores)
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+            plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig
+
+    def get_modes(self, states, env):
+        num_pick = int((env.length * env.length) / 100) * 5
+        percent = num_pick / (env.length * env.length) * 100
+        print(
+            "\nUser-Defined Warning: Top {}% of states with maximum reward are picked for GP mode metrics".format(
+                percent
+            )
+        )
+        state_oracle_input = states.clone()
+        if hasattr(env, "call_oracle_per_fidelity"):
+            samples, fidelity = env.statebatch2oracle(state_oracle_input)
+            targets = env.oracle[-1](samples).detach().cpu()
+        elif hasattr(env, "oracle"):
+            samples = env.statebatch2oracle(state_oracle_input)
+            targets = env.oracle(samples).detach().cpu()
+        targets = targets * self.target_factor
+        idx_pick = torch.argsort(targets, descending=True)[:num_pick].tolist()
+        states_pick = states[idx_pick]
+        if hasattr(env, "oracle"):
+            self._mode = states_pick
+        else:
+            fidelities = torch.zeros((len(states_pick) * 3, 1)).to(states_pick.device)
+            for i in range(self.n_fid):
+                fidelities[i * len(states_pick) : (i + 1) * len(states_pick), 0] = i
+            states_pick = states_pick.repeat(self.n_fid, 1)
+            state_pick_fid = torch.cat([states_pick, fidelities], dim=1)
+            self._mode = state_pick_fid
+
+    def evaluate_model(self, env, do_figure=True):
+        states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
+        y_mean, y_std = self.get_predictions(env, states)
+        rmse, nll = self.get_metrics(y_mean, y_std, env, states)
+        if hasattr(self, "_mode") == False:
+            self.get_modes(states, env)
+        mode_mean, mode_std = self.get_predictions(env, self._mode)
+        mode_rmse, mode_nll = self.get_metrics(mode_mean, mode_std, env, self._mode)
+        if do_figure:
+            figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
+        else:
+            figure = None
+        return figure, rmse, nll, mode_rmse, mode_nll
+
+
+class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
+    def __init__(self, logger, device, dataset, **kwargs):
+        super().__init__(logger, device, dataset, **kwargs)
+
+    def init_model(self, train_x, train_y):
         self.model = SingleTaskMultiFidelityGP(
             train_x,
             train_y,
@@ -40,27 +191,41 @@ class MultitaskGPRegressor:
             # fid column
             data_fidelity=self.n_fid - 1,
         )
-
-    def fit(self):
-
-        train = self.dataset.train_dataset
-        train_x = train["samples"]
-        # HACK: we want to maximise the energy, so we multiply by -1
-        train_y = train["energies"].unsqueeze(-1)
-
-        # train_x, index = unique(train_x, dim=0)
-        # train_y = train_y[index]
-
-        train_y = train_y * (-1)
-        # samples, energies = self.dataset.shuffle(samples, energies)
-        # train_x = samples[:self.n_samples, :-1].to(self.device)
-        # targets = energies.to(self.device)
-        # train_y = torch.stack([targets[i*self.n_samples:(i+1)*self.n_samples] for i in range(self.n_fid)], dim=-1)
-
-        self.init_model(train_x, train_y)
-
-        mll = gpytorch.mlls.ExactMarginalLogLikelihood(
+        self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
             self.model.likelihood, self.model
         )
-        mll.to(train_x)
-        mll = fit_gpytorch_mll(mll)
+        self.mll.to(train_x)
+
+
+class SingleFidelitySingleTaskRegressor(SingleTaskGPRegressor):
+    def __init__(self, logger, device, dataset, **kwargs):
+        super().__init__(logger, device, dataset, **kwargs)
+
+    def init_model(self, train_x, train_y):
+        self.model = SingleTaskGP(
+            train_x,
+            train_y,
+            outcome_transform=Standardize(m=1),
+        )
+        self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
+            self.model.likelihood, self.model
+        )
+        self.mll.to(train_x)
+
+
+class VariationalSingleTaskRegressor(SingleTaskGPRegressor):
+    def __init__(self, logger, device, dataset, **kwargs):
+        super().__init__(logger, device, dataset, **kwargs)
+        self.num_inducing_points = 64
+
+    def init_model(self, train_x, train_y):
+        train_x = train_x[: self.num_inducing_points]
+        train_y = train_y[: self.num_inducing_points]
+        self.model = SingleTaskVariationalGP(
+            train_x,
+            train_y,
+            outcome_transform=Standardize(m=1),
+        )
+        self.mll = VariationalELBO(
+            self.model.likelihood, self.model.model, num_data=train_x.shape[-2]
+        )

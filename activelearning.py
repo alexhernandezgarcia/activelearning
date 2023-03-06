@@ -12,7 +12,6 @@ import torch
 from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import make_dataset, plot_gp_predictions
 import matplotlib.pyplot as plt
-from regressor.gp import MultitaskGPRegressor
 from regressor.dkl import Tokenizer
 
 # ToyOracle,
@@ -23,6 +22,7 @@ from regressor.dkl import Tokenizer
 # )
 from pathlib import Path
 import pandas as pd
+import numpy as np
 
 
 @hydra.main(config_path="./config", config_name="mf_dkl")
@@ -71,6 +71,11 @@ def main(config):
     else:
         tokenizer = None
 
+    if hasattr(env, "rescale"):
+        rescale = env.rescale
+    else:
+        rescale = 1.0
+    # TODO: Get rid of config.multifidelit.rescale and use env.rescale instead
     oracles = []
     width = (N_FID) * 5
     fig, axs = plt.subplots(1, N_FID, figsize=(width, 5))
@@ -78,17 +83,17 @@ def main(config):
     for fid in range(1, N_FID + 1):
         oracle = hydra.utils.instantiate(
             config._oracle_dict[str(fid)],
-            # required for toy oracle setups
+            # required for toy grid oracle setups
             oracle=true_oracle,
             env=env,
             device=config.device,
             float_precision=config.float_precision,
         )
         oracles.append(oracle)
-        if hasattr(oracle, "plot_true_rewards"):
-            axs[fid - 1] = oracle.plot_true_rewards(
-                env, axs[fid - 1], rescale=config.multifidelity.rescale
-            )
+        if hasattr(oracle, "plot_true_rewards") and N_FID > 1:
+            axs[fid - 1] = oracle.plot_true_rewards(env, axs[fid - 1], rescale=rescale)
+        elif hasattr(oracle, "plot_true_rewards") and N_FID == 1:
+            axs = oracle.plot_true_rewards(env, axs, rescale=rescale)
         else:
             do_figure = False
     if do_figure:
@@ -103,14 +108,19 @@ def main(config):
             n_fid=N_FID,
             oracle=oracles,
             proxy_state_format=config.env.proxy_state_format,
-            rescale=config.multifidelity.rescale,
+            rescale=rescale,
         )
         env.env.oracle = oracles[0]
     else:
         oracle = oracles[0]
         env.oracle = oracle
 
-    if N_FID == 1 or config.multifidelity.proxy == True:
+    if "model" in config:
+        config_model = config.model
+    else:
+        config_model = None
+
+    if config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
             config.dataset,
             env=env,
@@ -118,15 +128,16 @@ def main(config):
             oracle=oracle,
             device=config.device,
             float_precision=config.float_precision,
-            rescale=config.multifidelity.rescale,
             tokenizer=tokenizer,
+            rescale=rescale,
         )
         regressor = hydra.utils.instantiate(
             config.regressor,
             config_env=config.env,
-            config_model=config.model,
+            config_model=config_model,
             dataset=data_handler,
             device=config.device,
+            maximize=oracle.maximize,
             float_precision=config.float_precision,
             _recursive_=False,
             logger=logger,
@@ -145,36 +156,50 @@ def main(config):
                 path=config.multifidelity.candidate_set_path,
             )
 
+    cumulative_cost = 0.0
+    cumulative_sampled_states = []
+    cumulative_sampled_energies = torch.tensor([], device=env.device, dtype=env.float)
     for iter in range(1, config.al_n_rounds + 1):
-        print(f"\n Starting iteration {iter} of active learning")
+        print(f"\nStarting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
         if N_FID == 1 or config.multifidelity.proxy == True:
             regressor.fit()
-            if isinstance(regressor, MultitaskGPRegressor):
-                fig = plot_gp_predictions(env, regressor, config.multifidelity.rescale)
-                plt.tight_layout()
-                plt.show()
-                plt.close()
-                logger.log_figure("gp_predictions", fig, use_context=True)
-        proxy = hydra.utils.instantiate(
-            config.proxy,
-            regressor=regressor,
-            device=config.device,
-            float_precision=config.float_precision,
-            logger=logger,
-            oracle=oracles,
-            env=env,
-        )
-        # fig = proxy.plot_context_points()
-        # logger.log_figure("context_points", fig, True)
-        # plot_context_points(env, proxy)
-        # plot_acquisition(env, 0, proxy)
-        # plot_acquisition(env, 1, proxy)
-        # plot_acquisition(env, 2, proxy)
-        # plot_predictions_oracle(env, 0)
-        # plot_predictions_oracle(env, 1)
-        # plot_predictions_oracle(env, 2)
+            if hasattr(regressor, "evaluate_model"):
+                metrics = {}
+                (
+                    fig,
+                    entire_rmse,
+                    entire_nll,
+                    mode_rmse,
+                    mode_nll,
+                ) = regressor.evaluate_model(env, do_figure=config.do_figure)
+                metrics.update(
+                    {
+                        "proxy_rmse_entire_data": entire_rmse,
+                        "proxy_nll_entire_data": entire_nll,
+                        "proxy_rmse_modes": mode_rmse,
+                        "proxy_nll_modes": mode_nll,
+                    }
+                )
+                if fig is not None:
+                    plt.tight_layout()
+                    plt.show()
+                    plt.close()
+                    logger.log_figure("gp_predictions", fig, use_context=True)
+                logger.log_metrics(metrics, use_context=False)
+        if "proxy" in config:
+            proxy = hydra.utils.instantiate(
+                config.proxy,
+                regressor=regressor,
+                device=config.device,
+                float_precision=config.float_precision,
+                logger=logger,
+                oracle=oracles,
+                env=env,
+            )
+        else:
+            proxy = None
 
         env.set_proxy(proxy)
         gflownet = hydra.utils.instantiate(
@@ -191,63 +216,106 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
+            states_tensor = torch.tensor(states)
+            states_tensor = states_tensor.unique(dim=0)
+            states = states_tensor.tolist()
             state_proxy = env.statebatch2proxy(states)
             if isinstance(state_proxy, list):
                 state_proxy = torch.FloatTensor(state_proxy).to(config.device)
-            scores = env.proxy(state_proxy)
+            if proxy is not None:
+                scores = env.proxy(state_proxy)
+            else:
+                scores, _ = regressor.get_predictions(env, states)
+            num_pick = min(config.n_samples, len(states))
             # to change desc/asc wrt higherIsBetter, and that should depend on proxy
-            idx_pick = torch.argsort(scores, descending=True)[
-                : config.n_samples
-            ].tolist()
+            if proxy is not None:
+                maximize = proxy.maximize
+            else:
+                if regressor.target_factor == -1:
+                    maximize = not oracle.maximize
+                else:
+                    maximize = oracle.maximize
+            idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
             picked_states = [states[i] for i in idx_pick]
+
             if N_FID > 1:
-                picked_states, picked_fidelity = zip(
-                    *[(state[:-1], state[-1]) for state in picked_states]
+                picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
+                picked_energies = env.call_oracle_per_fidelity(
+                    picked_samples, picked_fidelity
                 )
-                picked_fidelity = torch.LongTensor(picked_fidelity).to(config.device)
-                picked_samples = env.env.statebatch2oracle(picked_states)
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
-
-            if N_FID == 1:
-                energies = env.oracle(picked_samples)
+                picked_energies = env.oracle(picked_samples)
                 picked_fidelity = None
-            else:
-                if config.env.proxy_state_format == "raw":
-                    # Specifically for Branin
-                    picked_states_tensor = torch.tensor(
-                        picked_states, device=config.device, dtype=env.float
-                    )
-                    picked_states_tensor = (
-                        picked_states_tensor / config.multifidelity.rescale
-                    )
-                    picked_states_oracle = picked_states_tensor.tolist()
-                    energies = env.call_oracle_per_fidelity(
-                        picked_states_oracle, picked_fidelity
-                    )
-                else:
-                    energies = env.call_oracle_per_fidelity(
-                        picked_samples, picked_fidelity
-                    )
 
-            if config.env.proxy_state_format == "ohe":
+            cumulative_sampled_states.extend(picked_states)
+            cumulative_sampled_energies = torch.cat(
+                (cumulative_sampled_energies, picked_energies)
+            )
+            if (hasattr(env, "env") and hasattr(env.env, "plot_samples_frequency")) or (
+                hasattr(env, "env") == False and hasattr(env, "plot_samples_frequency")
+            ):
+                fig = env.plot_samples_frequency(
+                    cumulative_sampled_states,
+                    title="Cumulative Sampled Dataset",
+                    rescale=env.rescale,
+                )
+                logger.log_figure("cum_sampled_dataset", fig, use_context=True)
+
+            if (
+                hasattr(env, "env") and hasattr(env.env, "plot_reward_distribution")
+            ) or (
+                hasattr(env, "env") == False
+                and hasattr(env, "plot_reward_distribution")
+            ):
+                fig = env.plot_reward_distribution(
+                    scores=cumulative_sampled_energies.tolist(),
+                    title="Cumulative Sampled Dataset (over AL Interations)",
+                )
+                logger.log_figure("cum_sampled_dataset", fig, use_context=True)
+
+            if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
-                    picked_samples, energies, data_handler.train_dataset["samples"]
+                    cumulative_sampled_states,
+                    cumulative_sampled_energies,
+                    oracle.maximize,
+                    data_handler.train_dataset["states"],
                 )
 
-            df = pd.DataFrame(
-                {
-                    "readable": [env.state2readable(s) for s in picked_states],
-                    "energies": energies.cpu().numpy(),
-                }
-            )
-            df = df.sort_values(by=["energies"])
-            path = logger.logdir / Path("gfn_samples.csv")
-            df.to_csv(path)
+            # df = pd.DataFrame(
+            #     {
+            #         "readable": [env.state2readable(s) for s in picked_states],
+            #         "energies": picked_energies.tolist(),
+            #     }
+            # )
+            # df = df.sort_values(by=["energies"])
+            # path = logger.logdir / Path("gfn_samples.csv")
+            # df.to_csv(path)
             if N_FID == 1 or config.multifidelity.proxy == True:
                 data_handler.update_dataset(
-                    list(picked_states), energies.tolist(), picked_fidelity
+                    picked_states, picked_energies.tolist(), picked_fidelity
                 )
+            if hasattr(env, "get_cost"):
+                cost_al_round = env.get_cost(picked_states, picked_fidelity)
+                cumulative_cost += np.sum(cost_al_round)
+                avg_cost = np.mean(cost_al_round)
+                logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
+                logger.log_metrics(
+                    {"post_al_cum_cost": cumulative_cost}, use_context=False
+                )
+            else:
+                print(
+                    "\nUser-Defined Warning: Maximum cost in the single fidelity case is assumed to be 1 \n \
+                    for the calculation of mean and cumulative cost over active learning rounds."
+                )
+                cost_al_round = torch.ones(len(picked_states))
+                avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
+                cumulative_cost += torch.sum(cost_al_round).detach().cpu().numpy()
+                logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
+                logger.log_metrics(
+                    {"post_al_cum_cost": cumulative_cost}, use_context=False
+                )
+
         del gflownet
         del proxy
 
