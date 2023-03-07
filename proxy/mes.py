@@ -345,6 +345,8 @@ class GaussianProcessMultiFidelityMES(MES):
         return states
 
     def plot_acquisition_rewards(self, **kwargs):
+        if self.env.n_dim > 2:
+            return None
         if hasattr(self.env, "get_all_terminating_states") == False:
             return None
         states = torch.tensor(
