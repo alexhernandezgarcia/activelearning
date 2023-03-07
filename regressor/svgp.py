@@ -197,7 +197,20 @@ class SingleTaskSVGP(DeepKernelRegressor):
         test_rmse = self.best_score
         test_nll = self.best_loss
         return test_rmse, test_nll, 0.0, 0.0, None
-
+    
+    def get_predictions(self, env, states):
+        states = torch.tensor(states, device = self.device, dtype = self.float)
+        states_proxy_input = states.clone()
+        states_proxy = env.statetorch2proxy(states_proxy_input)
+        model = self.surrogate
+        model.eval()
+        model.likelihood.eval()
+        with torch.no_grad():
+            f_dist = model(states_proxy)
+            y_dist = model.likelihood(f_dist)
+            y_mean = y_dist.mean
+            y_std = y_dist.variance.sqrt()
+        return y_mean, y_std
 
 class SingleTaskMultiFidelitySVGP(SingleTaskSVGP):
     def __init__(

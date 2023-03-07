@@ -14,7 +14,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from abc import abstractmethod
 from botorch.models.approximate_gp import SingleTaskVariationalGP
 from gpytorch.mlls import VariationalELBO
-
+from botorch.settings import debug
 """
 Assumes that in single fidelity, fid =1
 """
@@ -45,14 +45,15 @@ class SingleTaskGPRegressor:
         pass
 
     def fit(self):
+        # debug(state=True)
         train = self.dataset.train_dataset
         train_x = train["states"]
         train_y = train["energies"].unsqueeze(-1)
         train_y = train_y * self.target_factor
 
         self.init_model(train_x, train_y)
-
-        self.mll = fit_gpytorch_mll(self.mll)
+        with debug(state = True):
+            self.mll = fit_gpytorch_mll(self.mll)
 
     def get_predictions(self, env, states):
         """Input is states
