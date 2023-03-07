@@ -488,8 +488,7 @@ class DataHandler:
         """
         Pads till maximum length in the batch
         """
-        y, x, fid = (
-            [],
+        y, x = (
             [],
             [],
         )

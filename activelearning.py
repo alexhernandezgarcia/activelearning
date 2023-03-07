@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="random_sampler")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -108,6 +108,8 @@ def main(config):
         modes = oracle.modes
     else:
         modes = None
+
+    maximize = None
 
     if config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
@@ -257,30 +259,15 @@ def main(config):
             cumulative_sampled_energies = torch.cat(
                 (cumulative_sampled_energies, picked_energies)
             )
-            if (hasattr(env, "env") and hasattr(env.env, "plot_samples_frequency")) or (
-                hasattr(env, "env") == False and hasattr(env, "plot_samples_frequency")
-            ):
-                # TODO: send samples instead and do
-                # TODO: rename plot_samples to plot_states if we stick to current algo
-                fig = env.plot_samples_frequency(
-                    cumulative_sampled_states,
-                    title="Cumulative Sampled Dataset",
-                    rescale=env.rescale,
-                )
-                logger.log_figure("cum_sampled_dataset", fig, use_context=True)
 
-            if (
-                hasattr(env, "env") and hasattr(env.env, "plot_reward_distribution")
-            ) or (
-                hasattr(env, "env") == False
-                and hasattr(env, "plot_reward_distribution")
-            ):
-                fig = env.plot_reward_distribution(
-                    scores=cumulative_sampled_energies.tolist(),
-                    fidelity=picked_fidelity,
-                    title="Cumulative Sampled Dataset (over AL Interations)",
+            if config.do_figure:
+                get_figure_plots(
+                    env,
+                    cumulative_sampled_states,
+                    cumulative_sampled_energies,
+                    picked_fidelity,
+                    logger,
                 )
-                logger.log_figure("cum_sampled_dataset", fig, use_context=True)
 
             if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
@@ -338,6 +325,31 @@ def set_seeds(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+
+
+def get_figure_plots(
+    env, cumulative_sampled_states, cumulative_sampled_energies, picked_fidelity, logger
+):
+    if (hasattr(env, "env") and hasattr(env.env, "plot_samples_frequency")) or (
+        hasattr(env, "env") == False and hasattr(env, "plot_samples_frequency")
+    ):
+        # TODO: send samples instead and do
+        # TODO: rename plot_samples to plot_states if we stick to current algo
+        fig = env.plot_samples_frequency(
+            cumulative_sampled_states,
+            title="Cumulative Sampled Dataset",
+            rescale=env.rescale,
+        )
+        logger.log_figure("cum_sampled_dataset", fig, use_context=True)
+    if (hasattr(env, "env") and hasattr(env.env, "plot_reward_distribution")) or (
+        hasattr(env, "env") == False and hasattr(env, "plot_reward_distribution")
+    ):
+        fig = env.plot_reward_distribution(
+            scores=cumulative_sampled_energies.tolist(),
+            fidelity=picked_fidelity,
+            title="Cumulative Sampled Dataset (over AL Interations)",
+        )
+        logger.log_figure("cum_sampled_dataset", fig, use_context=True)
 
 
 if __name__ == "__main__":
