@@ -62,6 +62,7 @@ class BotorchUCB(UCB):
         if isinstance(inputs, np.ndarray):
             inputs = torch.tensor(inputs, device=self.device, dtype=self.float)
         if isinstance(self.regressor, DeepKernelRegressor) == True:
+            # TODO: Make uniform to get_features()
             if hasattr(self.regressor.language_model, "get_token_features"):
                 (
                     input_tok_features,
@@ -71,6 +72,8 @@ class BotorchUCB(UCB):
                     input_tok_features, input_mask
                 )
                 inputs = pooled_features
+            elif hasattr(self.regressor.language_model, "get_features"):
+                inputs = self.regressor.language_model.get_features(inputs)
         inputs = inputs.unsqueeze(-2)
         acq_values = self.acqf(inputs)
         return acq_values

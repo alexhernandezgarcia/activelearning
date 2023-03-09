@@ -16,6 +16,7 @@ from gpytorch.settings import cholesky_jitter
 from gpytorch.lazy import ConstantDiagLazyTensor
 from gpytorch import lazify
 from .botorch_models import SingleTaskMultiFidelityVariationalGP
+from gpytorch.kernels.kernel import ProductKernel
 
 
 class BaseGPSurrogate(abc.ABC):
@@ -227,12 +228,18 @@ class BaseGPSurrogate(abc.ABC):
             metrics[
                 "lengthscale"
             ] = covar_module.data_covar_module.lengthscale.mean().item()
-        elif hasattr(covar_module, "lengthscale"):
+        elif (
+            hasattr(covar_module, "lengthscale")
+            and covar_module.lengthscale is not None
+        ):
             metrics["lengthscale"] = covar_module.lengthscale.mean().item()
         else:
             pass
 
-        if hasattr(covar_module, "outputscale"):
+        if (
+            hasattr(covar_module, "outputscale")
+            and covar_module.outputscale is not None
+        ):
             metrics["outputscale"] = covar_module.outputscale.mean().item()
 
         return metrics
@@ -272,6 +279,96 @@ class BaseGPSurrogate(abc.ABC):
             param_groups.append(variational_group)
 
         return param_groups
+
+    def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
+        """
+        This is only intended for whitened variational distributions and gaussian likelihoods
+        at present.
+
+        \bar m = L^{-1} m
+        \bar S = L^{-1} S L^{-T}
+
+        where $LL^T = K_{uu}$.
+
+        Thus, the optimal \bar m, \bar S are given by
+        \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
+        \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
+        """
+
+        if isinstance(
+            self.model.variational_strategy, IndependentMultitaskVariationalStrategy
+        ):  # True in lambo code but False for me
+            ind_pts = (
+                self.model.variational_strategy.base_variational_strategy.inducing_points
+            )  # Parameter containing: torch.Size([64, 16])
+            train_y = train_y.transpose(-1, -2).unsqueeze(-1)
+            is_batch_model = True
+        else:
+            ind_pts = self.model.variational_strategy.inducing_points
+            is_batch_model = False
+
+        with cholesky_jitter(1e-4):
+            kuu = self.model.covar_module(
+                ind_pts
+            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+            kuu_chol = (
+                kuu.cholesky()
+            )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
+            kuv = self.model.covar_module(ind_pts, train_x).double()
+
+            if hasattr(self.likelihood, "noise"):  # False
+                noise = self.likelihood.noise
+            elif hasattr(self.likelihood, "task_noises"):
+                noise = self.likelihood.task_noises.view(-1, 1, 1)
+            else:
+                raise AttributeError
+            noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
+
+            if len(train_y.shape) < len(kuv.shape):
+                train_y = train_y.unsqueeze(-1)
+            if len(noise.shape) < len(kuv.shape):
+                noise = noise.unsqueeze(-1)
+
+            data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
+            if is_batch_model:  # True
+                noise_as_lt = ConstantDiagLazyTensor(
+                    noise.squeeze(-1), diag_shape=kuv.shape[-1]
+                )
+                inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
+                inner_term = inner_prod + kuu
+            else:
+                inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
+
+            s_mat = kuu_chol.transpose(-1, -2).matmul(
+                inner_term.inv_matmul(kuu_chol.evaluate())
+            )  # torch.Size([3, 64, 64])
+            s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
+            # the expression below is less efficient but probably more stable
+            mean_param = kuu_chol.transpose(-1, -2).matmul(
+                inner_term.inv_matmul(data_term)
+            )
+
+        mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
+        s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
+
+        if not is_batch_model:  # True
+            self.model.variational_strategy._variational_distribution.variational_mean.data = (
+                mean_param.data.detach().squeeze()
+            )
+            self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
+                s_root.data.detach()
+            )
+            self.model.variational_strategy.variational_params_initialized.fill_(1)
+        else:
+            self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
+                mean_param.data.detach().squeeze()
+            )
+            self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
+                s_root.data.detach()
+            )
+            self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
+                1
+            )
 
 
 class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
@@ -400,95 +497,95 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         """
         return torch.Size([])
 
-    def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
-        """
-        This is only intended for whitened variational distributions and gaussian likelihoods
-        at present.
+    # def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
+    #     """
+    #     This is only intended for whitened variational distributions and gaussian likelihoods
+    #     at present.
 
-        \bar m = L^{-1} m
-        \bar S = L^{-1} S L^{-T}
+    #     \bar m = L^{-1} m
+    #     \bar S = L^{-1} S L^{-T}
 
-        where $LL^T = K_{uu}$.
+    #     where $LL^T = K_{uu}$.
 
-        Thus, the optimal \bar m, \bar S are given by
-        \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
-        \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
-        """
+    #     Thus, the optimal \bar m, \bar S are given by
+    #     \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
+    #     \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
+    #     """
 
-        if isinstance(
-            self.model.variational_strategy, IndependentMultitaskVariationalStrategy
-        ):  # True in lambo code but False for me
-            ind_pts = (
-                self.model.variational_strategy.base_variational_strategy.inducing_points
-            )  # Parameter containing: torch.Size([64, 16])
-            train_y = train_y.transpose(-1, -2).unsqueeze(-1)
-            is_batch_model = True
-        else:
-            ind_pts = self.model.variational_strategy.inducing_points
-            is_batch_model = False
+    #     if isinstance(
+    #         self.model.variational_strategy, IndependentMultitaskVariationalStrategy
+    #     ):  # True in lambo code but False for me
+    #         ind_pts = (
+    #             self.model.variational_strategy.base_variational_strategy.inducing_points
+    #         )  # Parameter containing: torch.Size([64, 16])
+    #         train_y = train_y.transpose(-1, -2).unsqueeze(-1)
+    #         is_batch_model = True
+    #     else:
+    #         ind_pts = self.model.variational_strategy.inducing_points
+    #         is_batch_model = False
 
-        with cholesky_jitter(1e-4):
-            kuu = self.model.covar_module(
-                ind_pts
-            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
-            kuu_chol = (
-                kuu.cholesky()
-            )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
-            kuv = self.model.covar_module(ind_pts, train_x).double()
+    #     with cholesky_jitter(1e-4):
+    #         kuu = self.model.covar_module(
+    #             ind_pts
+    #         ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+    #         kuu_chol = (
+    #             kuu.cholesky()
+    #         )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
+    #         kuv = self.model.covar_module(ind_pts, train_x).double()
 
-            if hasattr(self.likelihood, "noise"):  # False
-                noise = self.likelihood.noise
-            elif hasattr(self.likelihood, "task_noises"):
-                noise = self.likelihood.task_noises.view(-1, 1, 1)
-            else:
-                raise AttributeError
-            noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
+    #         if hasattr(self.likelihood, "noise"):  # False
+    #             noise = self.likelihood.noise
+    #         elif hasattr(self.likelihood, "task_noises"):
+    #             noise = self.likelihood.task_noises.view(-1, 1, 1)
+    #         else:
+    #             raise AttributeError
+    #         noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
 
-            if len(train_y.shape) < len(kuv.shape):
-                train_y = train_y.unsqueeze(-1)
-            if len(noise.shape) < len(kuv.shape):
-                noise = noise.unsqueeze(-1)
+    #         if len(train_y.shape) < len(kuv.shape):
+    #             train_y = train_y.unsqueeze(-1)
+    #         if len(noise.shape) < len(kuv.shape):
+    #             noise = noise.unsqueeze(-1)
 
-            data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
-            if is_batch_model:  # True
-                noise_as_lt = ConstantDiagLazyTensor(
-                    noise.squeeze(-1), diag_shape=kuv.shape[-1]
-                )
-                inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
-                inner_term = inner_prod + kuu
-            else:
-                inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
+    #         data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
+    #         if is_batch_model:  # True
+    #             noise_as_lt = ConstantDiagLazyTensor(
+    #                 noise.squeeze(-1), diag_shape=kuv.shape[-1]
+    #             )
+    #             inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
+    #             inner_term = inner_prod + kuu
+    #         else:
+    #             inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
 
-            s_mat = kuu_chol.transpose(-1, -2).matmul(
-                inner_term.inv_matmul(kuu_chol.evaluate())
-            )  # torch.Size([3, 64, 64])
-            s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
-            # the expression below is less efficient but probably more stable
-            mean_param = kuu_chol.transpose(-1, -2).matmul(
-                inner_term.inv_matmul(data_term)
-            )
+    #         s_mat = kuu_chol.transpose(-1, -2).matmul(
+    #             inner_term.inv_matmul(kuu_chol.evaluate())
+    #         )  # torch.Size([3, 64, 64])
+    #         s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
+    #         # the expression below is less efficient but probably more stable
+    #         mean_param = kuu_chol.transpose(-1, -2).matmul(
+    #             inner_term.inv_matmul(data_term)
+    #         )
 
-        mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
-        s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
+    #     mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
+    #     s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
 
-        if not is_batch_model:  # True
-            self.model.variational_strategy._variational_distribution.variational_mean.data = (
-                mean_param.data.detach().squeeze()
-            )
-            self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
-                s_root.data.detach()
-            )
-            self.model.variational_strategy.variational_params_initialized.fill_(1)
-        else:
-            self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
-                mean_param.data.detach().squeeze()
-            )
-            self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
-                s_root.data.detach()
-            )
-            self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
-                1
-            )
+    #     if not is_batch_model:  # True
+    #         self.model.variational_strategy._variational_distribution.variational_mean.data = (
+    #             mean_param.data.detach().squeeze()
+    #         )
+    #         self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
+    #             s_root.data.detach()
+    #         )
+    #         self.model.variational_strategy.variational_params_initialized.fill_(1)
+    #     else:
+    #         self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
+    #             mean_param.data.detach().squeeze()
+    #         )
+    #         self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
+    #             s_root.data.detach()
+    #         )
+    #         self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
+    #             1
+    #         )
 
 
 # TODO: Adopt inheritance
@@ -504,6 +601,7 @@ class SingleTaskMultiFidelitySVGP(
         device,
         float_precision,
         n_fid,
+        is_fid_param_nn,
         noise_constraint=None,
         lengthscale_prior=None,
         outcome_transform=None,
@@ -519,11 +617,14 @@ class SingleTaskMultiFidelitySVGP(
         self.float = float_precision
         BaseGPSurrogate.__init__(self, encoder=encoder, *args, **kwargs)
         self.num_inducing_points = num_inducing_points  # 64
-
+        self.is_fid_param_nn = is_fid_param_nn
+        active_dims = torch.arange(feature_dim).to(device)
         if out_dim == 1:
             if kernel == "matern":
+                # active_dims = active_dims
                 covar_module_x = kernels.MaternKernel(
-                    ard_num_dims=feature_dim, lengthscale_prior=lengthscale_prior
+                    ard_num_dims=feature_dim,
+                    lengthscale_prior=lengthscale_prior,
                 )
             elif kernel == "rbf":
                 covar_module_x = kernels.RBFKernel(
@@ -535,6 +636,9 @@ class SingleTaskMultiFidelitySVGP(
             )
             likelihood.initialize(noise=self.task_noise_init)
             covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
+            # active_dims = torch.tensor([feature_dim])
+            covar_module = ProductKernel(covar_module_x, covar_module_fidelity)
+
             likelihood.initialize(noise=self.task_noise_init)
         else:
             raise NotImplementedError(
@@ -562,6 +666,11 @@ class SingleTaskMultiFidelitySVGP(
         dummy_X = torch.cat([dummy_X, dummy_fid], dim=1)
         # torch.Size([64, 16])
         dummy_Y = torch.randn(num_inducing_points, out_dim).to(self.device, self.float)
+        # covar_module = (
+        #     covar_module
+        #     if covar_module is None
+        #     else covar_module.to(self.device, self.float)
+        # )
         covar_module_x = (
             covar_module_x
             if covar_module_x is None
@@ -573,7 +682,9 @@ class SingleTaskMultiFidelitySVGP(
             else covar_module_fidelity.to(self.device, self.float)
         )
 
+        # self.base_cls = SingleTaskVariationalGP
         self.base_cls = SingleTaskMultiFidelityVariationalGP
+
         self.base_cls.__init__(
             self,
             dummy_X,
@@ -581,6 +692,7 @@ class SingleTaskMultiFidelitySVGP(
             likelihood,
             out_dim,
             learn_inducing_points,
+            # covar_module = covar_module,
             covar_module_x=covar_module_x,
             covar_module_fidelity=covar_module_fidelity,
             inducing_points=dummy_X,
@@ -605,18 +717,23 @@ class SingleTaskMultiFidelitySVGP(
         original_shape = seq_array.shape[:-1]
         flat_seq_array = seq_array.flatten(end_dim=-2)
         enc_seq_array = seq_array.to(self.device)
+        state_array = enc_seq_array[..., :-1]
         fid_array = seq_array[..., -1].to(self.device)
         # .to(
         # torch.long
         # )  # torch.Size([32, 36]), padded states
+        if self.is_fid_param_nn == True:
+            features = self.encoder.get_features(enc_seq_array)
+        else:
+            features = self.encoder.get_features(state_array)
 
         """
         Potential Code
         features = self.encoder.get_features(enc_seq_array)
         """
-        features = self.encoder(
-            enc_seq_array
-        )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
+        # features = self.encoder.get_features(
+        #     enc_seq_array
+        # )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
         features = torch.cat(
             [features, fid_array.unsqueeze(-1)], dim=-1
         )  # torch.Size([32, 17])

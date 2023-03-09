@@ -44,6 +44,7 @@ class LanguageModel(nn.Module):
         self.max_shift = max_shift
         self.tokenizer = tokenizer
         self.mask_ratio = mask_ratio
+        self.is_fid_param = False
 
     def forward(self, inputs):  # torch.Size([426, 36])
         return self.model(inputs)
@@ -53,14 +54,14 @@ class LanguageModel(nn.Module):
         # fid_array = inputs[..., -1].to(self.device)
         return self.model(inputs)
 
-    def train_step(self, optimizer, input_batch, loss_scale=1.0, **kwargs):
+    def train_step(self, optimizer, input_batch, n_fid, loss_scale=1.0, **kwargs):
         optimizer.zero_grad(set_to_none=True)
         mask_ratio = self.mask_ratio
-        if self.n_fid > 1:
+        if n_fid > 1:
             input_batch = input_batch[..., :-1]
         # replace random tokens with mask token
         mask_idxs = sample_mask(input_batch, self.tokenizer, mask_ratio)  # (32, 5)
-        masked_token_batch = input_batch.clone().to(self.language_model.device)
+        masked_token_batch = input_batch.clone().to(self.device)
         np.put_along_axis(
             masked_token_batch, mask_idxs, self.tokenizer.masking_idx, axis=1
         )
@@ -80,7 +81,7 @@ class LanguageModel(nn.Module):
         loss.backward()
         optimizer.step()
 
-        return loss, masked_logits, masked_tokens
+        return loss  # masked_logits, masked_tokens
 
     def pool_features(self, src_tok_features, src_mask):
         lat_tok_features, pooled_features = self.model.function_head(

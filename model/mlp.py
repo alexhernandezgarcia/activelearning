@@ -35,6 +35,7 @@ class MLP(nn.Module):
 
         """
         self.activation = ACTIVATION_KEY[activation]
+        self.is_fid_param = False
 
         # TODO: this is grid specific for now, make it general (for apatamers and torus)
         if config_env.proxy_state_format == "ohe":

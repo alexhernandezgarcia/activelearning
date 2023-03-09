@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import wandb
 
 class AL_Logger(Logger):
     """
@@ -87,3 +87,6 @@ class AL_Logger(Logger):
             figimg = self.wandb.Image(fig)
             self.wandb.log({key: figimg})
             plt.close()
+    
+    def define_metric(self, metric, step_metric=None):
+        wandb.define_metric(metric, step_metric=step_metric)    

@@ -128,6 +128,7 @@ class DeepKernelRegressor:
             config_env=config_env,
             _recursive_=False,
         )
+        is_fid_param = self.language_model.is_fid_param
         self.encoder_obj = encoder_obj
 
         self.surrogate_config = surrogate
@@ -138,6 +139,7 @@ class DeepKernelRegressor:
             device=self.device,
             float_precision=self.float,
             n_fid=self.n_fid,
+            is_fid_param_nn=is_fid_param,
         )
 
         self.batch_size = self.surrogate.bs
@@ -231,16 +233,7 @@ class DeepKernelRegressor:
         return loss
 
     def fit(self):
-        print(
-            "\n\nUser-Defined Warning: DKL regressor strictly assumes that the states are integral. \n \
-            This is because an embedding layer is used to map each state element to a corresponding embedding.\n \
-            If the input states aren't integral, they are forcefully converted to integers. \n \
-            This might lead to loss of precision if the states were intended to be fractional for training and evaluation purposes. \n \
-            Please ensure that you wanted the states to be integral. \n \
-            (For example in 100x100 Branin, the states are not intended to be integral.)"
-        )
         select_crit_key = "test_nll"
-
         X_train = self.dataset.train_dataset["states"]
         Y_train = self.dataset.train_dataset["energies"]
         Y_train = self.surrogate.reshape_targets(Y_train)
@@ -281,7 +274,6 @@ class DeepKernelRegressor:
         if hasattr(self.mll, "num_data"):
             self.mll.num_data = len(train_loader.dataset)
 
-        stop_crit_key = "train_loss"
         best_loss, best_loss_epoch = None, 0
         stop = False
 
@@ -301,14 +293,16 @@ class DeepKernelRegressor:
             avg_gp_loss = 0.0
             self.surrogate.train()
             for inputs, targets in train_loader:
-                inputs = inputs
                 # train encoder through unsupervised MLM objective
                 if self.encoder_obj == "mlm":
                     self.surrogate.encoder.requires_grad_(
                         True
                     )  # inputs = 32 x 36, mask_ratio=0.125, loss_scale=1.
                     mlm_loss = self.surrogate.encoder.train_step(
-                        optimizer=optimizer, input_batch=inputs, target_batch=targets
+                        optimizer=optimizer,
+                        input_batch=inputs,
+                        target_batch=targets,
+                        n_fid=self.n_fid,
                     )
                 # elif isinstance(surrogate.encoder, LanguageModel) and encoder_obj == 'lanmt':
                 #     surrogate.encoder.requires_grad_(True)
@@ -393,7 +387,7 @@ class DeepKernelRegressor:
             metrics.update(dict(best_score=best_score, best_epoch=best_score_epoch))
 
             # use train loss to determine convergence
-            stop_crit_key = "test_nll"
+            stop_crit_key = "test_rmse"
             stop_crit = metrics.get(stop_crit_key, None)
             if stop_crit is not None:
                 best_loss, best_loss_epoch, _, stop = check_early_stopping(
@@ -424,6 +418,9 @@ class DeepKernelRegressor:
         if self.surrogate.early_stopping:
             print(f"\n---- loading checkpoint from epoch {best_score_epoch} ----")
             self.surrogate.load_state_dict(best_weights)
+            print(f"---- best test NLL: {best_loss:.4f} ----")
+            self.best_score = best_score
+            self.best_loss = best_loss
         self.logger.save_proxy(
             self.surrogate, optimizer, epoch=best_score_epoch, final=True
         )
@@ -432,6 +429,25 @@ class DeepKernelRegressor:
         self.surrogate.clear_cache()
         self.surrogate.eval()
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
+
+    def evaluate(self, **kwargs):
+        test_nll = self.best_score
+        test_rmse = self.best_loss
+        return test_rmse, test_nll, 0.0, 0.0, None
+
+    def get_predictions(self, env, states):
+        states = torch.tensor(states, device=self.device, dtype=self.float)
+        states_proxy_input = states.clone()
+        states_proxy = env.statetorch2proxy(states_proxy_input)
+        model = self.surrogate
+        model.eval()
+        model.likelihood.eval()
+        with torch.no_grad():
+            f_dist = model(states_proxy)
+            y_dist = model.likelihood(f_dist)
+            y_mean = y_dist.mean
+            y_std = y_dist.variance.sqrt()
+        return y_mean, y_std
 
     # def load_model(self):
     #     """

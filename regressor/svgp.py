@@ -14,6 +14,7 @@ import wandb
 class AsItIs(nn.Module):
     def __init__(self):
         super().__init__()
+        self.is_fid_param = False
 
     def forward(self, x):
         return x
@@ -45,6 +46,7 @@ class SingleTaskSVGP(DeepKernelRegressor):
         self.dataset = dataset
 
         self.language_model = AsItIs()
+
         self.surrogate_config = surrogate
         self.surrogate = hydra.utils.instantiate(
             surrogate,
@@ -65,7 +67,7 @@ class SingleTaskSVGP(DeepKernelRegressor):
             1. Does not call mlm_eval_epoch()
         """
 
-        select_crit_key = "test_rmse"
+        select_crit_key = "test_nll"
 
         X_train = self.dataset.train_dataset["states"]
         Y_train = self.dataset.train_dataset["energies"]
@@ -199,8 +201,9 @@ class SingleTaskSVGP(DeepKernelRegressor):
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
 
     def evaluate(self, **kwargs):
-        test_rmse = self.best_score
-        test_nll = self.best_loss
+        # INCORRECT AS BOTH STOPPING AND SELECTING CRIT IS TEST_NLL
+        test_nll = self.best_score
+        test_rmse = self.best_loss
         return test_rmse, test_nll, 0.0, 0.0, None
 
     def get_predictions(self, env, states):
@@ -235,6 +238,7 @@ class SingleTaskMultiFidelitySVGP(SingleTaskSVGP):
         self.n_fid = self.dataset.n_fid
 
         self.language_model = AsItIs()
+        is_fid_param_nn = self.language_model.is_fid_param
         self.surrogate_config = surrogate
         self.surrogate = hydra.utils.instantiate(
             surrogate,
@@ -243,6 +247,7 @@ class SingleTaskMultiFidelitySVGP(SingleTaskSVGP):
             device=self.device,
             float_precision=self.float,
             n_fid=self.n_fid,
+            is_fid_param_nn=is_fid_param_nn,
         )
         self.batch_size = self.surrogate.bs
         if checkpoint:

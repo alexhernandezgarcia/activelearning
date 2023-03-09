@@ -37,6 +37,7 @@ class RegressiveMLP(nn.Module):
         self.device = device
         self.base_hidden_layers = [base_num_hidden] * base_num_layer
         self.num_fid_parameter = num_fid_parameter
+        self.is_fid_param = True
         base_layers = [
             nn.Linear(self.init_layer_depth, self.base_hidden_layers[0]),
             self.activation,
