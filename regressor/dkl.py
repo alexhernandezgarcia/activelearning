@@ -13,13 +13,15 @@ from torch.nn import functional as F
 from model.mlm import sample_mask
 from gpytorch.variational import IndependentMultitaskVariationalStrategy
 from gpytorch.mlls import ExactMarginalLogLikelihood, VariationalELBO
-from model.mlm import mlm_eval_epoch
+from model.mlm import mlm_eval_epoch as mlm_eval_epoch_lm
 from model.shared_elements import check_early_stopping
 import copy
 from torch.nn.utils.rnn import pad_sequence
 import os
 from tqdm import tqdm
 import wandb
+from model.regressive import RegressiveMLP
+from model.mlp import MLP
 
 """
 This DKL regressor strictly assumes that the states are integral. 
@@ -96,6 +98,7 @@ class DeepKernelRegressor:
         device,
         dataset,
         config_model,
+        config_env,
         surrogate,
         float_precision,
         tokenizer,
@@ -122,6 +125,7 @@ class DeepKernelRegressor:
             tokenizer=self.tokenizer,
             device=self.device,
             float_precision=self.float,
+            config_env=config_env,
             _recursive_=False,
         )
         self.encoder_obj = encoder_obj
@@ -129,7 +133,7 @@ class DeepKernelRegressor:
         self.surrogate_config = surrogate
         self.surrogate = hydra.utils.instantiate(
             surrogate,
-            tokenizer=self.language_model.tokenizer,
+            tokenizer=tokenizer,
             encoder=self.language_model,
             device=self.device,
             float_precision=self.float,
@@ -139,6 +143,13 @@ class DeepKernelRegressor:
         self.batch_size = self.surrogate.bs
         if checkpoint:
             self.logger.set_proxy_path(checkpoint)
+
+        if isinstance(self.language_model, MLP) or isinstance(
+            self.language_model, RegressiveMLP
+        ):
+            self.mlm_eval_epoch = self.language_model.eval_epoch
+        else:
+            self.mlm_eval_epoch = mlm_eval_epoch_lm
 
     def initialize_surrogate(self, X_train, Y_train):
         # X_train = torch.Size([5119, 51])
@@ -167,36 +178,36 @@ class DeepKernelRegressor:
         )
         self.mll.to(self.surrogate.device)
 
-    def mlm_train_step(self, optimizer, token_batch, mask_ratio, loss_scale=1.0):
-        optimizer.zero_grad(set_to_none=True)
+    # def mlm_train_step(self, optimizer, token_batch, mask_ratio, loss_scale=1.0):
+    #     optimizer.zero_grad(set_to_none=True)
 
-        if self.n_fid > 1:
-            token_batch = token_batch[..., :-1]
-        # replace random tokens with mask token
-        mask_idxs = sample_mask(token_batch, self.tokenizer, mask_ratio)  # (32, 5)
-        masked_token_batch = token_batch.clone().to(self.language_model.device)
-        np.put_along_axis(
-            masked_token_batch, mask_idxs, self.tokenizer.masking_idx, axis=1
-        )
+    #     if self.n_fid > 1:
+    #         token_batch = token_batch[..., :-1]
+    #     # replace random tokens with mask token
+    #     mask_idxs = sample_mask(token_batch, self.tokenizer, mask_ratio)  # (32, 5)
+    #     masked_token_batch = token_batch.clone().to(self.language_model.device)
+    #     np.put_along_axis(
+    #         masked_token_batch, mask_idxs, self.tokenizer.masking_idx, axis=1
+    #     )
 
-        # get predicted logits for masked tokens
-        logits, _ = self.language_model.logits_from_tokens(masked_token_batch)
-        vocab_size = logits.shape[-1]
-        masked_logits = np.take_along_axis(logits, mask_idxs[..., None], axis=1).view(
-            -1, vocab_size
-        )  # torch.Size([160, 26])
+    #     # get predicted logits for masked tokens
+    #     logits, _ = self.language_model.logits_from_tokens(masked_token_batch)
+    #     vocab_size = logits.shape[-1]
+    #     masked_logits = np.take_along_axis(logits, mask_idxs[..., None], axis=1).view(
+    #         -1, vocab_size
+    #     )  # torch.Size([160, 26])
 
-        # use the ground-truth tokens as labels
-        masked_tokens = np.take_along_axis(token_batch, mask_idxs, axis=1)
-        masked_tokens = masked_tokens.view(-1).to(
-            self.language_model.device
-        )  # torch.Size([160])
+    #     # use the ground-truth tokens as labels
+    #     masked_tokens = np.take_along_axis(token_batch, mask_idxs, axis=1)
+    #     masked_tokens = masked_tokens.view(-1).to(
+    #         self.language_model.device
+    #     )  # torch.Size([160])
 
-        loss = loss_scale * F.cross_entropy(masked_logits, masked_tokens)
-        loss.backward()
-        optimizer.step()
+    #     loss = loss_scale * F.cross_entropy(masked_logits, masked_tokens)
+    #     loss.backward()
+    #     optimizer.step()
 
-        return loss, masked_logits, masked_tokens
+    #     return loss, masked_logits, masked_tokens
 
     def gp_train_step(self, optimizer, inputs, targets, mll):
         self.surrogate.zero_grad(set_to_none=True)
@@ -230,23 +241,12 @@ class DeepKernelRegressor:
         )
         select_crit_key = "test_nll"
 
-        if self.progress:
-            print(
-                "\nUser-Defined Warning: Converting states to integer for variational inducing points initialization."
-            )
-        # TODO: Is the conversion to long necessary
-        # TODO: Y_train was long -- I removed that
-        X_train = self.dataset.train_dataset["states"].long()
+        X_train = self.dataset.train_dataset["states"]
         Y_train = self.dataset.train_dataset["energies"]
         Y_train = self.surrogate.reshape_targets(Y_train)
         Y_train = Y_train.to(dtype=list(self.surrogate.parameters())[0].dtype)
 
         train_loader, test_loader = self.dataset.get_dataloader()
-        if self.progress:
-            print(
-                "\nUser-Defined Warning: Converting states in train loader to integer for MLM training.\n \
-                    Similar conversion will be done in test loader for MLM and Surrogate evaluation."
-            )
 
         print("\n---- preparing checkpoint ----")
         self.surrogate.eval()
@@ -255,12 +255,16 @@ class DeepKernelRegressor:
         start_metrics = {}
         start_metrics.update(self.surrogate.evaluate(test_loader))
         start_metrics["epoch"] = 0
+        if hasattr(self.language_model, "mask_ratio"):
+            mask_ratio = self.language_model.mask_ratio
+        else:
+            mask_ratio = None
         start_metrics.update(
-            mlm_eval_epoch(
-                self.language_model,
-                test_loader,
-                self.language_model.mask_ratio,
-                self.n_fid,
+            self.mlm_eval_epoch(
+                model=self.language_model,
+                mask_ratio=mask_ratio,
+                n_fid=self.n_fid,
+                loader=test_loader,
             )
         )
 
@@ -292,21 +296,19 @@ class DeepKernelRegressor:
         pbar = tqdm(range(1, self.surrogate.num_epochs + 1), disable=not self.progress)
         for epoch_idx in pbar:  # 128
             metrics = {}
-
             avg_train_loss = 0.0
+            avg_mlm_loss = 0.0
+            avg_gp_loss = 0.0
             self.surrogate.train()
             for inputs, targets in train_loader:
-                inputs = inputs.to(torch.long)
+                inputs = inputs
                 # train encoder through unsupervised MLM objective
                 if self.encoder_obj == "mlm":
                     self.surrogate.encoder.requires_grad_(
                         True
                     )  # inputs = 32 x 36, mask_ratio=0.125, loss_scale=1.
-                    mlm_loss, _, _ = self.mlm_train_step(
-                        optimizer,
-                        inputs,
-                        self.surrogate.encoder.mask_ratio,
-                        loss_scale=1.0,
+                    mlm_loss = self.surrogate.encoder.train_step(
+                        optimizer=optimizer, input_batch=inputs, target_batch=targets
                     )
                 # elif isinstance(surrogate.encoder, LanguageModel) and encoder_obj == 'lanmt':
                 #     surrogate.encoder.requires_grad_(True)
@@ -323,6 +325,8 @@ class DeepKernelRegressor:
                 avg_train_loss += (mlm_loss.detach() + gp_loss.detach()) / len(
                     train_loader
                 )
+                avg_mlm_loss += mlm_loss.detach() / len(train_loader)
+                avg_gp_loss += gp_loss.detach() / len(train_loader)
 
             lr_sched.step(avg_train_loss)
 
@@ -330,6 +334,8 @@ class DeepKernelRegressor:
                 {
                     "epoch": epoch_idx + 1,
                     "train_loss": avg_train_loss.item(),
+                    "mlm_loss": avg_mlm_loss.item(),
+                    "gp_loss": avg_gp_loss.item(),
                 }
             )
 
@@ -342,10 +348,11 @@ class DeepKernelRegressor:
                 metrics.update(self.surrogate.evaluate(test_loader))
                 if self.encoder_obj == "mlm":
                     metrics.update(
-                        mlm_eval_epoch(
-                            self.language_model,
-                            test_loader,
-                            self.surrogate.encoder.mask_ratio,
+                        self.mlm_eval_epoch(
+                            model=self.language_model,
+                            mask_ratio=mask_ratio,
+                            n_fid=self.n_fid,
+                            loader=test_loader,
                         )
                     )
                     if self.progress:

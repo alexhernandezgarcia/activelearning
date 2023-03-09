@@ -18,7 +18,7 @@ surrogate:
   holdout_ratio: 0.1 #0.2
   early_stopping: True
   patience: 32
-  eval_period: 5
+  eval_period: 1
   # Specific to the synthetic functions based on grid
   feature_dim: ${env.n_dim}
   out_dim: 1

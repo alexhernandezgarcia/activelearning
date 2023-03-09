@@ -90,7 +90,7 @@ class BaseGPSurrogate(abc.ABC):
         # .to(
         # torch.long
         # )  # torch.Size([32, 36]), padded states
-        features = self.encoder(
+        features = self.encoder.get_features(
             enc_seq_array
         )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
 

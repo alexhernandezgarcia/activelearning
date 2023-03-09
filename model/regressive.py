@@ -2,6 +2,7 @@ import torch.nn as nn
 from .mlp import ACTIVATION_KEY
 import torch
 import torch.nn.functional as F
+from torch.nn import MSELoss
 
 
 class RegressiveMLP(nn.Module):
@@ -248,3 +249,29 @@ class RegressiveMLP(nn.Module):
         for p_name, param in self.named_parameters():
             shared_group["params"].append(param)
         return [shared_group]
+
+    def train_step(
+        self, input_batch, optimizer, target_batch, criterion=MSELoss(), **kwargs
+    ):
+        """
+        Required so that one DKL can work with many models
+        """
+        self.train()
+        optimizer.zero_grad()
+        output = self(input_batch)
+        loss = criterion(output, target_batch)
+        loss.backward()
+        optimizer.step()
+        return loss
+
+    def eval_epoch(self, loader, criterion=MSELoss(), **kwargs):
+        metrics = {"loss": 0.0}
+        self.eval()
+        with torch.no_grad():
+            for (input_batch, target_batch) in loader:
+                input_batch = input_batch.to("cuda")
+                target_batch = target_batch.to("cuda")
+                loss = criterion(self(input_batch), target_batch)
+                metrics["loss"] += loss.item() / len(loader)
+        metrics = {f"test_{key}": val for key, val in metrics.items()}
+        return metrics
