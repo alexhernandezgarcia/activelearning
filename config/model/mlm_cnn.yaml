@@ -19,3 +19,4 @@ patience: 32
 lr: 1e-3
 max_shift: 0
 mask_ratio: 0.125
+feature_dim: ${model.model.out_dim}

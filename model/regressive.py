@@ -20,23 +20,30 @@ class RegressiveMLP(nn.Module):
         config_env,
         device,
         # In OHE, this is num_fid, but in Hartmann this is 1
-        num_fid_parameter,
+        feature_dim,
+        **kwargs,
     ):
         """
         Implements regressive deep learning networks in the mulit-fidelity setting as done Shibo Li et. al.
         For the emebedding variant, see nikita-0209/mf-proxy repo
         """
         super(RegressiveMLP, self).__init__()
+        if config_env.proxy_state_format == "ohe":
+            self.num_fid_parameter = n_fid
+            input_classes = config_env.length  # length
+            input_max_length = config_env.n_dim  # n_dim
+            self.init_layer_depth = int((input_classes) * (input_max_length))
+        else:
+            self.init_layer_depth = config_env.n_dim
+            self.num_fid_parameter = 1
+        self.feature_dim = feature_dim
         self.n_fid = n_fid
-        input_classes = config_env["length"]  # length
-        input_max_length = config_env["n_dim"]  # n_dim
-        self.init_layer_depth = int((input_classes) * (input_max_length))
+
         self.fid_num_hidden = fid_num_hidden
         self.num_output = num_output
         self.activation = ACTIVATION_KEY[activation]
         self.device = device
         self.base_hidden_layers = [base_num_hidden] * base_num_layer
-        self.num_fid_parameter = num_fid_parameter
         self.is_fid_param = True
         base_layers = [
             nn.Linear(self.init_layer_depth, self.base_hidden_layers[0]),
@@ -59,7 +66,7 @@ class RegressiveMLP(nn.Module):
 
         # list of layers created
         if regressive_mode == "seq":
-            self.forward = self.get_feature_seq_regressive
+            self.get_features = self.get_feature_seq_regressive
             self.layers = nn.ModuleList(
                 [
                     nn.Sequential(
@@ -80,9 +87,9 @@ class RegressiveMLP(nn.Module):
                     for i in range(self.n_fid)
                 ]
             )
-            self.forward_for_loss = self.forward_seq_regressive
+            self.forward = self.forward_seq_regressive
         elif regressive_mode == "full":
-            self.forward = self.get_feature_full_regressive
+            self.get_features = self.get_feature_full_regressive
             self.layers = nn.ModuleList(
                 [
                     nn.Sequential(
@@ -101,7 +108,7 @@ class RegressiveMLP(nn.Module):
                     for i in range(self.n_fid)
                 ]
             )
-            self.forward_for_loss = self.forward_full_regressive
+            self.forward = self.forward_full_regressive
             # self.get_feature = self.get_feature_full_regressive
         self.output_layer = nn.Sequential(
             self.activation,
@@ -109,6 +116,9 @@ class RegressiveMLP(nn.Module):
         )
 
     def get_feature_seq_regressive(self, input):
+        """
+        Have not performed experiments with this.
+        """
         x, fid = (
             input[:, : -self.num_fid_parameter],
             input[:, -self.num_fid_parameter :],
@@ -260,7 +270,7 @@ class RegressiveMLP(nn.Module):
         self.train()
         optimizer.zero_grad()
         output = self(input_batch)
-        loss = criterion(output, target_batch)
+        loss = criterion(output, target_batch.unsqueeze(-1))
         loss.backward()
         optimizer.step()
         return loss
@@ -272,7 +282,7 @@ class RegressiveMLP(nn.Module):
             for (input_batch, target_batch) in loader:
                 input_batch = input_batch.to("cuda")
                 target_batch = target_batch.to("cuda")
-                loss = criterion(self(input_batch), target_batch)
+                loss = criterion(self(input_batch), target_batch.unsqueeze(-1))
                 metrics["loss"] += loss.item() / len(loader)
         metrics = {f"test_{key}": val for key, val in metrics.items()}
         return metrics

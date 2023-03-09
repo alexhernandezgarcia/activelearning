@@ -280,95 +280,95 @@ class BaseGPSurrogate(abc.ABC):
 
         return param_groups
 
-    def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
-        """
-        This is only intended for whitened variational distributions and gaussian likelihoods
-        at present.
+    # def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
+    #     """
+    #     This is only intended for whitened variational distributions and gaussian likelihoods
+    #     at present.
 
-        \bar m = L^{-1} m
-        \bar S = L^{-1} S L^{-T}
+    #     \bar m = L^{-1} m
+    #     \bar S = L^{-1} S L^{-T}
 
-        where $LL^T = K_{uu}$.
+    #     where $LL^T = K_{uu}$.
 
-        Thus, the optimal \bar m, \bar S are given by
-        \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
-        \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
-        """
+    #     Thus, the optimal \bar m, \bar S are given by
+    #     \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
+    #     \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
+    #     """
 
-        if isinstance(
-            self.model.variational_strategy, IndependentMultitaskVariationalStrategy
-        ):  # True in lambo code but False for me
-            ind_pts = (
-                self.model.variational_strategy.base_variational_strategy.inducing_points
-            )  # Parameter containing: torch.Size([64, 16])
-            train_y = train_y.transpose(-1, -2).unsqueeze(-1)
-            is_batch_model = True
-        else:
-            ind_pts = self.model.variational_strategy.inducing_points
-            is_batch_model = False
+    #     if isinstance(
+    #         self.model.variational_strategy, IndependentMultitaskVariationalStrategy
+    #     ):  # True in lambo code but False for me
+    #         ind_pts = (
+    #             self.model.variational_strategy.base_variational_strategy.inducing_points
+    #         )  # Parameter containing: torch.Size([64, 16])
+    #         train_y = train_y.transpose(-1, -2).unsqueeze(-1)
+    #         is_batch_model = True
+    #     else:
+    #         ind_pts = self.model.variational_strategy.inducing_points
+    #         is_batch_model = False
 
-        with cholesky_jitter(1e-4):
-            kuu = self.model.covar_module(
-                ind_pts
-            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
-            kuu_chol = (
-                kuu.cholesky()
-            )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
-            kuv = self.model.covar_module(ind_pts, train_x).double()
+    #     with cholesky_jitter(1e-4):
+    #         kuu = self.model.covar_module(
+    #             ind_pts
+    #         ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+    #         kuu_chol = (
+    #             kuu.cholesky()
+    #         )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
+    #         kuv = self.model.covar_module(ind_pts, train_x).double()
 
-            if hasattr(self.likelihood, "noise"):  # False
-                noise = self.likelihood.noise
-            elif hasattr(self.likelihood, "task_noises"):
-                noise = self.likelihood.task_noises.view(-1, 1, 1)
-            else:
-                raise AttributeError
-            noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
+    #         if hasattr(self.likelihood, "noise"):  # False
+    #             noise = self.likelihood.noise
+    #         elif hasattr(self.likelihood, "task_noises"):
+    #             noise = self.likelihood.task_noises.view(-1, 1, 1)
+    #         else:
+    #             raise AttributeError
+    #         noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
 
-            if len(train_y.shape) < len(kuv.shape):
-                train_y = train_y.unsqueeze(-1)
-            if len(noise.shape) < len(kuv.shape):
-                noise = noise.unsqueeze(-1)
+    #         if len(train_y.shape) < len(kuv.shape):
+    #             train_y = train_y.unsqueeze(-1)
+    #         if len(noise.shape) < len(kuv.shape):
+    #             noise = noise.unsqueeze(-1)
 
-            data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
-            if is_batch_model:  # True
-                noise_as_lt = ConstantDiagLazyTensor(
-                    noise.squeeze(-1), diag_shape=kuv.shape[-1]
-                )
-                inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
-                inner_term = inner_prod + kuu
-            else:
-                inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
+    #         data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
+    #         if is_batch_model:  # True
+    #             noise_as_lt = ConstantDiagLazyTensor(
+    #                 noise.squeeze(-1), diag_shape=kuv.shape[-1]
+    #             )
+    #             inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
+    #             inner_term = inner_prod + kuu
+    #         else:
+    #             inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
 
-            s_mat = kuu_chol.transpose(-1, -2).matmul(
-                inner_term.inv_matmul(kuu_chol.evaluate())
-            )  # torch.Size([3, 64, 64])
-            s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
-            # the expression below is less efficient but probably more stable
-            mean_param = kuu_chol.transpose(-1, -2).matmul(
-                inner_term.inv_matmul(data_term)
-            )
+    #         s_mat = kuu_chol.transpose(-1, -2).matmul(
+    #             inner_term.inv_matmul(kuu_chol.evaluate())
+    #         )  # torch.Size([3, 64, 64])
+    #         s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
+    #         # the expression below is less efficient but probably more stable
+    #         mean_param = kuu_chol.transpose(-1, -2).matmul(
+    #             inner_term.inv_matmul(data_term)
+    #         )
 
-        mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
-        s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
+    #     mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
+    #     s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
 
-        if not is_batch_model:  # True
-            self.model.variational_strategy._variational_distribution.variational_mean.data = (
-                mean_param.data.detach().squeeze()
-            )
-            self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
-                s_root.data.detach()
-            )
-            self.model.variational_strategy.variational_params_initialized.fill_(1)
-        else:
-            self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
-                mean_param.data.detach().squeeze()
-            )
-            self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
-                s_root.data.detach()
-            )
-            self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
-                1
-            )
+    #     if not is_batch_model:  # True
+    #         self.model.variational_strategy._variational_distribution.variational_mean.data = (
+    #             mean_param.data.detach().squeeze()
+    #         )
+    #         self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
+    #             s_root.data.detach()
+    #         )
+    #         self.model.variational_strategy.variational_params_initialized.fill_(1)
+    #     else:
+    #         self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
+    #             mean_param.data.detach().squeeze()
+    #         )
+    #         self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
+    #             s_root.data.detach()
+    #         )
+    #         self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
+    #             1
+    #         )
 
 
 class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
@@ -497,95 +497,95 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         """
         return torch.Size([])
 
-    # def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
-    #     """
-    #     This is only intended for whitened variational distributions and gaussian likelihoods
-    #     at present.
+    def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
+        """
+        This is only intended for whitened variational distributions and gaussian likelihoods
+        at present.
 
-    #     \bar m = L^{-1} m
-    #     \bar S = L^{-1} S L^{-T}
+        \bar m = L^{-1} m
+        \bar S = L^{-1} S L^{-T}
 
-    #     where $LL^T = K_{uu}$.
+        where $LL^T = K_{uu}$.
 
-    #     Thus, the optimal \bar m, \bar S are given by
-    #     \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
-    #     \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
-    #     """
+        Thus, the optimal \bar m, \bar S are given by
+        \bar S = L^T (K_{uu} + \sigma^{-2} K_{uv} K_{vu})^{-1} L
+        \bar m = \bar S L^{-1} (K_{uv} y \sigma^{-2})
+        """
 
-    #     if isinstance(
-    #         self.model.variational_strategy, IndependentMultitaskVariationalStrategy
-    #     ):  # True in lambo code but False for me
-    #         ind_pts = (
-    #             self.model.variational_strategy.base_variational_strategy.inducing_points
-    #         )  # Parameter containing: torch.Size([64, 16])
-    #         train_y = train_y.transpose(-1, -2).unsqueeze(-1)
-    #         is_batch_model = True
-    #     else:
-    #         ind_pts = self.model.variational_strategy.inducing_points
-    #         is_batch_model = False
+        if isinstance(
+            self.model.variational_strategy, IndependentMultitaskVariationalStrategy
+        ):  # True in lambo code but False for me
+            ind_pts = (
+                self.model.variational_strategy.base_variational_strategy.inducing_points
+            )  # Parameter containing: torch.Size([64, 16])
+            train_y = train_y.transpose(-1, -2).unsqueeze(-1)
+            is_batch_model = True
+        else:
+            ind_pts = self.model.variational_strategy.inducing_points
+            is_batch_model = False
 
-    #     with cholesky_jitter(1e-4):
-    #         kuu = self.model.covar_module(
-    #             ind_pts
-    #         ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
-    #         kuu_chol = (
-    #             kuu.cholesky()
-    #         )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
-    #         kuv = self.model.covar_module(ind_pts, train_x).double()
+        with cholesky_jitter(1e-4):
+            kuu = self.model.covar_module(
+                ind_pts
+            ).double()  # <gpytorch.lazy.lazy_evaluated_kernel_tensor.LazyEvaluatedKernelTensor object at 0x7fa0aecc3c40>
+            kuu_chol = (
+                kuu.cholesky()
+            )  # <gpytorch.lazy.triangular_lazy_tensor.TriangularLazyTensor object at 0x7fa0cc0de130>
+            kuv = self.model.covar_module(ind_pts, train_x).double()
 
-    #         if hasattr(self.likelihood, "noise"):  # False
-    #             noise = self.likelihood.noise
-    #         elif hasattr(self.likelihood, "task_noises"):
-    #             noise = self.likelihood.task_noises.view(-1, 1, 1)
-    #         else:
-    #             raise AttributeError
-    #         noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
+            if hasattr(self.likelihood, "noise"):  # False
+                noise = self.likelihood.noise
+            elif hasattr(self.likelihood, "task_noises"):
+                noise = self.likelihood.task_noises.view(-1, 1, 1)
+            else:
+                raise AttributeError
+            noise = noise.clamp(min=noise_lb).double()  # torch.Size([3, 1, 1])
 
-    #         if len(train_y.shape) < len(kuv.shape):
-    #             train_y = train_y.unsqueeze(-1)
-    #         if len(noise.shape) < len(kuv.shape):
-    #             noise = noise.unsqueeze(-1)
+            if len(train_y.shape) < len(kuv.shape):
+                train_y = train_y.unsqueeze(-1)
+            if len(noise.shape) < len(kuv.shape):
+                noise = noise.unsqueeze(-1)
 
-    #         data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
-    #         if is_batch_model:  # True
-    #             noise_as_lt = ConstantDiagLazyTensor(
-    #                 noise.squeeze(-1), diag_shape=kuv.shape[-1]
-    #             )
-    #             inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
-    #             inner_term = inner_prod + kuu
-    #         else:
-    #             inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
+            data_term = kuv.matmul(train_y.double()) / noise  # torch.Size([3, 64, 1])
+            if is_batch_model:  # True
+                noise_as_lt = ConstantDiagLazyTensor(
+                    noise.squeeze(-1), diag_shape=kuv.shape[-1]
+                )
+                inner_prod = kuv.matmul(noise_as_lt).matmul(kuv.transpose(-1, -2))
+                inner_term = inner_prod + kuu
+            else:
+                inner_term = kuv @ kuv.transpose(-1, -2) / noise + kuu
 
-    #         s_mat = kuu_chol.transpose(-1, -2).matmul(
-    #             inner_term.inv_matmul(kuu_chol.evaluate())
-    #         )  # torch.Size([3, 64, 64])
-    #         s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
-    #         # the expression below is less efficient but probably more stable
-    #         mean_param = kuu_chol.transpose(-1, -2).matmul(
-    #             inner_term.inv_matmul(data_term)
-    #         )
+            s_mat = kuu_chol.transpose(-1, -2).matmul(
+                inner_term.inv_matmul(kuu_chol.evaluate())
+            )  # torch.Size([3, 64, 64])
+            s_root = lazify(s_mat).cholesky().evaluate()  # torch.Size([3, 64, 64])
+            # the expression below is less efficient but probably more stable
+            mean_param = kuu_chol.transpose(-1, -2).matmul(
+                inner_term.inv_matmul(data_term)
+            )
 
-    #     mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
-    #     s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
+        mean_param = mean_param.to(train_y)  # torch.Size([3, 64, 1])
+        s_root = s_root.to(train_y)  # torch.Size([3, 64, 64])
 
-    #     if not is_batch_model:  # True
-    #         self.model.variational_strategy._variational_distribution.variational_mean.data = (
-    #             mean_param.data.detach().squeeze()
-    #         )
-    #         self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
-    #             s_root.data.detach()
-    #         )
-    #         self.model.variational_strategy.variational_params_initialized.fill_(1)
-    #     else:
-    #         self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
-    #             mean_param.data.detach().squeeze()
-    #         )
-    #         self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
-    #             s_root.data.detach()
-    #         )
-    #         self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
-    #             1
-    #         )
+        if not is_batch_model:  # True
+            self.model.variational_strategy._variational_distribution.variational_mean.data = (
+                mean_param.data.detach().squeeze()
+            )
+            self.model.variational_strategy._variational_distribution.chol_variational_covar.data = (
+                s_root.data.detach()
+            )
+            self.model.variational_strategy.variational_params_initialized.fill_(1)
+        else:
+            self.model.variational_strategy.base_variational_strategy._variational_distribution.variational_mean.data = (
+                mean_param.data.detach().squeeze()
+            )
+            self.model.variational_strategy.base_variational_strategy._variational_distribution.chol_variational_covar.data = (
+                s_root.data.detach()
+            )
+            self.model.variational_strategy.base_variational_strategy.variational_params_initialized.fill_(
+                1
+            )
 
 
 # TODO: Adopt inheritance

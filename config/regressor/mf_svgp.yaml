@@ -33,8 +33,8 @@ surrogate:
   noise_constraint:
     _target_: gpytorch.constraints.GreaterThan
     lower_bound: 1e-4
-  noise_prior:
-    _target_: gpytorch.priors.GammaPrior
-    concentration: 1.1
-    rate: 5e-2
+  # noise_prior:
+  #   _target_: gpytorch.priors.GammaPrior
+  #   concentration: 1.1
+  #   rate: 5e-2
   kernel: matern

@@ -19,7 +19,7 @@ surrogate:
   early_stopping: True
   patience: 32
   eval_period: 1
-  feature_dim: ${model.n_hid}
+  feature_dim: ${model.feature_dim}
   out_dim: 1
   num_inducing_points: 64
   learn_inducing_points: True

@@ -327,18 +327,27 @@ class DeepKernelMultiFidelityMES(MES):
         state = [self.env.readable2state(sample) for sample in samples]
         state_proxy = self.env.statebatch2proxy(state)  # [: self.regressor.n_samples]
         fid_proxy = state_proxy[..., -1]
-        state_proxy = state_proxy[..., :-1]
-        (
-            state_tok_features,
-            state_mask,
-        ) = self.regressor.language_model.get_token_features(state_proxy)
-        _, pooled_state_proxy_features = self.regressor.language_model.pool_features(
-            state_tok_features, state_mask
-        )
-        candidate_set = torch.cat(
-            [pooled_state_proxy_features, fid_proxy.unsqueeze(-1)], dim=1
-        )
-        return candidate_set
+        if self.regressor.language_model.is_fid_param is False:
+            state_proxy = state_proxy[..., :-1]
+        if isinstance(self.regressor, DeepKernelRegressor) == True:
+            if hasattr(self.regressor.language_model, "get_token_features"):
+                (
+                    input_tok_features,
+                    input_mask,
+                ) = self.regressor.language_model.get_token_features(state_proxy)
+                _, candidate_features = self.regressor.language_model.pool_features(
+                    input_tok_features, input_mask
+                )
+                candidate_features = torch.cat(
+                    [candidate_features, fid_proxy.unsqueeze(-1)], dim=1
+                )
+            else:
+                candidate_features = self.regressor.surrogate.get_features(state_proxy)
+        # Get_features does the concatenation and returns
+        # candidate_set = torch.cat(
+        # [features, fid_proxy.unsqueeze(-1)], dim=1
+        # )
+        return candidate_features
 
     def project(self, states):
         input_dim = states.ndim
@@ -357,22 +366,27 @@ class DeepKernelMultiFidelityMES(MES):
             states = torch.cat([states, max_fid], dim=1)
         return states
 
-    def __call__(self, states):
-        assert torch.eq(states.to(torch.long), states).all()
-        inputs = states.clone().to(torch.long)
+    def __call__(self, inputs):
+        # inputs = states.clone()
         fid = inputs[..., -1]
-        inputs = inputs[..., :-1]
-        (
-            input_tok_features,
-            input_mask,
-        ) = self.regressor.language_model.get_token_features(inputs)
-        _, pooled_features = self.regressor.language_model.pool_features(
-            input_tok_features, input_mask
-        )
-        inputs = pooled_features
-        inputs = torch.cat([inputs, fid.unsqueeze(-1)], dim=1)
-        inputs = inputs.unsqueeze(-2)
-        acq_values = self.acqf(inputs)
+        if self.regressor.language_model.is_fid_param is False:
+            inputs = inputs[..., :-1]
+        if isinstance(self.regressor, DeepKernelRegressor) == True:
+            if hasattr(self.regressor.language_model, "get_token_features"):
+                (
+                    input_tok_features,
+                    input_mask,
+                ) = self.regressor.language_model.get_token_features(inputs)
+                _, features = self.regressor.language_model.pool_features(
+                    input_tok_features, input_mask
+                )
+                features = torch.cat([features, fid.unsqueeze(-1)], dim=1)
+            else:
+                features = self.regressor.surrogate.get_features(inputs)
+
+        # inputs = features
+        features = features.unsqueeze(-2)
+        acq_values = self.acqf(features)
         return acq_values
 
 

@@ -26,11 +26,13 @@ class LanguageModel(nn.Module):
         tokenizer,
         device,
         float_precision,
+        feature_dim,
         **kwargs
     ):
         super().__init__()
         self.device = device
         self.float = float_precision
+        self.feature_dim = feature_dim
         config_model = model
         self.model = hydra.utils.instantiate(
             config_model, tokenizer=tokenizer, **kwargs

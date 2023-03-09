@@ -126,6 +126,7 @@ class DeepKernelRegressor:
             device=self.device,
             float_precision=self.float,
             config_env=config_env,
+            n_fid=self.n_fid,
             _recursive_=False,
         )
         is_fid_param = self.language_model.is_fid_param

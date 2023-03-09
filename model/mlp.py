@@ -18,12 +18,14 @@ class MLP(nn.Module):
         num_output,
         dropout_prob,
         activation,
+        feature_dim,
         transformerCall=False,
         config_env=None,
         input_dim=None,
         **kwargs,
     ):
         super(MLP, self).__init__()
+        self.feature_dim = feature_dim
         """
         Args:
             model parameters
