@@ -19,6 +19,7 @@ import copy
 from torch.nn.utils.rnn import pad_sequence
 import os
 from tqdm import tqdm
+import wandb
 
 """
 This DKL regressor strictly assumes that the states are integral. 
@@ -406,7 +407,7 @@ class DeepKernelRegressor:
                     "/".join((log_prefix, key)): val for key, val in metrics.items()
                 }
             try:
-                self.logger.log_metrics(metrics)
+                self.logger.log_metrics(metrics, use_context=True)
             except Exception:
                 pass
 
@@ -456,3 +457,22 @@ class DeepKernelRegressor:
     #         return True
     #     else:
     #         raise FileNotFoundError
+
+    def define_metric(self):
+        try:
+            self.logger.define_metric("epoch")
+            self.logger.define_metric("1/svgp/best_loss", step_metric="epoch")
+            self.logger.define_metric("1/svgp/test_rmse", step_metric="epoch")
+            self.logger.define_metric("lengthscale", step_metric="epoch")
+            self.logger.define_metric("train_loss", step_metric="epoch")
+            self.logger.define_metric("best_score", step_metric="epoch")
+            self.logger.define_metric("best_loss_epoch", step_metric="epoch")
+            self.logger.define_metric("test_nll", step_metric="epoch")
+            self.logger.define_metric("best_epoch", step_metric="epoch")
+            self.logger.define_metric("test_occ_diff", step_metric="epoch")
+            self.logger.define_metric("test_ece", step_metric="epoch")
+            self.logger.define_metric("test_post_var", step_metric="epoch")
+            self.logger.define_metric("test_s_rho", step_metric="epoch")
+            self.logger.define_metric("noise", step_metric="epoch")
+        except:
+            pass

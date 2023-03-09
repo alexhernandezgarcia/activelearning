@@ -15,6 +15,7 @@ from abc import abstractmethod
 from botorch.models.approximate_gp import SingleTaskVariationalGP
 from gpytorch.mlls import VariationalELBO
 from botorch.settings import debug
+
 """
 Assumes that in single fidelity, fid =1
 """
@@ -52,7 +53,7 @@ class SingleTaskGPRegressor:
         train_y = train_y * self.target_factor
 
         self.init_model(train_x, train_y)
-        with debug(state = True):
+        with debug(state=True):
             self.mll = fit_gpytorch_mll(self.mll)
 
     def get_predictions(self, env, states):

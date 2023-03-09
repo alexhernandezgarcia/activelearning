@@ -387,6 +387,19 @@ class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
         else:
             return targets.squeeze(-1)
 
+    @property
+    def num_outputs(self) -> int:
+        return self._num_outputs
+
+    @property
+    def batch_shape(self):
+        """
+        This is a batch shape from an I/O perspective. For a model with `m` outputs, a `test_batch_shape x q x d`-shaped input `X`
+        to the `posterior` method returns a Posterior object over an output of
+        shape `broadcast(test_batch_shape, model.batch_shape) x q x m`.
+        """
+        return torch.Size([])
+
     def initialize_var_dist_sgpr(self, train_x, train_y, noise_lb):
         """
         This is only intended for whitened variational distributions and gaussian likelihoods
@@ -591,34 +604,35 @@ class SingleTaskMultiFidelitySVGP(
     ):  # batch_size not used
         original_shape = seq_array.shape[:-1]
         flat_seq_array = seq_array.flatten(end_dim=-2)
+        enc_seq_array = seq_array.to(self.device)
+        fid_array = seq_array[..., -1].to(self.device)
+        # .to(
+        # torch.long
+        # )  # torch.Size([32, 36]), padded states
 
-        # if transform is not None:
-        #     seq_array = transform(seq_array)
-
-        # Train transform = data augmentations + test transform
-
-        # if self.training and transform:
-        #     enc_seq_array = gfp_transforms.padding_collate_fn(
-        #         [self.train_transform(seq) for seq in flat_seq_array],
-        #         self.tokenizer.padding_idx,
-        #     )
-        # elif transform:  # transforms from string to int
-        #     enc_seq_array = gfp_transforms.padding_collate_fn(
-        #         [self.test_transform(seq) for seq in flat_seq_array],
-        #         self.tokenizer.padding_idx,
-        #     )
-        # else:
-        #     enc_seq_array = seq_array
-        fid_array = seq_array[..., -1].to(self.device)  # N.to(torch.long)
-        enc_seq_array = seq_array[..., :-1].to(
-            self.device
-        )  # torch.Size([32, 36]), padded states
+        """
+        Potential Code
+        features = self.encoder.get_features(enc_seq_array)
+        """
         features = self.encoder(
             enc_seq_array
         )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
         features = torch.cat(
             [features, fid_array.unsqueeze(-1)], dim=-1
         )  # torch.Size([32, 17])
+        # TODO: what is oroginal shape?
+        return features.view(*original_shape, -1)
+
+        # fid_array = seq_array[..., -1].to(self.device)  # N.to(torch.long)
+        # enc_seq_array = seq_array[..., :-1].to(
+        #     self.device
+        # )  # torch.Size([32, 36]), padded states
+        # features = self.encoder(
+        #     enc_seq_array
+        # )  # torch.Size([32, 16]) --> pooled features where we had considered 0s for both the padding and the EOS element, encoder here is the entire LanguageModel
+        # features = torch.cat(
+        #     [features, fid_array.unsqueeze(-1)], dim=-1
+        # )  # torch.Size([32, 17])
         # original shape = batch_shape
         return features.view(*original_shape, -1)
 

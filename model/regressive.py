@@ -18,6 +18,8 @@ class RegressiveMLP(nn.Module):
         n_fid,
         config_env,
         device,
+        # In OHE, this is num_fid, but in Hartmann this is 1
+        num_fid_parameter,
     ):
         """
         Implements regressive deep learning networks in the mulit-fidelity setting as done Shibo Li et. al.
@@ -25,16 +27,15 @@ class RegressiveMLP(nn.Module):
         """
         super(RegressiveMLP, self).__init__()
         self.n_fid = n_fid
-        input_classes = config_env.n_alphabet  # length
-        input_max_length = config_env.max_seq_length  # n_dim
+        input_classes = config_env["length"]  # length
+        input_max_length = config_env["n_dim"]  # n_dim
         self.init_layer_depth = int((input_classes) * (input_max_length))
         self.fid_num_hidden = fid_num_hidden
         self.num_output = num_output
         self.activation = ACTIVATION_KEY[activation]
         self.device = device
         self.base_hidden_layers = [base_num_hidden] * base_num_layer
-
-        # base model
+        self.num_fid_parameter = num_fid_parameter
         base_layers = [
             nn.Linear(self.init_layer_depth, self.base_hidden_layers[0]),
             self.activation,
@@ -50,12 +51,13 @@ class RegressiveMLP(nn.Module):
                     nn.Dropout(dropout_base),
                 ]
             )
-        base_layers.append(nn.Linear(self.base_hidden_layers[-1], self.num_output))
-        self.base_module = nn.Sequential(*base_layers)
+        if base_layers != []:
+            base_layers.append(nn.Linear(self.base_hidden_layers[-1], self.num_output))
+            self.base_module = nn.Sequential(*base_layers)
 
         # list of layers created
         if regressive_mode == "seq":
-            self.forward = self.forward_seq_regressive
+            self.forward = self.get_feature_seq_regressive
             self.layers = nn.ModuleList(
                 [
                     nn.Sequential(
@@ -70,14 +72,15 @@ class RegressiveMLP(nn.Module):
                         self.activation,
                         nn.Linear(self.fid_num_hidden, self.fid_num_hidden),
                         nn.Dropout(dropout_fid),
-                        self.activation,
-                        nn.Linear(self.fid_num_hidden, self.num_output),
+                        # self.activation,
+                        # nn.Linear(self.fid_num_hidden, self.num_output),
                     )
                     for i in range(self.n_fid)
                 ]
             )
+            self.forward_for_loss = self.forward_seq_regressive
         elif regressive_mode == "full":
-            self.forward = self.forward_full_regressive
+            self.forward = self.get_feature_full_regressive
             self.layers = nn.ModuleList(
                 [
                     nn.Sequential(
@@ -92,12 +95,64 @@ class RegressiveMLP(nn.Module):
                         self.activation,
                         nn.Linear(self.fid_num_hidden, self.fid_num_hidden),
                         nn.Dropout(dropout_fid),
-                        self.activation,
-                        nn.Linear(self.fid_num_hidden, self.num_output),
                     )
                     for i in range(self.n_fid)
                 ]
             )
+            self.forward_for_loss = self.forward_full_regressive
+            # self.get_feature = self.get_feature_full_regressive
+        self.output_layer = nn.Sequential(
+            self.activation,
+            nn.Linear(self.fid_num_hidden, self.num_output),
+        )
+
+    def get_feature_seq_regressive(self, input):
+        x, fid = (
+            input[:, : -self.num_fid_parameter],
+            input[:, -self.num_fid_parameter :],
+        )
+        if self.num_fid_parameter != self.n_fid:
+            fid = fid.squeeze(-1)
+            fid_ohe = F.one_hot(fid.long(), num_classes=self.n_fid + 1)[:, :-1].to(
+                torch.float32
+            )
+        output_interm = self.base_module(x)
+        features = []
+        for m in range(self.n_fid):
+            # TODO: MIGHT BREAK BECAUSE OUTPUT_INTERM IS EMPTY
+            augment_input = torch.cat([output_interm, x], axis=1)
+            feature = self.layers[m](augment_input)
+            output_interm = self.output_layer(feature)
+            features.append(feature)
+        feature_tensor = torch.stack(features, dim=1).to(self.device)
+        feature_masked = feature_tensor[fid == 1]
+        return feature_masked
+
+    def get_feature_full_regressive(self, input):
+        x, fid = (
+            input[:, : -self.num_fid_parameter],
+            input[:, -self.num_fid_parameter :],
+        )
+        if self.num_fid_parameter != self.n_fid:
+            fid = fid.squeeze(-1)
+            fid_ohe = F.one_hot(fid.long(), num_classes=self.n_fid + 1)[:, :-1].to(
+                torch.float32
+            )
+        # input, fid_ohe = self.preprocess(input, fid)
+        if self.base_module is not None:
+            output_interm = self.base_module(x)
+            augment_input = torch.cat([output_interm, x], axis=1)
+        else:
+            augment_input = x
+        features = []
+        for m in range(self.n_fid):
+            feature = self.layers[m](augment_input)
+            output_fid = self.output_layer(feature)
+            augment_input = torch.cat([output_fid, augment_input], axis=1)
+            features.append(feature)
+        feature_tensor = torch.stack(features, dim=1).to(self.device)
+        feature_masked = feature_tensor[fid_ohe == 1]
+        return feature_masked
 
     # def preprocess(self, x, fid):
     #     """
@@ -123,16 +178,31 @@ class RegressiveMLP(nn.Module):
                 example: tensor([2, 1])
         Returns:
             output_masked: tensor of shape (batch_size, num_output=1)"""
+        feature = self.get_feature_seq_regressive(input)
+        output = self.output_layer(feature)
+        return output
         # input, fid_ohe = self.preprocess(input, fid)
-        x, fid = input[:, : -self.n_fid], input[:, -self.n_fid :]
+        x, fid = (
+            input[:, : -self.num_fid_parameter],
+            input[:, -self.num_fid_parameter :],
+        )
+        if self.num_fid_parameter != self.n_fid:
+            fid = fid.squeeze(-1)
+            fid_ohe = F.one_hot(fid.long(), num_classes=self.n_fid + 1)[:, :-1].to(
+                torch.float32
+            )
+        else:
+            fid_ohe = fid
         output_interm = self.base_module(x)
         outputs = []
         for m in range(self.n_fid):
+            # TODO: MIGHT BREAK BECAUSE OUTPUT_INTERM IS EMPTY
             augment_input = torch.cat([output_interm, x], axis=1)
-            output_interm = self.layers[m](augment_input)
+            feature = self.layers[m](augment_input)
+            output_interm = self.output_layer(feature)
             outputs.append(output_interm)
         output_tensor = torch.stack(outputs, dim=1).to(self.device)
-        output_masked = output_tensor[fid == 1]
+        output_masked = output_tensor[fid_ohe == 1]
         return output_masked
 
     def forward_full_regressive(self, input):
@@ -143,15 +213,38 @@ class RegressiveMLP(nn.Module):
                 example: tensor([2, 1])
         Returns:
             output_masked: tensor of shape (batch_size, num_output=1)"""
-        x, fid_ohe = input[:, : -self.n_fid], input[:, -self.n_fid :]
+        feature = self.get_feature_full_regressive(input)
+        output = self.output_layer(feature)
+        return output
+        x, fid = (
+            input[:, : -self.num_fid_parameter],
+            input[:, -self.num_fid_parameter :],
+        )
+        if self.num_fid_parameter != self.n_fid:
+            fid = fid.squeeze(-1)
+            fid_ohe = F.one_hot(fid.long(), num_classes=self.n_fid + 1)[:, :-1].to(
+                torch.float32
+            )
+        else:
+            fid_ohe = fid
         # input, fid_ohe = self.preprocess(input, fid)
-        output_interm = self.base_module(x)
+        if self.base_module is not None:
+            output_interm = self.base_module(x)
+            augment_input = torch.cat([output_interm, x], axis=1)
+        else:
+            augment_input = x
         outputs = []
-        augment_input = torch.cat([output_interm, x], axis=1)
         for m in range(self.n_fid):
-            output_fid = self.layers[m](augment_input)
+            feature = self.layers[m](augment_input)
+            output_fid = self.output_layer(feature)
             augment_input = torch.cat([output_fid, augment_input], axis=1)
             outputs.append(output_fid)
         output_tensor = torch.stack(outputs, dim=1).to(self.device)
         output_masked = output_tensor[fid_ohe == 1]
         return output_masked
+
+    def param_groups(self, lr, weight_decay):
+        shared_group = dict(params=[], lr=lr, weight_decay=weight_decay)
+        for p_name, param in self.named_parameters():
+            shared_group["params"].append(param)
+        return [shared_group]

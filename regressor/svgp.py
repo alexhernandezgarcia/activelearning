@@ -18,6 +18,9 @@ class AsItIs(nn.Module):
     def forward(self, x):
         return x
 
+    def get_features(self, x):
+        return x
+
 
 class SingleTaskSVGP(DeepKernelRegressor):
     def __init__(
@@ -53,6 +56,8 @@ class SingleTaskSVGP(DeepKernelRegressor):
         self.batch_size = self.surrogate.bs
         if checkpoint:
             self.logger.set_proxy_path(checkpoint)
+
+        self.define_metric()
 
     def fit(self):
         """
@@ -171,7 +176,7 @@ class SingleTaskSVGP(DeepKernelRegressor):
                     "/".join((log_prefix, key)): val for key, val in metrics.items()
                 }
             try:
-                wandb.log(metrics)
+                self.logger.log_metrics(metrics, use_context=True)
             except Exception:
                 pass
 
@@ -197,9 +202,9 @@ class SingleTaskSVGP(DeepKernelRegressor):
         test_rmse = self.best_score
         test_nll = self.best_loss
         return test_rmse, test_nll, 0.0, 0.0, None
-    
+
     def get_predictions(self, env, states):
-        states = torch.tensor(states, device = self.device, dtype = self.float)
+        states = torch.tensor(states, device=self.device, dtype=self.float)
         states_proxy_input = states.clone()
         states_proxy = env.statetorch2proxy(states_proxy_input)
         model = self.surrogate
@@ -211,6 +216,7 @@ class SingleTaskSVGP(DeepKernelRegressor):
             y_mean = y_dist.mean
             y_std = y_dist.variance.sqrt()
         return y_mean, y_std
+
 
 class SingleTaskMultiFidelitySVGP(SingleTaskSVGP):
     def __init__(

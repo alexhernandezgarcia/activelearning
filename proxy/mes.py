@@ -1,11 +1,17 @@
 from botorch.acquisition.max_value_entropy_search import (
     qMultiFidelityLowerBoundMaxValueEntropy,
     qMultiFidelityMaxValueEntropy,
+    qLowerBoundMaxValueEntropy,
+    qMaxValueEntropy,
 )
 from gflownet.proxy.base import Proxy
 from pathlib import Path
 import pandas as pd
-from .botorch_models import MultifidelityOracleModel, MultiFidelityProxyModel
+from .botorch_models import (
+    MultifidelityOracleModel,
+    MultiFidelityProxyModel,
+    ProxyBotorchMES,
+)
 import torch
 import numpy as np
 from botorch.models.cost import AffineFidelityCostModel
@@ -13,13 +19,75 @@ from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 
 from gpytorch.functions import inv_quad
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from regressor.regressor import DropoutRegressor as SurrogateDropoutRegressor
 
 CLAMP_LB = 1.0e-8
 from botorch.models.utils import check_no_nans
 from .botorch_models import FidelityCostModel
 from abc import abstractmethod
 import matplotlib.pyplot as plt
+from regressor.dkl import DeepKernelRegressor
+
+
+class SingleFidelityMES(Proxy):
+    def __init__(self, regressor, logger, env, gibbon=True, **kwargs):
+        super().__init__(**kwargs)
+        self.regressor = regressor
+        self.logger = logger
+        self.env = env
+        self.candidate_set = self.load_candidate_set()
+        if isinstance(self.regressor, SurrogateDropoutRegressor):
+            # TODO: Check if model weights are loaded.
+            model = ProxyBotorchMES(self.regressor, self.num_dropout_samples)
+        else:
+            model = self.regressor.surrogate
+            model.eval()
+        if gibbon == True:
+            self.acqf = qLowerBoundMaxValueEntropy(
+                model,
+                candidate_set=self.candidate_set,
+            )
+        else:
+            self.acqf = qMaxValueEntropy(
+                model,
+                candidate_set=self.candidate_set,
+            )
+
+    def load_candidate_set(self):
+        path = self.logger.data_path.parent / Path("data_train.csv")
+        data = pd.read_csv(path, index_col=0)
+        samples = data["samples"]
+        state = [self.env.readable2state(sample) for sample in samples]
+        state_proxy = self.env.statebatch2proxy(state)
+        if isinstance(self.regressor, DeepKernelRegressor) == True:
+            features = self.regressor.surrogate.get_features(state_proxy)
+        return features
+
+
+class GaussianProcessSingleFidelityMES(SingleFidelityMES):
+    """
+    Specifically for Deep Kernel Methods right now
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, states):
+        if isinstance(self.regressor, DeepKernelRegressor) == True:
+            features = self.regressor.surrogate.get_features(states)
+        features = features.unsqueeze(-2)
+        mes = self.acqf(features)
+        return mes
+
+
+class NeuralNetworkSingleFidelityMES(SingleFidelityMES):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, states):
+        states = states.unsqueeze(-2)
+        mes = self.acqf(states)
+        return mes
 
 
 class MultiFidelity(Proxy):
@@ -274,9 +342,9 @@ class DeepKernelMultiFidelityMES(MES):
 
     def project(self, states):
         input_dim = states.ndim
-        print(
-            "User Defined Warning: In MES-project, fidelity is being replace by the INDEX (not oracle.fid) of the maximum fidelity."
-        )
+        # print(
+        #     "User Defined Warning: In MES-project, fidelity is being replace by the INDEX (not oracle.fid) of the maximum fidelity."
+        # )
         max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
             self.n_fid - 1
         )
