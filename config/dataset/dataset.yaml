@@ -15,4 +15,3 @@ path:
   oracle_dataset: null
   # to store the dataset
   dataset: data
-dataset_size: 200

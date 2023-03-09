@@ -41,7 +41,6 @@ class DataHandler:
         logger,
         oracle,
         split,
-        dataset_size,
         device,
         float_precision,
         # TODO: Do we even need the tokenzier here?
@@ -62,7 +61,6 @@ class DataHandler:
         self.progress = self.logger.progress
         self.oracle = oracle
         self.logger.set_data_path(self.path.dataset)
-        self.dataset_size = dataset_size
         self.device = device
         if hasattr(env, "n_fid"):
             self.n_fid = env.n_fid
