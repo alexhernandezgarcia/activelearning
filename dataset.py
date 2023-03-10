@@ -129,9 +129,14 @@ class DataHandler:
             scores = train_scores + test_scores
             if scores == []:
                 scores = None
-            states = [
-                torch.tensor(self.sfenv.readable2state(sample)) for sample in states
-            ]
+            if self.path.oracle_dataset.type != "mf":
+                states = [
+                    torch.tensor(self.sfenv.readable2state(sample)) for sample in states
+                ]
+            else:
+                states = [
+                    torch.tensor(self.env.readable2state(sample)) for sample in states
+                ]
             states = torch.stack(states)
         else:
             # for AMP this is the implementation
@@ -169,9 +174,7 @@ class DataHandler:
             state_oracle = self.env.statetorch2oracle(states_oracle_input)
             scores = self.env.oracle(state_oracle)
         elif self.n_fid > 1 and self.fidelity.do == False:
-            raise NotImplementedError(
-                "Not implemented for when n_fid>1 and fidelity.do == False"
-            )
+            print("Scores were not calculated and fidelity was not assigned. Directly taken from dataset")
 
         if hasattr(self.sfenv, "plot_samples_frequency"):
             fig = self.sfenv.plot_samples_frequency(

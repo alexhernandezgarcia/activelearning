@@ -177,6 +177,10 @@ class MES(MultiFidelity):
 
 
 class ProxyMultiFidelityMES(MES):
+    """
+    NN based
+    """
+
     def __init__(self, regressor, num_dropout_samples, **kwargs):
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
@@ -192,16 +196,29 @@ class ProxyMultiFidelityMES(MES):
 
     def project(self, states):
         input_dim = states.ndim
-        max_fid = torch.zeros((states.shape[0], self.n_fid), device=self.device)
-        max_fid[:, -1] = 1
-        if input_dim == 3:
-            states = states[:, :, : -self.n_fid]
-            max_fid = max_fid.unsqueeze(1)
-            states = torch.cat([states, max_fid], dim=2)
-        elif input_dim == 2:
-            states = states[:, : -self.n_fid]
-            states = torch.cat([states, max_fid], dim=1)
-        return states
+        if self.env.proxy_state_format == "ohe":
+            max_fid = torch.zeros((states.shape[0], self.n_fid), device=self.device)
+            max_fid[:, -1] = 1
+            if input_dim == 3:
+                states = states[:, :, : -self.n_fid]
+                max_fid = max_fid.unsqueeze(1)
+                states = torch.cat([states, max_fid], dim=2)
+            elif input_dim == 2:
+                states = states[:, : -self.n_fid]
+                states = torch.cat([states, max_fid], dim=1)
+            return states
+        else:
+            max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
+                self.n_fid - 1
+            )
+            if input_dim == 3:
+                states = states[:, :, :-1]
+                max_fid = max_fid.unsqueeze(1)
+                states = torch.cat([states, max_fid], dim=2)
+            elif input_dim == 2:
+                states = states[:, :-1]
+                states = torch.cat([states, max_fid], dim=1)
+            return states
 
     def load_candidate_set(self):
         path = self.logger.data_path.parent / Path("data_train.csv")
@@ -480,6 +497,11 @@ class GaussianProcessMultiFidelityMES(MES):
 
 
 class VariationalGPMultiFidelityMES(MES):
+    """
+    For stachastic GPs
+    Project function differes from above
+    """
+
     def __init__(self, regressor, **kwargs):
         self.regressor = regressor
         super().__init__(**kwargs)

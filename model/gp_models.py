@@ -753,13 +753,13 @@ class SingleTaskMultiFidelitySVGP(
         # original shape = batch_shape
         return features.view(*original_shape, -1)
 
-    def forward(self, inputs):
-        assert isinstance(inputs, torch.Tensor)
-        features = (
-            self.get_features(inputs, self.bs)
-            if isinstance(inputs, np.ndarray)
-            else inputs
-        )  # torch.Size([32, 16]) --> ita a tensor whenever it is called so far
+    def forward(self, features):
+        assert isinstance(features, torch.Tensor)
+        # features = (
+        #     self.get_features(inputs, self.bs)
+        #     if isinstance(inputs, np.ndarray)
+        #     else inputs
+        # )  # torch.Size([32, 16]) --> ita a tensor whenever it is called so far
         res = self.base_cls.forward(
             self, features
         )  # MultivariateNormal(loc: torch.Size([32]), covariance_matrix: torch.Size([32, 32]), precision_matrix: torch.Size([32, 32]), scale_tril: torch.Size([32, 32]))

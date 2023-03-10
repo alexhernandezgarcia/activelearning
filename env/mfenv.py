@@ -287,6 +287,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self.n_actions = 0
         return self
 
+    def set_state(self, state, done):
+        self.env.state = state
+        fid = torch.randint(self.n_fid, (1,))
+        if self.is_state_list:
+            self.state = state + [fid.item()]
+        else:
+            self.state = torch.cat([state, fid], dim=-1)
+        self.done = done
+        self.fid_done = self.state[-1] != -1
+
     def get_mask_invalid_actions_forward(self, state=None, done=None, fid_done=None):
         if state is not None and fid_done is None:
             fid_done = state[-1] != -1
@@ -294,7 +304,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             fid_done = self.fid_done
         else:
             print("state, fid_done", state, fid_done)
-            raise ValueError("Either just state should be provided. Or both state and fid should be provided. Or nothing should be provided for consistency.")
+            raise ValueError(
+                "Either just state should be provided. Or both state and fid should be provided. Or nothing should be provided for consistency."
+            )
         if state is None:
             if self.is_state_list:
                 state = self.state.copy()
@@ -306,7 +318,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             try:
                 assert self.env.done == True
             except:
-                print("done is true but env.done is False: done, env.done".format(done, self.env.done))
+                print(
+                    "done is true but env.done is False: done, env.done".format(
+                        done, self.env.done
+                    )
+                )
                 raise Exception
             return [True for _ in range(len(self.action_space))]
         mask = self.env.get_mask_invalid_actions_forward(state[:-1])
@@ -353,7 +369,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def state2readable(self, state=None):
         readable_state = self.env.state2readable(state[:-1])
         if isinstance(state[-1], torch.Tensor):
-                fid = str(state[-1].detach().cpu().numpy())
+            fid = str(state[-1].detach().cpu().numpy())
         else:
             fid = str(state[-1])
         return readable_state + ";" + fid
@@ -361,7 +377,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def statetorch2readable(self, state=None, **kwargs):
         try:
             assert torch.eq(state.to(torch.long), state).all()
-        except: 
+        except:
             print(state)
             raise Exception("state is not integer")
         state = state.to(torch.long)
@@ -429,11 +445,12 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # 1. The parent state with fidelity set to state's fidelity
         # 2. The parent with action as choosing that fidelity
         elif state[-1] != -1:
-            fid = state[-1]
             if self.is_state_list:
+                fid = state[-1]
                 parents = [parent + [fid] for parent in parents_no_fid]
                 fid_parent = state[:-1] + [-1]
             else:
+                fid = state[-1].item()
                 fid_tensor = torch.tensor([fid], device=state.device)
                 parents = [
                     torch.cat([parent, fid_tensor], dim=-1) for parent in parents_no_fid
@@ -466,18 +483,32 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 assert self.n_actions == self.env.n_actions
             except:
                 print(self.n_actions, self.env.n_actions)
-                raise Exception("n_actions is not equal to env.n_actions in step when fid has not been chosen")
+                raise Exception(
+                    "n_actions is not equal to env.n_actions in step when fid has not been chosen"
+                )
         else:
             try:
                 assert self.n_actions == self.env.n_actions + 1
             except:
                 print(self.n_actions, self.env.n_actions)
-                raise Exception("n_actions is not equal to env.n_actions + 1 in step when fid has been chosen")
+                raise Exception(
+                    "n_actions is not equal to env.n_actions + 1 in step when fid has been chosen"
+                )
         if self.done:
-            parents, parents_actions = self.get_parents(state=self.state, done=self.done)
+            parents, parents_actions = self.get_parents(
+                state=self.state, done=self.done
+            )
             for p in range(len(parents)):
-                print(parents[p], parents_actions[p], self.get_mask_invalid_actions_forward(state=parents[p], done = False))
-            print(self.state, action, self.get_mask_invalid_actions_forward(state=self.state, done = self.done))
+                print(
+                    parents[p],
+                    parents_actions[p],
+                    self.get_mask_invalid_actions_forward(state=parents[p], done=False),
+                )
+            print(
+                self.state,
+                action,
+                self.get_mask_invalid_actions_forward(state=self.state, done=self.done),
+            )
             raise ValueError("Action has been sampled despite environment being done")
             # return self.state, action, False
         if action[0] == self.fid:
@@ -486,10 +517,24 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 self.fid_done = True
                 self.n_actions += 1
             else:
-                parents, parents_actions = self.get_parents(state=self.state, done=self.done)
+                parents, parents_actions = self.get_parents(
+                    state=self.state, done=self.done
+                )
                 for p in range(len(parents)):
-                    print(parents[p], parents_actions[p], self.get_mask_invalid_actions_forward(state=parents[p], done = False))
-                print(self.state, action, self.get_mask_invalid_actions_forward(state=self.state, done = self.done))
+                    print(
+                        parents[p],
+                        parents_actions[p],
+                        self.get_mask_invalid_actions_forward(
+                            state=parents[p], done=False
+                        ),
+                    )
+                print(
+                    self.state,
+                    action,
+                    self.get_mask_invalid_actions_forward(
+                        state=self.state, done=self.done
+                    ),
+                )
                 raise ValueError("Fidelity has already been chosen.")
             self.done = self.env.done and self.fid_done
             return self.state, action, True

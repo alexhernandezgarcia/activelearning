@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="mf_dkl")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
