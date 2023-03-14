@@ -312,7 +312,7 @@ class LengthTransform(nn.Module):
             return src_tok_features, src_mask.bool()
         else:
             raise NotImplementedError(
-                "Lenght Tranb=formation nto supported here. Check Lambo."
+                "Length Transformation nto supported here. Check Lambo."
             )
 
         # src_arange = torch.arange(num_src_tokens).to(src_mask.device)

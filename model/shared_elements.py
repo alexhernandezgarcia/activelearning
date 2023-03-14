@@ -223,115 +223,116 @@ class mCNN(nn.Module):
         return shared_group, other_group
 
 
-# class Transformer(nn.Module):
-#     """1d CNN for sequences like CNN, but includes an additional mask
-#     argument (bs,n) that specifies which elements in the sequence are
-#     merely padded values."""
+class Transformer(nn.Module):
+    """1d CNN for sequences like CNN, but includes an additional mask
+    argument (bs,n) that specifies which elements in the sequence are
+    merely padded values."""
 
-#     device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
-#     def __init__(self, tokenizer, max_len, embed_dim=64, ff_dim=256, num_heads=2, num_layers=4, p=0.1, out_dim=1,
-#                  latent_dim=16, max_len_delta=2, **kwargs):
-#         super().__init__()
-#         vocab_size = len(tokenizer.full_vocab)
-#         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=tokenizer.padding_idx)
-#         self.pos_encoder = PositionalEncoding(embed_dim, p, max_len, batch_first=True)
-#         self.encoder = nn.TransformerEncoder(
-#             encoder_layer=nn.TransformerEncoderLayer(
-#                 d_model=embed_dim, nhead=num_heads, dim_feedforward=ff_dim, dropout=p, batch_first=True
-#             ),
-#             num_layers=num_layers,
-#         )
-#         self.decoder = nn.TransformerEncoder(
-#             encoder_layer=nn.TransformerEncoderLayer(
-#                 d_model=embed_dim, nhead=num_heads, dim_feedforward=ff_dim, dropout=p, batch_first=True
-#             ),
-#             num_layers=num_layers,
-#         )
+    def __init__(self, tokenizer, max_len=50, embed_dim=64, ff_dim=256, num_heads=2, num_layers=4, p=0.1, out_dim=1,
+                 latent_dim=16, max_len_delta=2, **kwargs):
+        super().__init__()
+        max_len = max_len + 2
+        vocab_size = len(tokenizer.full_vocab)
+        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=tokenizer.padding_idx)
+        self.pos_encoder = PositionalEncoding(embed_dim, p, max_len, batch_first=True)
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer=nn.TransformerEncoderLayer(
+                d_model=embed_dim, nhead=num_heads, dim_feedforward=ff_dim, dropout=p, batch_first=True
+            ),
+            num_layers=num_layers,
+            enable_nested_tensor=False
+        )
+        self.decoder = nn.TransformerEncoder(
+            encoder_layer=nn.TransformerEncoderLayer(
+                d_model=embed_dim, nhead=num_heads, dim_feedforward=ff_dim, dropout=p, batch_first=True
+            ),
+            num_layers=num_layers,
+        )
 
-#         self.length_transform = LengthTransform()
-#         self.function_head = FunctionHead(latent_dim, out_dim, None, None, p, num_heads, type='mha')
-#         self.length_head = LengthHead(latent_dim, max_len_delta)
-#         self.lm_head = nn.Linear(embed_dim, vocab_size)
-#         self.embed2latent = nn.Linear(embed_dim, latent_dim)
-#         self.latent2embed = nn.Linear(2 * latent_dim, embed_dim)
+        self.length_transform = LengthTransform()
+        self.function_head = FunctionHead(latent_dim, out_dim, None, None, p, num_heads, type='mha')
+        self.length_head = LengthHead(latent_dim, max_len_delta)
+        self.lm_head = nn.Linear(embed_dim, vocab_size)
+        self.embed2latent = nn.Linear(embed_dim, latent_dim)
+        self.latent2embed = nn.Linear(2 * latent_dim, embed_dim)
 
-#         self.tokenizer = tokenizer
-#         self.out_dim = out_dim
-#         self.embed_dim = embed_dim
-#         self.latent_dim = latent_dim
-#         self.max_len = max_len
-#         self.max_len_delta = max_len_delta
+        self.tokenizer = tokenizer
+        self.out_dim = out_dim
+        self.embed_dim = embed_dim
+        self.latent_dim = latent_dim
+        self.max_len = max_len
+        self.max_len_delta = max_len_delta
 
-#     def enc_tok_features(self, src_tok_idxs):
-#         if src_tok_idxs.size(1) > self.max_len:
-#             src_tok_idxs = src_tok_idxs[:, :self.max_len + 1]
+    def enc_tok_features(self, src_tok_idxs):
+        if src_tok_idxs.size(1) > self.max_len:
+            src_tok_idxs = src_tok_idxs[:, :self.max_len + 1]
+        src_tok_features = self.embedding(src_tok_idxs) * math.sqrt(self.embed_dim)
+        src_tok_features = self.pos_encoder(src_tok_features) #torch.Size([32, 51, 64])
+        key_padding_mask = src_tok_idxs.eq(self.tokenizer.padding_idx) #torch.Size([32, 51])
 
-#         src_tok_features = self.embedding(src_tok_idxs) * math.sqrt(self.embed_dim)
-#         src_tok_features = self.pos_encoder(src_tok_features)
-#         key_padding_mask = src_tok_idxs.eq(self.tokenizer.padding_idx)
+        src_tok_features = self.encoder(src_tok_features, src_key_padding_mask=key_padding_mask)
+        src_tok_features = self.embed2latent(src_tok_features)
+        src_mask = (~key_padding_mask).float()
 
-#         src_tok_features = self.encoder(src_tok_features, src_key_padding_mask=key_padding_mask)
-#         src_tok_features = self.embed2latent(src_tok_features)
-#         src_mask = (~key_padding_mask).float()
+        return src_tok_features, src_mask
 
-#         return src_tok_features, src_mask
+    def dec_tok_features(self, src_tok_features, src_mask, lat_tok_features=None, tgt_lens=None):
+        # internal features from function head
+        if lat_tok_features is None:
+            lat_tok_features, _ = self.function_head(
+                src_tok_features, padding_mask=src_mask, pooling_mask=src_mask
+            )
 
-#     def dec_tok_features(self, src_tok_features, src_mask, lat_tok_features=None, tgt_lens=None):
-#         # internal features from function head
-#         if lat_tok_features is None:
-#             lat_tok_features, _ = self.function_head(
-#                 src_tok_features, padding_mask=src_mask, pooling_mask=src_mask
-#             )
+        len_delta_logits = self.length_head(src_tok_features, src_mask)
+        # predict target seq length if unknown
+        if tgt_lens is None:
+            src_lens = src_mask.float().sum(-1)
+            tgt_lens = self.length_head.sample(src_lens, len_delta_logits)
 
-#         len_delta_logits = self.length_head(src_tok_features, src_mask)
-#         # predict target seq length if unknown
-#         if tgt_lens is None:
-#             src_lens = src_mask.float().sum(-1)
-#             tgt_lens = self.length_head.sample(src_lens, len_delta_logits)
+        tgt_tok_features, tgt_mask = self.length_transform(
+            src_tok_features=torch.cat([src_tok_features, lat_tok_features], dim=-1),
+            src_mask=src_mask,
+            tgt_lens=tgt_lens
+        )
+        tgt_tok_features = self.latent2embed(tgt_tok_features)
 
-#         tgt_tok_features, tgt_mask = self.length_transform(
-#             src_tok_features=torch.cat([src_tok_features, lat_tok_features], dim=-1),
-#             src_mask=src_mask,
-#             tgt_lens=tgt_lens
-#         )
-#         tgt_tok_features = self.latent2embed(tgt_tok_features)
+        tgt_pad_mask = ~tgt_mask.bool()
+        tgt_tok_features = self.decoder(
+            tgt_tok_features,
+            src_key_padding_mask=tgt_pad_mask,
+        )
 
-#         tgt_pad_mask = ~tgt_mask.bool()
-#         tgt_tok_features = self.decoder(
-#             tgt_tok_features,
-#             src_key_padding_mask=tgt_pad_mask,
-#         )
+        return lat_tok_features, tgt_tok_features, tgt_mask, len_delta_logits
 
-#         return lat_tok_features, tgt_tok_features, tgt_mask, len_delta_logits
+    def tgt_tok_logits(self, tgt_tok_features):
+        reshaped_features = tgt_tok_features.flatten(end_dim=-2)
+        logits = self.lm_head(reshaped_features)
+        logits = logits.view(*tgt_tok_features.shape[:-1], -1)
+        return logits
 
-#     def tgt_tok_logits(self, tgt_tok_features):
-#         reshaped_features = tgt_tok_features.flatten(end_dim=-2)
-#         logits = self.lm_head(reshaped_features)
-#         logits = logits.view(*tgt_tok_features.shape[:-1], -1)
-#         return logits
+    def forward(self, src_tok_idxs):
+        if src_tok_idxs.size(1) > self.max_len:
+            src_tok_idxs = src_tok_idxs[:, :self.max_len + 1]
+        src_tok_features, src_mask = self.enc_tok_features(src_tok_idxs)
+        pooling_mask = src_mask * src_tok_idxs.ne(self.tokenizer.eos_idx)
+        _, pooled_features = self.function_head(src_tok_features, src_mask, pooling_mask)
+        return pooled_features
 
-#     def forward(self, src_tok_idxs):
-#         if src_tok_idxs.size(1) > self.max_len:
-#             src_tok_idxs = src_tok_idxs[:, :self.max_len + 1]
-#         src_tok_features, src_mask = self.enc_tok_features(src_tok_idxs)
-#         pooling_mask = src_mask * src_tok_idxs.ne(self.tokenizer.eos_idx)
-#         _, pooled_features = self.function_head(src_tok_features, src_mask, pooling_mask)
-#         return pooled_features
+    def param_groups(self, lr, weight_decay=0.):
+        shared_group = dict(params=[], lr=lr, weight_decay=weight_decay, betas=(0., 1e-2))
+        other_group = dict(params=[], lr=lr, weight_decay=weight_decay)
 
-#     def param_groups(self, lr, weight_decay=0.):
-#         shared_group = dict(params=[], lr=lr, weight_decay=weight_decay, betas=(0., 1e-2))
-#         other_group = dict(params=[], lr=lr, weight_decay=weight_decay)
+        shared_names = ['embedding', 'pos_encoder', 'encoder', 'function_head']
+        for p_name, param in self.named_parameters():
+            prefix = p_name.split('.')[0]
+            if prefix in shared_names:
+                shared_group['params'].append(param)
+            else:
+                other_group['params'].append(param)
 
-#         shared_names = ['embedding', 'pos_encoder', 'encoder', 'function_head']
-#         for p_name, param in self.named_parameters():
-#             prefix = p_name.split('.')[0]
-#             if prefix in shared_names:
-#                 shared_group['params'].append(param)
-#             else:
-#                 other_group['params'].append(param)
-
-#         return shared_group, other_group
+        return shared_group, other_group
 
 
 class Expression(nn.Module):
@@ -370,3 +371,58 @@ def check_early_stopping(
         model.to(model.device)
 
     return best_score, best_epoch, best_weights, stop
+
+"""
+TransformerEncoder(
+  (layers): ModuleList(
+    (0): TransformerEncoderLayer(
+      (self_attn): MultiheadAttention(
+        (out_proj): NonDynamicallyQuantizableLinear(in_features=64, out_features=64, bias=True)
+      )
+      (linear1): Linear(in_features=64, out_features=256, bias=True)
+      (dropout): Dropout(p=0.0, inplace=False)
+      (linear2): Linear(in_features=256, out_features=64, bias=True)
+      (norm1): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+      (norm2): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+      (dropout1): Dropout(p=0.0, inplace=False)
+      (dropout2): Dropout(p=0.0, inplace=False)
+    )
+    (1): TransformerEncoderLayer(
+      (self_attn): MultiheadAttention(
+        (out_proj): NonDynamicallyQuantizableLinear(in_features=64, out_features=64, bias=True)
+      )
+      (linear1): Linear(in_features=64, out_features=256, bias=True)
+      (dropout): Dropout(p=0.0, inplace=False)
+      (linear2): Linear(in_features=256, out_features=64, bias=True)
+      (norm1): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+      (norm2): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+      (dropout1): Dropout(p=0.0, inplace=False)
+      (dropout2): Dropout(p=0.0, inplace=False)
+    )
+    (2): TransformerEncoderLayer(
+      (self_attn): MultiheadAttention(
+        (out_proj): NonDynamicallyQuantizableLinear(in_features=64, out_features=64, bias=True)
+      )
+      (linear1): Linear(in_features=64, out_features=256, bias=True)
+      (dropout): Dropout(p=0.0, inplace=False)
+      (linear2): Linear(in_features=256, out_features=64, bias=True)
+      (norm1): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+      (norm2): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+      (dropout1): Dropout(p=0.0, inplace=False)
+      (dropout2): Dropout(p=0.0, inplace=False)
+    )
+    (3): TransformerEncoderLayer(
+      (self_attn): MultiheadAttention(
+        (out_proj): NonDynamicallyQuantizableLinear(in_features=64, out_features=64, bias=True)
+      )
+      (linear1): Linear(in_features=64, out_features=256, bias=True)
+      (dropout): Dropout(p=0.0, inplace=False)
+      (linear2): Linear(in_features=256, out_features=64, bias=True)
+      (norm1): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+      (norm2): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+      (dropout1): Dropout(p=0.0, inplace=False)
+      (dropout2): Dropout(p=0.0, inplace=False)
+    )
+  )
+)
+"""

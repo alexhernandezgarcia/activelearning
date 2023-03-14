@@ -162,7 +162,10 @@ class SingleTaskMultiFidelityVariationalGP(ApproximateGPyTorchModel):
                 num_inducing=num_inducing,
                 input_batch_shape=self._input_batch_shape,
             )
-            var_strat.inducing_points.copy_(inducing_points)
+            if inducing_points.shape[0] != var_strat.inducing_points.shape[0]:
+                var_strat.inducing_points = inducing_points
+            else:
+                var_strat.inducing_points.copy_(inducing_points)
             var_strat.variational_params_initialized.fill_(0)
 
         return inducing_points
