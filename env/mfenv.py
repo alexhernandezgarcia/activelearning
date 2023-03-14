@@ -53,7 +53,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             self.statebatch2proxy = self.statebatch2state_longFid
             self.statetorch2proxy = self.statetorch2state_longFid
             if isinstance(self.env, Grid):
-                # only for branin
+                # only for botorch synthetic functions like branin and hartmann
                 self.statetorch2oracle = self.state_from_statefid
                 self.statebatch2oracle = self.state_from_statefid
         else:
@@ -288,19 +288,37 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         return self
 
     def set_state(self, state, done):
-        self.env.state = state
-        fid = torch.randint(self.n_fid, (1,))
-        if self.is_state_list:
-            self.state = state + [fid.item()]
-        else:
-            self.state = torch.cat([state, fid], dim=-1)
+        self.state = state
+        self.env.state = state[:-1]
         self.done = done
-        self.fid_done = self.state[-1] != -1
+        if done:
+            self.fid_done = done
+            self.env.done = done
+        else:
+            # Suppose done state was [2 3 4 0] with max_seq_length = 3
+            # Then the two possible parents are: [2 3 4 -1] and [2 3 21 0]
+            # In the first parent, env.done is True and fid_done is False
+            # In the second parent, env.done is False and fid_done is True
+            # For all subsequent parents of this parent, env.done will be False
+            # For this particular parent, we have to check whether the fid was the last action 
+            # or something env-specific was the last action
+            self.fid_done = self.state[-1] != -1
+            if self.n_actions == self.get_max_traj_len() - 1:
+                # If fid is incomplete then env is complete
+                # If fid is complete then env is incomplete
+                self.env.done = ~self.fid_done
+            else:
+                self.env.done = done
+        return self
+
+    def get_max_traj_len(self):
+        return self.env.get_max_traj_len() + 1
 
     def get_mask_invalid_actions_forward(self, state=None, done=None, fid_done=None):
         if state is not None and fid_done is None:
-            fid_done = state[-1] != -1
+            fid_done = (state[-1] != -1)
         elif state is None and fid_done is None:
+            assert self.fid_done == (self.state[-1] != -1)
             fid_done = self.fid_done
         else:
             print("state, fid_done", state, fid_done)
@@ -319,14 +337,14 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 assert self.env.done == True
             except:
                 print(
-                    "done is true but env.done is False: done, env.done".format(
+                    "done is true but env.done is False: {}, {}".format(
                         done, self.env.done
                     )
                 )
                 raise Exception
             return [True for _ in range(len(self.action_space))]
         mask = self.env.get_mask_invalid_actions_forward(state[:-1])
-        mask = mask + [self.fid_done for _ in range(self.n_fid)]
+        mask = mask + [fid_done for _ in range(self.n_fid)]
         return mask
 
     def state2policy(self, state: List = None):
@@ -536,6 +554,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     ),
                 )
                 raise ValueError("Fidelity has already been chosen.")
+            assert self.fid_done == (self.state[-1] != -1)
             self.done = self.env.done and self.fid_done
             return self.state, action, True
         else:
@@ -549,6 +568,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             else:
                 fid = torch.tensor([fid], device=state.device)
                 self.state = torch.cat([state, fid], dim=-1)
+            assert self.fid_done == (self.state[-1] != -1)
             self.done = self.env.done and self.fid_done
             padded_action = tuple(list(action) + [0] * (self.action_pad_length))
             return self.state, padded_action, valid
