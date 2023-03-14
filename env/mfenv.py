@@ -300,7 +300,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # In the first parent, env.done is True and fid_done is False
             # In the second parent, env.done is False and fid_done is True
             # For all subsequent parents of this parent, env.done will be False
-            # For this particular parent, we have to check whether the fid was the last action 
+            # For this particular parent, we have to check whether the fid was the last action
             # or something env-specific was the last action
             self.fid_done = self.state[-1] != -1
             if self.n_actions == self.get_max_traj_len() - 1:
@@ -316,7 +316,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_mask_invalid_actions_forward(self, state=None, done=None, fid_done=None):
         if state is not None and fid_done is None:
-            fid_done = (state[-1] != -1)
+            fid_done = state[-1] != -1
         elif state is None and fid_done is None:
             assert self.fid_done == (self.state[-1] != -1)
             fid_done = self.fid_done
