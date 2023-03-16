@@ -22,6 +22,22 @@ from tqdm import tqdm
 import wandb
 from model.regressive import RegressiveMLP
 from model.mlp import MLP
+# import pytorch_lightning as pl
+# from apex.optimizers import FusedAdam
+
+# class TorchTensorboardProfilerCallback(pl.Callback):
+#   """Quick-and-dirty Callback for invoking TensorboardProfiler during training.
+  
+#   For greater robustness, extend the pl.profiler.profilers.BaseProfiler. See
+#   https://pytorch-lightning.readthedocs.io/en/stable/advanced/profiler.html"""
+
+#   def __init__(self, profiler):
+#     super().__init__()
+#     self.profiler = profiler 
+
+#   def on_train_batch_end(self, trainer, pl_module, outputs, *args, **kwargs):
+#     self.profiler.step()
+#     pl_module.log_dict(outputs)  # also logging the loss, while we're here
 
 """
 This DKL regressor strictly assumes that the states are integral. 
@@ -293,7 +309,16 @@ class DeepKernelRegressor:
             avg_mlm_loss = 0.0
             avg_gp_loss = 0.0
             self.surrogate.train()
+            # with torch.profiler.profile(
+            #         schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+            #         on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/resnet18'),
+            #         record_shapes=True,
+            #         profile_memory=True,
+            #         with_stack=True
+            # ) as prof:
             for inputs, targets in train_loader:
+                inputs = inputs.to(self.surrogate.device)
+                targets = targets.to(self.surrogate.device)
                 # train encoder through unsupervised MLM objective
                 if self.encoder_obj == "mlm":
                     self.surrogate.encoder.requires_grad_(
@@ -312,16 +337,15 @@ class DeepKernelRegressor:
                 #     )
                 # else:
                 #     mlm_loss = torch.zeros(1, device=surrogate.device)
-
                 # train all params through supervised MLL objective
                 self.surrogate.requires_grad_(True)
                 gp_loss = self.gp_train_step(optimizer, inputs, targets, self.mll)
-
                 avg_train_loss += (mlm_loss.detach() + gp_loss.detach()) / len(
                     train_loader
                 )
                 avg_mlm_loss += mlm_loss.detach() / len(train_loader)
                 avg_gp_loss += gp_loss.detach() / len(train_loader)
+                    # prof.step()
 
             lr_sched.step(avg_train_loss)
 
@@ -422,6 +446,8 @@ class DeepKernelRegressor:
             print(f"---- best test NLL: {best_loss:.4f} ----")
             self.best_score = best_score
             self.best_loss = best_loss
+            y_std = self.surrogate.evaluate(test_loader, final=True)
+            print(y_std.squeeze(-1))
         self.logger.save_proxy(
             self.surrogate, optimizer, epoch=best_score_epoch, final=True
         )

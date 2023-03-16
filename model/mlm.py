@@ -44,8 +44,10 @@ def mlm_eval_epoch(model, loader, mask_ratio, n_fid=1):
     model.eval()  # LanguageModel
     # print("\nUser-Defined Warning: Converting states in test loader to integer for mlm evaluation.")
     for minibatch in loader:
-        if isinstance(minibatch, tuple):
+        if isinstance(minibatch, tuple) or isinstance(minibatch, list):
             token_batch = minibatch[0]  # torch.Size([32, 36])
+        # elif :
+
         else:
             assert torch.is_tensor(minibatch)
             token_batch = minibatch

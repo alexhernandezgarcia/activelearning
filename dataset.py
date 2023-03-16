@@ -15,8 +15,8 @@ from typing import List
 
 class Data(Dataset):
     def __init__(self, X_data, y_data):
-        self.X_data = X_data
-        self.y_data = y_data
+        self.X_data = X_data.detach().cpu()
+        self.y_data = y_data.detach().cpu()
 
     def __getitem__(self, index):
         return self.X_data[index], self.y_data[index]
@@ -174,7 +174,9 @@ class DataHandler:
             state_oracle = self.env.statetorch2oracle(states_oracle_input)
             scores = self.env.oracle(state_oracle)
         elif self.n_fid > 1 and self.fidelity.do == False:
-            print("Scores were not calculated and fidelity was not assigned. Directly taken from dataset")
+            print(
+                "Scores were not calculated and fidelity was not assigned. Directly taken from dataset"
+            )
 
         if hasattr(self.sfenv, "plot_samples_frequency"):
             fig = self.sfenv.plot_samples_frequency(
@@ -496,7 +498,7 @@ class DataHandler:
         for (_sequence, _label) in batch:
             y.append(_label)
             x.append(_sequence)
-        y = torch.tensor(y, dtype=self.float, device=self.device)
+        y = torch.tensor(y, dtype=self.float)  # , device=self.device
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
         return xPadded, y
 
@@ -511,8 +513,8 @@ class DataHandler:
             self.train_data,
             batch_size=self.dataloader.train.batch_size,
             shuffle=self.dataloader.train.shuffle,
-            # num_workers=0,
-            # pin_memory=True,
+            num_workers=2,
+            pin_memory=True,
             collate_fn=self.collate_batch,
         )
 
@@ -520,8 +522,8 @@ class DataHandler:
             self.test_data,
             batch_size=self.dataloader.test.batch_size,
             shuffle=self.dataloader.test.shuffle,
-            # num_workers=0,
-            # pin_memory=True,
+            num_workers=2,
+            pin_memory=True,
             collate_fn=self.collate_batch,
         )
 

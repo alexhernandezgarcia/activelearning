@@ -134,7 +134,7 @@ class BaseGPSurrogate(abc.ABC):
     #         pred_dist = pred_dist if latent else self.likelihood(pred_dist)
     #     return pred_dist
 
-    def evaluate(self, loader, *args, **kwargs):
+    def evaluate(self, loader, final=False, *args, **kwargs):
         self.eval()
         targets, y_mean, y_std, f_std = [], [], [], []
         # print("\nUser-Defined Warning: Converting states in test loader to integer for surrogate evaluation.")
@@ -143,6 +143,8 @@ class BaseGPSurrogate(abc.ABC):
                 input_batch,
                 target_batch,
             ) in loader:
+                input_batch = input_batch.to(self.device)
+                target_batch = target_batch.to(self.device)
                 # input_batch: torch.Size([45, 36]), target_batch: torch.Size([45, 3]) --> in variational, the number of elements is 32, ie batch size
                 # features = self.get_features(input_batch.to(self.device), self.bs, transform=False)
                 features = self.get_features(
@@ -209,6 +211,9 @@ class BaseGPSurrogate(abc.ABC):
             f"test_occ_diff": occ_diff,
             f"test_post_var": (f_std**2).mean().item(),
         }
+
+        if final == True:
+            return y_std
 
         if hasattr(self.likelihood, "task_noises"):
             metrics["noise"] = self.likelihood.task_noises.mean().item()
