@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 
 
-@hydra.main(config_path="./config", config_name="mf_dkl")
+@hydra.main(config_path="./config", config_name="mf_hartmann")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -122,18 +122,6 @@ def main(config):
             tokenizer=tokenizer,
             rescale=rescale,
         )
-        regressor = hydra.utils.instantiate(
-            config.regressor,
-            config_env=config.env,
-            config_model=config_model,
-            dataset=data_handler,
-            device=config.device,
-            maximize=oracle.maximize,
-            float_precision=config.float_precision,
-            _recursive_=False,
-            logger=logger,
-            tokenizer=tokenizer,
-        )
     # check if path exists
     elif config.multifidelity.proxy == False:
         regressor = None
@@ -152,6 +140,21 @@ def main(config):
     cumulative_sampled_samples = []
     cumulative_sampled_energies = torch.tensor([], device=env.device, dtype=env.float)
     for iter in range(1, config.al_n_rounds + 1):
+        if config.multifidelity.proxy == True:
+            # Moved in AL iter because of inducing point bug:
+            # Different number of inducing points calculated by cholesky method in each iteration
+            regressor = hydra.utils.instantiate(
+                config.regressor,
+                config_env=config.env,
+                config_model=config_model,
+                dataset=data_handler,
+                device=config.device,
+                maximize=oracle.maximize,
+                float_precision=config.float_precision,
+                _recursive_=False,
+                logger=logger,
+                tokenizer=tokenizer,
+            )
         print(f"\nStarting iteration {iter} of active learning")
         if logger:
             logger.set_context(iter)
@@ -269,6 +272,25 @@ def main(config):
                     logger,
                 )
 
+            if hasattr(env, "get_cost"):
+                cost_al_round = env.get_cost(picked_states, picked_fidelity)
+                cumulative_cost += np.sum(cost_al_round)
+                avg_cost = np.mean(cost_al_round)
+                logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
+                logger.log_metrics(
+                    {"post_al_cum_cost": cumulative_cost}, use_context=False
+                )
+            else:
+                cost_al_round = torch.ones(len(picked_states))
+                if hasattr(oracle, "cost"):
+                    cost_al_round = cost_al_round * oracle.cost
+                avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
+                cumulative_cost += torch.sum(cost_al_round).detach().cpu().numpy()
+                logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
+                logger.log_metrics(
+                    {"post_al_cum_cost": cumulative_cost}, use_context=False
+                )
+
             if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
                     cumulative_sampled_samples,
@@ -291,29 +313,10 @@ def main(config):
                 data_handler.update_dataset(
                     picked_states, picked_energies.tolist(), picked_fidelity
                 )
-            if hasattr(env, "get_cost"):
-                cost_al_round = env.get_cost(picked_states, picked_fidelity)
-                cumulative_cost += np.sum(cost_al_round)
-                avg_cost = np.mean(cost_al_round)
-                logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
-                logger.log_metrics(
-                    {"post_al_cum_cost": cumulative_cost}, use_context=False
-                )
-            else:
-                print(
-                    "\nUser-Defined Warning: Maximum cost in the single fidelity case is assumed to be 1 \n \
-                    for the calculation of mean and cumulative cost over active learning rounds."
-                )
-                cost_al_round = torch.ones(len(picked_states))
-                avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
-                cumulative_cost += torch.sum(cost_al_round).detach().cpu().numpy()
-                logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
-                logger.log_metrics(
-                    {"post_al_cum_cost": cumulative_cost}, use_context=False
-                )
 
         del gflownet
         del proxy
+        del regressor
 
 
 def set_seeds(seed):

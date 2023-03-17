@@ -84,6 +84,19 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         else:
             self.proxy_factor = -1.0
 
+    def unpad_function(self, states_term):
+        states_tensor = torch.tensor(states_term)
+        states_tensor = states_tensor[:, :-1]
+        state_XX = []
+        for state in states_tensor:
+            state = (
+                state[: torch.where(state == self.padding_idx)[0][0]]
+                if state[-1] == self.padding_idx
+                else state
+            )
+            state_XX.append(state)
+        return state_XX
+
     def statebatch2oracle_joined(self, states):
         # Specifically for Oracle MES and Oracle based MF Experiments
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])

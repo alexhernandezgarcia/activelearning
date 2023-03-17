@@ -22,18 +22,19 @@ from tqdm import tqdm
 import wandb
 from model.regressive import RegressiveMLP
 from model.mlp import MLP
+
 # import pytorch_lightning as pl
 # from apex.optimizers import FusedAdam
 
 # class TorchTensorboardProfilerCallback(pl.Callback):
 #   """Quick-and-dirty Callback for invoking TensorboardProfiler during training.
-  
+
 #   For greater robustness, extend the pl.profiler.profilers.BaseProfiler. See
 #   https://pytorch-lightning.readthedocs.io/en/stable/advanced/profiler.html"""
 
 #   def __init__(self, profiler):
 #     super().__init__()
-#     self.profiler = profiler 
+#     self.profiler = profiler
 
 #   def on_train_batch_end(self, trainer, pl_module, outputs, *args, **kwargs):
 #     self.profiler.step()
@@ -345,7 +346,7 @@ class DeepKernelRegressor:
                 )
                 avg_mlm_loss += mlm_loss.detach() / len(train_loader)
                 avg_gp_loss += gp_loss.detach() / len(train_loader)
-                    # prof.step()
+                # prof.step()
 
             lr_sched.step(avg_train_loss)
 
@@ -446,8 +447,6 @@ class DeepKernelRegressor:
             print(f"---- best test NLL: {best_loss:.4f} ----")
             self.best_score = best_score
             self.best_loss = best_loss
-            y_std = self.surrogate.evaluate(test_loader, final=True)
-            print(y_std.squeeze(-1))
         self.logger.save_proxy(
             self.surrogate, optimizer, epoch=best_score_epoch, final=True
         )

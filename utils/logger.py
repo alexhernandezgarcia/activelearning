@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import wandb
 
+
 class AL_Logger(Logger):
     """
     Utils functions to compute and handle the statistics (saving them or send to
@@ -71,6 +72,8 @@ class AL_Logger(Logger):
     def save_dataset(self, dataset, type):
         if self.data_path is not None:
             data = pd.DataFrame(dataset)
+            # sort dataframe by energies column in descending order
+            data = data.sort_values(by="energies", ascending=False)
             if type == "sampled":
                 type = type + "_iter" + self.context
             name = Path(self.data_path.stem + "_" + type + ".csv")
@@ -87,6 +90,6 @@ class AL_Logger(Logger):
             figimg = self.wandb.Image(fig)
             self.wandb.log({key: figimg})
             plt.close()
-    
+
     def define_metric(self, metric, step_metric=None):
-        wandb.define_metric(metric, step_metric=step_metric)    
+        wandb.define_metric(metric, step_metric=step_metric)
