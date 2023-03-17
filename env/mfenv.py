@@ -85,6 +85,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             self.proxy_factor = -1.0
 
     def unpad_function(self, states_term):
+        if hasattr(self.env, "unpad_function") == False:
+            return states_term
         states_tensor = torch.tensor(states_term)
         states_tensor = states_tensor[:, :-1]
         state_XX = []

@@ -141,8 +141,8 @@ def main(config):
     cumulative_sampled_energies = torch.tensor([], device=env.device, dtype=env.float)
     for iter in range(1, config.al_n_rounds + 1):
         if config.multifidelity.proxy == True:
-            # Moved in AL iter because of inducing point bug:
-            # Different number of inducing points calculated by cholesky method in each iteration
+        # Moved in AL iter because of inducing point bug:
+        # Different number of inducing points calculated by cholesky method in each iteration
             regressor = hydra.utils.instantiate(
                 config.regressor,
                 config_env=config.env,
@@ -281,9 +281,9 @@ def main(config):
                     {"post_al_cum_cost": cumulative_cost}, use_context=False
                 )
             else:
-                cost_al_round = torch.ones(len(picked_states))
+                cost_al_round = torch.ones(len(picked_states)) 
                 if hasattr(oracle, "cost"):
-                    cost_al_round = cost_al_round * oracle.cost
+                   cost_al_round = cost_al_round * oracle.cost
                 avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
                 cumulative_cost += torch.sum(cost_al_round).detach().cpu().numpy()
                 logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
@@ -313,6 +313,7 @@ def main(config):
                 data_handler.update_dataset(
                     picked_states, picked_energies.tolist(), picked_fidelity
                 )
+            
 
         del gflownet
         del proxy
