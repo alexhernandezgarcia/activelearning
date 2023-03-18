@@ -6,6 +6,7 @@ base_num_hidden: 512
 base_num_layer: 2
 fid_num_hidden: 512
 fid_num_layer: 2
+feature_dim: ${model.fid_num_hidden}
 activation: "relu"
 dropout_prob: 0.1
 num_output: 1

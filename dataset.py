@@ -15,8 +15,8 @@ from typing import List
 
 class Data(Dataset):
     def __init__(self, X_data, y_data):
-        self.X_data = X_data
-        self.y_data = y_data
+        self.X_data = X_data.detach().cpu()
+        self.y_data = y_data.detach().cpu()
 
     def __getitem__(self, index):
         return self.X_data[index], self.y_data[index]
@@ -34,23 +34,23 @@ class DataHandler:
     def __init__(
         self,
         env,
-        normalise_data,
+        normalize_data,
         train_fraction,
         dataloader,
         path,
         logger,
         oracle,
         split,
-        dataset_size,
         device,
         float_precision,
+        # TODO: Do we even need the tokenzier here?
         tokenizer=None,
         n_samples=None,
         fidelity=None,
         rescale=None,
     ):
         self.env = env
-        self.normalise_data = normalise_data
+        self.normalize_data = normalize_data
         self.train_fraction = train_fraction
         self.n_samples = n_samples
         self.dataloader = dataloader
@@ -61,7 +61,6 @@ class DataHandler:
         self.progress = self.logger.progress
         self.oracle = oracle
         self.logger.set_data_path(self.path.dataset)
-        self.dataset_size = dataset_size
         self.device = device
         if hasattr(env, "n_fid"):
             self.n_fid = env.n_fid
@@ -104,7 +103,7 @@ class DataHandler:
         - dataset['states']: list of arrays
         - dataset['energies']: list of float values
 
-        If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalised data is saved as npy
+        If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalized data is saved as npy
         """
         if self.path.oracle_dataset:
             # when one dataset without fidelity is given
@@ -130,9 +129,14 @@ class DataHandler:
             scores = train_scores + test_scores
             if scores == []:
                 scores = None
-            states = [
-                torch.tensor(self.sfenv.readable2state(sample)) for sample in states
-            ]
+            if self.path.oracle_dataset.type != "mf":
+                states = [
+                    torch.tensor(self.sfenv.readable2state(sample)) for sample in states
+                ]
+            else:
+                states = [
+                    torch.tensor(self.env.readable2state(sample)) for sample in states
+                ]
             states = torch.stack(states)
         else:
             # for AMP this is the implementation
@@ -170,8 +174,8 @@ class DataHandler:
             state_oracle = self.env.statetorch2oracle(states_oracle_input)
             scores = self.env.oracle(state_oracle)
         elif self.n_fid > 1 and self.fidelity.do == False:
-            raise NotImplementedError(
-                "Not implemented for when n_fid>1 and fidelity.do == False"
+            print(
+                "Scores were not calculated and fidelity was not assigned. Directly taken from dataset"
             )
 
         if hasattr(self.sfenv, "plot_samples_frequency"):
@@ -184,30 +188,31 @@ class DataHandler:
             self.logger.log_figure("initial_dataset", fig, use_context=True)
 
         if self.split == "random":
-            if (
-                self.path.oracle_dataset is not None
-                and self.path.oracle_dataset.train is not None
-            ):
-                index = torch.randperm(len(states))
-                train_index = index[: int(len(states) * self.train_fraction)]
-                test_index = index[int(len(states) * self.train_fraction) :]
-                train_states = states[train_index]
-                test_states = states[test_index]
-                if scores is not None:
-                    train_scores = scores[train_index]
-                    test_scores = scores[test_index]
-                # TODO: can we change this to dtype = self.float and device = cuda
-                train_states = train_states.to(self.device)  # long()
-                test_states = test_states.to(self.device)  # .long()
-                train_scores = train_scores.to(self.float).to(self.device)
-                test_scores = test_scores.to(self.float).to(self.device)
-
+            # if (
+            #     self.path.oracle_dataset is not None
+            #     and self.path.oracle_dataset.train is not None
+            # ):
+            index = torch.randperm(len(states))
+            train_index = index[: int(len(states) * self.train_fraction)]
+            test_index = index[int(len(states) * self.train_fraction) :]
+            train_states = states[train_index]
+            test_states = states[test_index]
+            if scores is not None:
+                train_scores = scores[train_index]
+                test_scores = scores[test_index]
+            train_states = train_states.to(self.device)
+            test_states = test_states.to(self.device)
+            train_scores = train_scores.to(self.float).to(self.device)
+            test_scores = test_scores.to(self.float).to(self.device)
         elif self.split == "all_train":
             train_states = states.to(self.device)
             train_scores = scores.to(self.device)
             test_states = torch.Tensor([])
             test_scores = torch.Tensor([])
-        # TODO: make general to sf
+        else:
+            raise ValueError("Split type not implemented")
+        # TODO: can we remove the tokenzier? as state here is before the tokenzier transformation?
+        # TODO: can we simply call statetorch2readable because the states here is always a tensor
         if hasattr(self.sfenv, "statetorch2readable"):
             if self.tokenizer is not None:
                 readable_train_samples = [
@@ -234,7 +239,7 @@ class DataHandler:
                 "samples": readable_train_samples,
                 "energies": train_scores.tolist(),
             }
-        # Save the raw (un-normalised) dataset
+        # Save the raw (un-normalized) dataset
         self.logger.save_dataset(readable_train_dataset, "train")
         self.train_dataset = {"states": train_states, "energies": train_scores}
 
@@ -245,14 +250,19 @@ class DataHandler:
 
         if len(test_states) > 0:
             if hasattr(self.sfenv, "statetorch2readable"):
-                readable_test_samples = [
-                    self.env.statetorch2readable(
-                        sample,
-                        inverse_lookup=self.tokenizer.inverse_lookup,
-                        lookup=self.tokenizer.lookup,
-                    )
-                    for sample in test_states
-                ]
+                if self.tokenizer is not None:
+                    readable_test_samples = [
+                        self.env.statetorch2readable(
+                            sample,
+                            inverse_lookup=self.tokenizer.inverse_lookup,
+                            lookup=self.tokenizer.lookup,
+                        )
+                        for sample in test_states
+                    ]
+                else:
+                    readable_test_samples = [
+                        self.env.statetorch2readable(sample) for sample in test_states
+                    ]
                 readable_test_dataset = {
                     "samples": readable_test_samples,
                     "energies": test_scores.tolist(),
@@ -280,8 +290,7 @@ class DataHandler:
         # Log the dataset statistics
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            prefix = "\nNormalised " if self.normalise_data else "\n"
-            print(prefix + "Dataset Statistics")
+            print("\nDataset Statistics (Prior to Normalization)")
             print(
                 "Train Data \n \t Mean Score:{:.2f} \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.train_stats["mean"],
@@ -303,7 +312,7 @@ class DataHandler:
     def preprocess(self, dataset):
         """
         - converts states to proxy space
-        - normalises the energies
+        - normalizes the energies
         - shuffles the data
         - splits the data into train and test
         """
@@ -322,8 +331,8 @@ class DataHandler:
         dataset = {"states": states, "energies": scores}
 
         stats = self.get_statistics(scores)
-        if self.normalise_data:
-            dataset["energies"] = self.normalise(dataset["energies"], stats)
+        if self.normalize_data:
+            dataset["energies"] = self.normalize(dataset["energies"], stats)
 
         return dataset, stats
 
@@ -338,28 +347,30 @@ class DataHandler:
         dict["min"] = torch.min(y)
         return dict
 
-    def normalise(self, y, stats):
+    def normalize(self, y, stats):
         """
         Args:
-            y: targets to normalise (tensor)
+            y: targets to normalize (tensor)
             mean: mean of targets (tensor)
             std: std of targets (tensor)
         Returns:
-            y: normalised targets (tensor)
+            y: normalized targets (tensor)
         """
-        y = (y - stats["mean"]) / stats["std"]
+        y = (y - stats["min"]) / (stats["max"] - stats["min"])
+        # y = (y - stats["mean"]) / stats["std"]
         return y
 
-    def denormalise(self, y, stats):
+    def denormalize(self, y, stats):
         """
         Args:
-            y: targets to denormalise (tensor)
+            y: targets to denormalize (tensor)
             mean: mean of targets (tensor)
             std: std of targets (tensor)
         Returns:
-            y: denormalised targets (tensor)
+            y: denormalized targets (tensor)
         """
-        y = y * stats["std"] + stats["mean"]
+        y = y * (stats["max"] - stats["min"]) + stats["min"]
+        # y = y * stats["std"] + stats["mean"]
         return y
 
     def update_dataset(self, states, energies, fidelity=None):
@@ -418,8 +429,8 @@ class DataHandler:
             states = states.to(self.device)  # dtype=self.float
         energies = torch.tensor(energies, dtype=self.float, device=self.device)
 
-        if self.normalise_data:
-            self.train_dataset["energies"] = self.denormalise(
+        if self.normalize_data:
+            self.train_dataset["energies"] = self.denormalize(
                 self.train_dataset["energies"], stats=self.train_stats
             )
 
@@ -431,8 +442,8 @@ class DataHandler:
         )
 
         self.train_stats = self.get_statistics(self.train_dataset["energies"])
-        if self.normalise_data:
-            self.train_dataset["energies"] = self.normalise(
+        if self.normalize_data:
+            self.train_dataset["energies"] = self.normalize(
                 self.train_dataset["energies"], self.train_stats
             )
         self.train_data = Data(
@@ -441,8 +452,7 @@ class DataHandler:
 
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            prefix = "\nNormalised " if self.normalise_data else "\n"
-            print(prefix + "Updated Dataset Statistics")
+            print("\nUpdated Dataset Statistics")
             print(
                 "\n Train \n \t Mean Score:{:.2f} \n \t  Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.train_stats["mean"],
@@ -481,15 +491,14 @@ class DataHandler:
         """
         Pads till maximum length in the batch
         """
-        y, x, fid = (
-            [],
+        y, x = (
             [],
             [],
         )
         for (_sequence, _label) in batch:
             y.append(_label)
             x.append(_sequence)
-        y = torch.tensor(y, dtype=self.float, device=self.device)
+        y = torch.tensor(y, dtype=self.float)  # , device=self.device
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
         return xPadded, y
 
@@ -498,14 +507,14 @@ class DataHandler:
         Build and return the dataloader for the networks
         The dataloader should return x and y such that:
             x: self.env.statebatch2proxy(input)
-            y: normalised (if need be) energies
+            y: normalized (if need be) energies
         """
         train_loader = DataLoader(
             self.train_data,
             batch_size=self.dataloader.train.batch_size,
             shuffle=self.dataloader.train.shuffle,
-            # num_workers=0,
-            # pin_memory=True,
+            num_workers=2,
+            pin_memory=True,
             collate_fn=self.collate_batch,
         )
 
@@ -513,8 +522,8 @@ class DataHandler:
             self.test_data,
             batch_size=self.dataloader.test.batch_size,
             shuffle=self.dataloader.test.shuffle,
-            # num_workers=0,
-            # pin_memory=True,
+            num_workers=2,
+            pin_memory=True,
             collate_fn=self.collate_batch,
         )
 

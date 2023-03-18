@@ -85,6 +85,70 @@ class ProxyBotorchUCB(Model):
         return torch.Size([])
 
 
+class ProxyBotorchMES(Model):
+    def __init__(self, regressor, num_dropout_samples):
+        super().__init__()
+        self.regressor = regressor
+        self._num_outputs = 1
+        self.num_dropout_samples = num_dropout_samples
+
+    @property
+    def num_outputs(self) -> int:
+        return self._num_outputs
+
+    @property
+    def batch_shape(self):
+        """
+        This is a batch shape from an I/O perspective. For a model with `m` outputs, a `test_batch_shape x q x d`-shaped input `X`
+        to the `posterior` method returns a Posterior object over an output of
+        shape `broadcast(test_batch_shape, model.batch_shape) x q x m`.
+        """
+        return torch.Size([])
+
+    def posterior(self, X, observation_noise=False, posterior_transform=None):
+        """
+        Args:
+            X (Tensor): A `batch_shape x q x d`-dim Tensor of inputs.
+        Calculates:
+            mean (tensor): A `batch_shape x q`-dim
+            var (tensor): A `batch_shape x q`-dim of variance
+        Returns:
+            posterior:
+                base_sample_shape = torch.Size([batch_shape, q, num_output]) = torch.Size([batch_shape, 1, 1])
+                event_shape = torch.Size([batch_shape, q, num_output])
+                variance:  torch.Size([batch_shape, num_output, num_output]) = torch.Size([batch_shape, 1, 1])
+        """
+        super().posterior(X, observation_noise, posterior_transform)
+
+        self.regressor.model.train()
+        dim = X.ndim
+
+        with torch.no_grad():
+            outputs = self.regressor.forward_with_uncertainty(
+                X, self.num_dropout_samples
+            )
+        mean = torch.mean(outputs, dim=1).unsqueeze(-1)
+        var = torch.var(outputs, dim=1).unsqueeze(-1)
+        # if var is an array of zeros then we add a small value to it
+        var = torch.where(var == 0, torch.ones_like(var) * 1e-4, var)
+
+        if dim == 2:
+            # candidate set
+            covar = torch.diag(var)
+        elif dim == 4:
+            covar = [torch.diag(var[i][0]) for i in range(X.shape[0])]
+            covar = torch.stack(covar, axis=0)
+            covar = covar.unsqueeze(-1)
+        elif dim == 3:
+            # max samples
+            covar = [torch.diag(var[i]) for i in range(X.shape[0])]
+            covar = torch.stack(covar, axis=0)
+
+        mvn = MultivariateNormal(mean, covar)
+        posterior = GPyTorchPosterior(mvn)
+        return posterior
+
+
 class MultifidelityOracleModel(Model):
     def __init__(self, oracle, n_fid, device):
         super().__init__()

@@ -5,9 +5,9 @@ model:
   _target_: model.shared_elements.mCNN
   tokenizer: null
   max_len: ${env.max_seq_length}
-  embed_dim: 64
-  latent_dim: 16
-  out_dim: 16
+  embed_dim: 128
+  latent_dim: 128
+  out_dim: 128
   kernel_size: 5
   p: 0.
   layernorm: True
@@ -19,3 +19,4 @@ patience: 32
 lr: 1e-3
 max_shift: 0
 mask_ratio: 0.125
+feature_dim: ${model.model.out_dim}

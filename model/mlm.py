@@ -37,15 +37,17 @@ def sample_mask(
     return mask_idxs.detach().cpu().numpy()
 
 
-def mlm_eval_epoch(model, eval_loader, mask_ratio, n_fid=1):
+def mlm_eval_epoch(model, loader, mask_ratio, n_fid=1):
     metrics = dict(
         perplexity=0.0,
     )
     model.eval()  # LanguageModel
     # print("\nUser-Defined Warning: Converting states in test loader to integer for mlm evaluation.")
-    for minibatch in eval_loader:
-        if isinstance(minibatch, tuple):
+    for minibatch in loader:
+        if isinstance(minibatch, tuple) or isinstance(minibatch, list):
             token_batch = minibatch[0]  # torch.Size([32, 36])
+        # elif :
+
         else:
             assert torch.is_tensor(minibatch)
             token_batch = minibatch
@@ -81,7 +83,7 @@ def mlm_eval_epoch(model, eval_loader, mask_ratio, n_fid=1):
             log_prob, masked_tokens.cpu().numpy()[..., None], axis=1
         )  # torch.Size([160, 1])
         metrics["perplexity"] += 2 ** (-(log_prob / math.log(2)).mean().detach()) / len(
-            eval_loader
+            loader
         )
 
     metrics = {key: val.item() for key, val in metrics.items()}
