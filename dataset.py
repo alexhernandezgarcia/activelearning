@@ -43,8 +43,6 @@ class DataHandler:
         split,
         device,
         float_precision,
-        # TODO: Do we even need the tokenzier here?
-        tokenizer=None,
         n_samples=None,
         fidelity=None,
         rescale=None,
@@ -70,7 +68,6 @@ class DataHandler:
             self.sfenv = env
         self.float = set_float_precision(float_precision)
         self.rescale = rescale
-        self.tokenizer = tokenizer
         self.initialise_dataset()
 
     def generate_fidelities(self, states):
@@ -211,34 +208,22 @@ class DataHandler:
             test_scores = torch.Tensor([])
         else:
             raise ValueError("Split type not implemented")
-        # TODO: can we remove the tokenzier? as state here is before the tokenzier transformation?
-        # TODO: can we simply call statetorch2readable because the states here is always a tensor
-        if hasattr(self.sfenv, "statetorch2readable"):
-            if self.tokenizer is not None:
-                readable_train_samples = [
-                    self.env.statetorch2readable(
-                        sample,
-                        inverse_lookup=self.tokenizer.inverse_lookup,
-                        lookup=self.tokenizer.lookup,
-                    )
-                    for sample in train_states
-                ]
-            else:
-                readable_train_samples = [
-                    self.env.statetorch2readable(sample) for sample in train_states
-                ]
-            readable_train_dataset = {
-                "samples": readable_train_samples,
-                "energies": train_scores.tolist(),
-            }
-        else:
-            readable_train_samples = [
-                self.env.state2readable(sample) for sample in train_states
-            ]
-            readable_train_dataset = {
-                "samples": readable_train_samples,
-                "energies": train_scores.tolist(),
-            }
+        # if hasattr(self.sfenv, "statetorch2readable"):
+        readable_train_samples = [
+            self.env.statetorch2readable(sample) for sample in train_states
+        ]
+        readable_train_dataset = {
+            "samples": readable_train_samples,
+            "energies": train_scores.tolist(),
+        }
+        # else:
+        #     readable_train_samples = [
+        #         self.env.state2readable(sample) for sample in train_states
+        #     ]
+        #     readable_train_dataset = {
+        #         "samples": readable_train_samples,
+        #         "energies": train_scores.tolist(),
+        #     }
         # Save the raw (un-normalized) dataset
         self.logger.save_dataset(readable_train_dataset, "train")
         self.train_dataset = {"states": train_states, "energies": train_scores}
@@ -249,32 +234,22 @@ class DataHandler:
         )
 
         if len(test_states) > 0:
-            if hasattr(self.sfenv, "statetorch2readable"):
-                if self.tokenizer is not None:
-                    readable_test_samples = [
-                        self.env.statetorch2readable(
-                            sample,
-                            inverse_lookup=self.tokenizer.inverse_lookup,
-                            lookup=self.tokenizer.lookup,
-                        )
-                        for sample in test_states
-                    ]
-                else:
-                    readable_test_samples = [
-                        self.env.statetorch2readable(sample) for sample in test_states
-                    ]
-                readable_test_dataset = {
-                    "samples": readable_test_samples,
-                    "energies": test_scores.tolist(),
-                }
-            else:
-                readable_test_samples = [
-                    self.env.state2readable(sample) for sample in test_states
+            # if hasattr(self.sfenv, "statetorch2readable"):
+            readable_test_samples = [
+                    self.env.statetorch2readable(sample) for sample in test_states
                 ]
-                readable_test_dataset = {
-                    "samples": readable_test_samples,
-                    "energies": test_scores.tolist(),
-                }
+            readable_test_dataset = {
+                "samples": readable_test_samples,
+                "energies": test_scores.tolist(),
+            }
+            # else:
+            #     readable_test_samples = [
+            #         self.env.state2readable(sample) for sample in test_states
+            #     ]
+            #     readable_test_dataset = {
+            #         "samples": readable_test_samples,
+            #         "energies": test_scores.tolist(),
+            #     }
             self.logger.save_dataset(readable_test_dataset, "test")
             self.test_dataset = {"states": test_states, "energies": test_scores}
 
@@ -382,25 +357,10 @@ class DataHandler:
         Updates the dataset stats
         Saves the updated dataset if save_data=True
         """
-        # if self.n_fid > 1:
-        #     if isinstance(states[0], List):
-        #         states = [
-        #             state + [fid.tolist()] for state, fid in zip(states, fidelity)
-        #         ]
-        #     else:
-        #         states = torch.vstack(states)
-        #         states = torch.cat(
-        #             (states, fidelity.unsqueeze(-1).to(states.device)), dim=1
-        #         )
-        # remove duplicate rows from tensor states
-        # get indices of unique rows
-        # states, index = torch.unique(torch.tensor(states), dim=0, return_inverse=True)
-        # energies = energies[index]
         readable_dataset = {
             "samples": [self.env.state2readable(state) for state in states],
             "energies": energies,
         }
-        # readable_dataset = readable_dataset.sort_values(by=["energies"])
         self.logger.save_dataset(readable_dataset, "sampled")
 
         # for grid
