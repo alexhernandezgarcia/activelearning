@@ -1,7 +1,8 @@
 defaults:
   - base
 
-_target_: gflownet.envs.amp.AMP
+# _target_: gflownet.envs.amp.AMP
+_target_: env.amp.AMP 
 
 id: amp
 # Minimum and maximum length for the sequences

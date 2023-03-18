@@ -689,18 +689,23 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     #     else:
     #         return None
 
-    def plot_samples_frequency(self, samples, **kwargs):
+    def plot_samples_frequency(self, samples, title=None, **kwargs):
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
         for fid in range(0, self.n_fid):
-            samples_fid = [sample[:-1] for sample in samples if sample[-1] == fid]
+            if isinstance(samples, TensorType):
+                samples_fid = samples[:, :-1].tolist()
+            else:
+                samples_fid = [sample[:-1] for sample in samples if sample[-1] == fid]
             if hasattr(self.env, "plot_samples_frequency"):
                 axs[fid] = self.env.plot_samples_frequency(
                     samples_fid, axs[fid], "Fidelity {}".format(fid)
                 )
             else:
                 return None
-        fig.suptitle("Frequency of Coordinates Sampled")
+        if title is None:
+            title = "Frequency of Coordinates Sampled"
+        fig.suptitle(title)
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -720,7 +725,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     )
             elif scores is not None:
                 idx_fid = [i for i in range(len(scores)) if fidelity[i] == fid]
-                if hasattr(self.env, "plot_reward_distribution") and idx_fid is not []:
+                if hasattr(self.env, "plot_reward_distribution") and len(idx_fid) != 0:
                     axs[fid] = self.env.plot_reward_distribution(
                         scores=scores[idx_fid],
                         ax=axs[fid],
@@ -749,6 +754,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_distance_from_D0(self, samples, dataset_obs):
         if hasattr(self.env, "get_distance_from_D0"):
+            dataset_obs = [sample[:-1] for sample in dataset_obs]
             return self.env.get_distance_from_D0(samples, dataset_obs)
         else:
             return torch.zeros(len(samples))

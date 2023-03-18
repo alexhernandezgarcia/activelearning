@@ -384,7 +384,6 @@ class DeepKernelMultiFidelityMES(MES):
         return states
 
     def __call__(self, inputs):
-        # inputs = states.clone()
         fid = inputs[..., -1]
         if self.regressor.language_model.is_fid_param is False:
             inputs = inputs[..., :-1]
@@ -401,7 +400,6 @@ class DeepKernelMultiFidelityMES(MES):
             else:
                 features = self.regressor.surrogate.get_features(inputs)
 
-        # inputs = features
         features = features.unsqueeze(-2)
         acq_values = self.acqf(features)
         return acq_values

@@ -14,9 +14,10 @@ from regressor.dkl import Tokenizer
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from utils.common import get_figure_plots
 
 
-@hydra.main(config_path="./config", config_name="mf_dkl")
+@hydra.main(config_path="./config", config_name="mf_hartmann")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -119,7 +120,6 @@ def main(config):
             oracle=oracle,
             device=config.device,
             float_precision=config.float_precision,
-            tokenizer=tokenizer,
             rescale=rescale,
         )
     # check if path exists
@@ -141,8 +141,8 @@ def main(config):
     cumulative_sampled_energies = torch.tensor([], device=env.device, dtype=env.float)
     for iter in range(1, config.al_n_rounds + 1):
         if config.multifidelity.proxy == True:
-        # Moved in AL iter because of inducing point bug:
-        # Different number of inducing points calculated by cholesky method in each iteration
+            # Moved in AL iter because of inducing point bug:
+            # Different number of inducing points calculated by cholesky method in each iteration
             regressor = hydra.utils.instantiate(
                 config.regressor,
                 config_env=config.env,
@@ -270,6 +270,9 @@ def main(config):
                     cumulative_sampled_energies,
                     picked_fidelity,
                     logger,
+                    title="Cumulative Sampled Dataset",
+                    key="cum_sampled_dataset",
+                    use_context=True,
                 )
 
             if hasattr(env, "get_cost"):
@@ -281,9 +284,9 @@ def main(config):
                     {"post_al_cum_cost": cumulative_cost}, use_context=False
                 )
             else:
-                cost_al_round = torch.ones(len(picked_states)) 
+                cost_al_round = torch.ones(len(picked_states))
                 if hasattr(oracle, "cost"):
-                   cost_al_round = cost_al_round * oracle.cost
+                    cost_al_round = cost_al_round * oracle.cost
                 avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
                 cumulative_cost += torch.sum(cost_al_round).detach().cpu().numpy()
                 logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
@@ -299,21 +302,10 @@ def main(config):
                     modes=modes,
                     dataset_states=data_handler.train_dataset["states"],
                 )
-
-            # df = pd.DataFrame(
-            #     {
-            #         "readable": [env.state2readable(s) for s in picked_states],
-            #         "energies": picked_energies.tolist(),
-            #     }
-            # )
-            # df = df.sort_values(by=["energies"])
-            # path = logger.logdir / Path("gfn_samples.csv")
-            # df.to_csv(path)
             if N_FID == 1 or config.multifidelity.proxy == True:
                 data_handler.update_dataset(
                     picked_states, picked_energies.tolist(), picked_fidelity
                 )
-            
 
         del gflownet
         del proxy
@@ -329,31 +321,6 @@ def set_seeds(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-
-
-def get_figure_plots(
-    env, cumulative_sampled_states, cumulative_sampled_energies, picked_fidelity, logger
-):
-    if (hasattr(env, "env") and hasattr(env.env, "plot_samples_frequency")) or (
-        hasattr(env, "env") == False and hasattr(env, "plot_samples_frequency")
-    ):
-        # TODO: send samples instead and do
-        # TODO: rename plot_samples to plot_states if we stick to current algo
-        fig = env.plot_samples_frequency(
-            cumulative_sampled_states,
-            title="Cumulative Sampled Dataset",
-            rescale=env.rescale,
-        )
-        logger.log_figure("cum_sampled_dataset", fig, use_context=True)
-    if (hasattr(env, "env") and hasattr(env.env, "plot_reward_distribution")) or (
-        hasattr(env, "env") == False and hasattr(env, "plot_reward_distribution")
-    ):
-        fig = env.plot_reward_distribution(
-            scores=cumulative_sampled_energies.tolist(),
-            fidelity=picked_fidelity,
-            title="Cumulative Sampled Dataset (over AL Interations)",
-        )
-        logger.log_figure("cum_sampled_dataset", fig, use_context=True)
 
 
 if __name__ == "__main__":
