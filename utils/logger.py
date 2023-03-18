@@ -92,4 +92,6 @@ class AL_Logger(Logger):
             plt.close()
 
     def define_metric(self, metric, step_metric=None):
+        if not self.do.online:
+            return
         wandb.define_metric(metric, step_metric=step_metric)

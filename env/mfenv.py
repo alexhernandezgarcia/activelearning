@@ -725,7 +725,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     )
             elif scores is not None:
                 idx_fid = [i for i in range(len(scores)) if fidelity[i] == fid]
-                if hasattr(self.env, "plot_reward_distribution") and idx_fid is not []:
+                if hasattr(self.env, "plot_reward_distribution") and len(idx_fid)!=0:
                     axs[fid] = self.env.plot_reward_distribution(
                         scores=scores[idx_fid],
                         ax=axs[fid],
@@ -754,6 +754,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_distance_from_D0(self, samples, dataset_obs):
         if hasattr(self.env, "get_distance_from_D0"):
+            dataset_obs = [sample[:-1] for sample in dataset_obs]
             return self.env.get_distance_from_D0(samples, dataset_obs)
         else:
             return torch.zeros(len(samples))

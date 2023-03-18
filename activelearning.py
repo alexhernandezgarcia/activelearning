@@ -302,16 +302,6 @@ def main(config):
                     modes=modes,
                     dataset_states=data_handler.train_dataset["states"],
                 )
-
-            # df = pd.DataFrame(
-            #     {
-            #         "readable": [env.state2readable(s) for s in picked_states],
-            #         "energies": picked_energies.tolist(),
-            #     }
-            # )
-            # df = df.sort_values(by=["energies"])
-            # path = logger.logdir / Path("gfn_samples.csv")
-            # df.to_csv(path)
             if N_FID == 1 or config.multifidelity.proxy == True:
                 data_handler.update_dataset(
                     picked_states, picked_energies.tolist(), picked_fidelity

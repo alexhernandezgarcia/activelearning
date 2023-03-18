@@ -367,12 +367,13 @@ class DataHandler:
             "energies": energies,
         }
         self.logger.save_dataset(readable_dataset, "sampled")
+        energies = torch.tensor(energies, dtype=self.float, device=self.device)
 
         get_figure_plots(
             self.env,
             states,
             energies,
-            fidelity,
+            fidelity.squeeze(-1).tolist() if fidelity is not None else None,
             logger=self.logger,
             title="Sampled Dataset",
             key="post_al_iter_sampled_dataset",
@@ -386,7 +387,6 @@ class DataHandler:
             )  # dtype=self.float,
         else:
             states = states.to(self.device)  # dtype=self.float
-        energies = torch.tensor(energies, dtype=self.float, device=self.device)
 
         if self.normalize_data:
             self.train_dataset["energies"] = self.denormalize(
