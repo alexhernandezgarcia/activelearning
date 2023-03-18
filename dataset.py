@@ -11,6 +11,7 @@ from gflownet.utils.common import set_device, set_float_precision
 from torch.nn.utils.rnn import pad_sequence
 from torchtyping import TensorType
 from typing import List
+from utils.common import get_figure_plots
 
 
 class Data(Dataset):
@@ -156,6 +157,7 @@ class DataHandler:
 
         if scores is not None:
             scores = torch.tensor(scores, dtype=self.float, device=self.device)
+            fidelities = states[:, -1]
         if self.n_fid > 1 and self.fidelity.do == True:
             # TODO: Use mfenv.get_uniform_terminating_states instead
             states, fidelities = self.generate_fidelities(states)
@@ -170,19 +172,22 @@ class DataHandler:
             states_oracle_input = states.clone()
             state_oracle = self.env.statetorch2oracle(states_oracle_input)
             scores = self.env.oracle(state_oracle)
+            fidelities = None
         elif self.n_fid > 1 and self.fidelity.do == False:
             print(
                 "Scores were not calculated and fidelity was not assigned. Directly taken from dataset"
             )
 
-        if hasattr(self.sfenv, "plot_samples_frequency"):
-            fig = self.sfenv.plot_samples_frequency(
-                states, title="Initial Dataset", rescale=self.rescale
-            )
-            self.logger.log_figure("inital_dataset", fig, use_context=True)
-        if hasattr(self.sfenv, "plot_reward_distribution"):
-            fig = self.sfenv.plot_reward_distribution(scores=scores, title="Dataset")
-            self.logger.log_figure("initial_dataset", fig, use_context=True)
+        get_figure_plots(
+            self.env,
+            states,
+            scores,
+            fidelities.tolist(),
+            logger=self.logger,
+            title="Initial Dataset",
+            key="inital_dataset",
+            use_context=True,
+        )
 
         if self.split == "random":
             # if (
@@ -236,8 +241,8 @@ class DataHandler:
         if len(test_states) > 0:
             # if hasattr(self.sfenv, "statetorch2readable"):
             readable_test_samples = [
-                    self.env.statetorch2readable(sample) for sample in test_states
-                ]
+                self.env.statetorch2readable(sample) for sample in test_states
+            ]
             readable_test_dataset = {
                 "samples": readable_test_samples,
                 "energies": test_scores.tolist(),
@@ -363,22 +368,16 @@ class DataHandler:
         }
         self.logger.save_dataset(readable_dataset, "sampled")
 
-        # for grid
-        if hasattr(self.sfenv, "plot_samples_frequency"):
-            fig = self.sfenv.plot_samples_frequency(
-                states, title="Sampled Dataset", rescale=self.rescale
-            )
-            self.logger.log_figure(
-                "post_al_iter_sampled_dataset", fig, use_context=True
-            )
-        # for AMP
-        if hasattr(self.sfenv, "plot_reward_distribution"):
-            fig = self.sfenv.plot_reward_distribution(
-                scores=energies, title="Post AL Iteration Sampled Dataset"
-            )
-            self.logger.log_figure(
-                "post_al_iter_sampled_dataset", fig, use_context=True
-            )
+        get_figure_plots(
+            self.env,
+            states,
+            energies,
+            fidelity,
+            logger=self.logger,
+            title="Sampled Dataset",
+            key="post_al_iter_sampled_dataset",
+            use_context=True,
+        )
 
         states = self.env.statebatch2proxy(states)
         if isinstance(states, TensorType) == False:

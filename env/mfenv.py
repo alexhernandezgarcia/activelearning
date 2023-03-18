@@ -689,18 +689,23 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     #     else:
     #         return None
 
-    def plot_samples_frequency(self, samples, **kwargs):
+    def plot_samples_frequency(self, samples, title=None, **kwargs):
         width = (self.n_fid) * 5
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
         for fid in range(0, self.n_fid):
-            samples_fid = [sample[:-1] for sample in samples if sample[-1] == fid]
+            if isinstance(samples, TensorType):
+                samples_fid = samples[:, :-1].tolist()
+            else:
+                samples_fid = [sample[:-1] for sample in samples if sample[-1] == fid]
             if hasattr(self.env, "plot_samples_frequency"):
                 axs[fid] = self.env.plot_samples_frequency(
                     samples_fid, axs[fid], "Fidelity {}".format(fid)
                 )
             else:
                 return None
-        fig.suptitle("Frequency of Coordinates Sampled")
+        if title is None:
+            title = "Frequency of Coordinates Sampled"
+        fig.suptitle(title)
         plt.tight_layout()
         plt.show()
         plt.close()
