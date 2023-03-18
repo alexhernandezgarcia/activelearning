@@ -1,4 +1,4 @@
 _target_: proxy.hartmann.MultiFidelityHartmann
 fid: 1
-cost: 250
+cost: 16
 maximize: True

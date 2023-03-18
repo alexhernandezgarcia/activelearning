@@ -5,9 +5,9 @@ model:
   _target_: model.shared_elements.mCNN
   tokenizer: null
   max_len: ${env.max_seq_length}
-  embed_dim: 128
-  latent_dim: 128
-  out_dim: 128
+  embed_dim: 8
+  latent_dim: 8
+  out_dim: 8
   kernel_size: 5
   p: 0.
   layernorm: True

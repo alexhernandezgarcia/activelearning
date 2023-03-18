@@ -3,14 +3,20 @@
 defaults:
   # - _self_
   - env: grid
-  - oracle@_oracle_dict.1: branin1 #branin1
-  - oracle@_oracle_dict.2: branin2
-  - oracle@_oracle_dict.3: branin3
+  - oracle@_oracle_dict.1: hartmann #branin1 #branin1
+  # - oracle@_oracle_dict.2: hartmann2 #branin2
+  # - oracle@_oracle_dict.3: hartmann3 #branin3
   - gflownet: random
   - user: nikita
   - logger: wandb
   - dataset: dataset
-  - regressor: mf_gp #mf_gp
+  - regressor: sf_svgp #mf_gp for branin, mf_svgp for hartmann
+
+# COMMENT FOR BRANIN
+regressor:
+  surrogate:
+    num_epochs: 2048
+    eval_period: 1
 
 logger:
   project_name: "RandomAgent" #Scratch RandomAgent
@@ -22,19 +28,21 @@ logger:
     times: False
     online: True
   plot:
-    period: 1 #1000
-    first_it: True
+    period: -1 #1000
+    # first_it: True
   tags:
-    - branin
-    - multi_fidelity
+    - hartmann
+    - single_fidelity
+    - var_gp
 
 env:
-  rescale: 10
+  n_dim: 6 #2
+  length: 1000
+  rescale: ${env.length} #10
   reward_func: power
-  proxy_state_format: state
-  length: 100
-  reward_beta: 8.0
-  reward_norm: 0.1
+  proxy_state_format: state_fidIdx
+  reward_beta: 1
+  reward_norm: 1e-3
   buffer:
     train:
       path: null
@@ -43,41 +51,44 @@ env:
       output_csv: null 
     test:
       path: null
-      type: all
-      output_pkl: buffer_data_test.csv
+      type: null
+      output_pkl: null  #buffer_data_test.csv
       n: null
       seed: null
       output_csv: null 
 
 dataset:
+  normalize_data: False
 # TODO can we get rid of "do"
   fidelity: 
     do: True #add dependance on N_FID
     mixed: True
-  n_samples: 30
-  split: all_train #random
+  n_samples: 256
+  split: random #random all_train
+  train_fraction: 0.7
   dataloader:
     train:
-      batch_size: null
+      batch_size: 64
     test:
-      batch_size: null
+      batch_size: 64
   path:
-    oracle_dataset: 
-      train: 
-        path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
-        get_scores: True
-      test: null
+    oracle_dataset: null
+      # train: 
+        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
+        # get_scores: True
+      # test: null
 
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
-n_samples: 30
+n_samples: 128
 # Random seeds
 seed: 0
 # Device
 device: cuda
 # Float precision
 float_precision: 32
-al_n_rounds: 30
+al_n_rounds: 45
+do_figure: False
 
 multifidelity:
   toy: True
