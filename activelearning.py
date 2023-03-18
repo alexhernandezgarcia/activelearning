@@ -17,7 +17,7 @@ import numpy as np
 from utils.common import get_figure_plots
 
 
-@hydra.main(config_path="./config", config_name="mf_dkl")
+@hydra.main(config_path="./config", config_name="mf_hartmann")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
