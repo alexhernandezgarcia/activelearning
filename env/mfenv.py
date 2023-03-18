@@ -725,7 +725,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     )
             elif scores is not None:
                 idx_fid = [i for i in range(len(scores)) if fidelity[i] == fid]
-                if hasattr(self.env, "plot_reward_distribution") and len(idx_fid)!=0:
+                if hasattr(self.env, "plot_reward_distribution") and len(idx_fid) != 0:
                     axs[fid] = self.env.plot_reward_distribution(
                         scores=scores[idx_fid],
                         ax=axs[fid],
