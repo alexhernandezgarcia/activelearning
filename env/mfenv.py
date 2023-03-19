@@ -8,7 +8,7 @@ import torch
 import matplotlib.pyplot as plt
 import itertools
 import copy
-from gflownet.envs.grid import Grid
+from .grid import Grid
 
 
 class MultiFidelityEnvWrapper(GFlowNetEnv):
