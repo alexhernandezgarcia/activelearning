@@ -1,8 +1,8 @@
 def get_figure_plots(
     env,
-    cumulative_sampled_states,
-    cumulative_sampled_energies,
-    picked_fidelity,
+    states,
+    energies,
+    fidelity,
     logger,
     title,
     key,
@@ -14,7 +14,7 @@ def get_figure_plots(
         # TODO: send samples instead and do
         # TODO: rename plot_samples to plot_states if we stick to current algo
         fig = env.plot_samples_frequency(
-            cumulative_sampled_states,
+            states,
             title=title,
             rescale=env.rescale,
         )
@@ -23,8 +23,8 @@ def get_figure_plots(
         hasattr(env, "env") == False and hasattr(env, "plot_reward_distribution")
     ):
         fig = env.plot_reward_distribution(
-            scores=cumulative_sampled_energies,
-            fidelity=picked_fidelity,
+            scores=energies,
+            fidelity=fidelity,
             title=title,
         )
         logger.log_figure(key, fig, use_context=use_context)

@@ -721,10 +721,21 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 samples_fid = [state[:-1] for state in states if state[-1] == fid]
                 if hasattr(self.env, "plot_reward_distribution"):
                     axs[fid] = self.env.plot_reward_distribution(
-                        states=samples_fid, ax=axs[fid], title="Fidelity {}".format(fid)
+                        states=samples_fid,
+                        ax=axs[fid],
+                        title="Fidelity {}".format(fid),
+                        oracle=self.oracle[fid],
                     )
             elif scores is not None:
-                idx_fid = [i for i in range(len(scores)) if fidelity[i] == fid]
+                title = kwargs.get("title", None)
+                if title == "Initial Dataset":
+                    idx_fid = [i for i in range(len(scores)) if int(fidelity[i]) == fid]
+                else:
+                    idx_fid = [
+                        i
+                        for i in range(len(scores))
+                        if fidelity[i] == self.oracle[fid].fid
+                    ]
                 if hasattr(self.env, "plot_reward_distribution") and len(idx_fid) != 0:
                     axs[fid] = self.env.plot_reward_distribution(
                         scores=scores[idx_fid],

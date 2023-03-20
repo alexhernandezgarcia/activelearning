@@ -165,6 +165,7 @@ class DataHandler:
             states = torch.cat([states, fidelities], dim=1)  # .long()
             states_oracle_input = states.clone()
             state_oracle, fid = self.env.statetorch2oracle(states_oracle_input)
+            fidelities = fidelities.squeeze(-1)
             if scores is None:
                 scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
         # TODO: add clause for when n_fid> 1 but fidelity.do=False

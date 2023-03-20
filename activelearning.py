@@ -29,6 +29,10 @@ def main(config):
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     # print(torch.cuda.device_count())
 
+    print(
+        "\n \tUser-Defined Warning: Oracles must be in increasing order of fidelity. \n Best oracle should be the last one in the config list."
+    )
+
     # Logger
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
@@ -95,7 +99,8 @@ def main(config):
             proxy_state_format=config.env.proxy_state_format,
             rescale=rescale,
         )
-        env.env.oracle = oracles[0]
+        # Best fidelity
+        env.env.oracle = oracles[-1]
     else:
         oracle = oracles[0]
         env.oracle = oracle
@@ -111,6 +116,14 @@ def main(config):
         modes = None
 
     maximize = None
+
+    if "budget" in config:
+        BUDGET = config.budget
+    else:
+        if N_FID == 1:
+            BUDGET = config.al_n_rounds * oracle.cost * config.n_samples
+        else:
+            BUDGET = oracles[-1].cost * config.al_n_rounds * config.n_samples
 
     if config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
@@ -139,7 +152,10 @@ def main(config):
     cumulative_sampled_states = []
     cumulative_sampled_samples = []
     cumulative_sampled_energies = torch.tensor([], device=env.device, dtype=env.float)
-    for iter in range(1, config.al_n_rounds + 1):
+    cumulative_sampled_fidelities = torch.tensor([], device=env.device, dtype=env.float)
+    iter = 1
+    while cumulative_cost < BUDGET:
+        # for iter in range(1, config.al_n_rounds + 1):
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
             # Different number of inducing points calculated by cholesky method in each iteration
@@ -262,18 +278,22 @@ def main(config):
             cumulative_sampled_energies = torch.cat(
                 (cumulative_sampled_energies, picked_energies)
             )
-
-            if config.do_figure:
-                get_figure_plots(
-                    env,
-                    cumulative_sampled_states,
-                    cumulative_sampled_energies,
-                    picked_fidelity,
-                    logger,
-                    title="Cumulative Sampled Dataset",
-                    key="cum_sampled_dataset",
-                    use_context=True,
+            if picked_fidelity is not None:
+                cumulative_sampled_fidelities = torch.cat(
+                    (cumulative_sampled_fidelities, picked_fidelity)
                 )
+
+            # if config.do_figure:
+            get_figure_plots(
+                env,
+                cumulative_sampled_states,
+                cumulative_sampled_energies,
+                cumulative_sampled_fidelities,
+                logger,
+                title="Cumulative Sampled Dataset",
+                key="cum_sampled_dataset",
+                use_context=True,
+            )
 
             if hasattr(env, "get_cost"):
                 cost_al_round = env.get_cost(picked_states, picked_fidelity)
@@ -310,6 +330,7 @@ def main(config):
         del gflownet
         del proxy
         del regressor
+        iter += 1
 
 
 def set_seeds(seed):

@@ -6,6 +6,7 @@ from .base import GFlowNetEnv
 from clamp_common_eval.defaults import get_default_data_splits
 from sklearn.model_selection import GroupKFold
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class AMP(GFlowNetEnv, GflowNetAMP):
@@ -57,6 +58,29 @@ class AMP(GFlowNetEnv, GflowNetAMP):
         if self.tokenizer is not None:
             states = self.tokenizer.transform(states)
         return states.to(self.device)
+
+    def plot_reward_distribution(self, states=None, scores=None, ax=None, title=None):
+        if ax is None:
+            fig, ax = plt.subplots()
+            standalone = True
+        else:
+            standalone = False
+        if title == None:
+            title = "Rewards of Sampled States"
+        if scores is None:
+            oracle_states = self.statetorch2oracle(states)
+            scores = self.oracle(oracle_states)
+        if isinstance(scores, TensorType):
+            scores = scores.cpu().detach().numpy()
+        ax.hist(scores)
+        ax.set_title(title)
+        ax.set_ylabel("Number of Samples")
+        ax.set_xlabel("Energy")
+        plt.show()
+        if standalone == True:
+            plt.tight_layout()
+            plt.close()
+        return ax
 
     def load_dataset(self, split="D1", nfold=5):
         # TODO: rename to make_dataset()?
