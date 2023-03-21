@@ -46,7 +46,7 @@ class Grid(GFlowNetEnv, GflowNetGrid):
         return state_torch.to(self.float).to(self.device)
 
     def plot_reward_distribution(
-        self, states=None, scores=None, ax=None, title=None, oracle=None
+        self, states=None, scores=None, ax=None, title=None, oracle=None, **kwargs
     ):
         if ax is None:
             fig, ax = plt.subplots()
