@@ -1,0 +1,3 @@
+_target_: gflownet.proxy.aptamers.Aptamers
+cost: 1
+maximize: False

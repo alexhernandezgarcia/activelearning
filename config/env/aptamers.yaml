@@ -1,18 +1,19 @@
 defaults:
   - base
 
-# _target_: gflownet.envs.amp.AMP
-_target_: env.amp.AMP 
+_target_: env.aptamers.Aptamers
 
-id: amp
+id: aptamers
+# func: nupack energy
 # Minimum and maximum length for the sequences
-min_seq_length: 1
-max_seq_length: 50
+min_seq_length: 30
+max_seq_length: 30
 # Number of letters in alphabet
-n_alphabet: 20
+n_alphabet: 4
 # Minimum and maximum number of steps in the action space
 min_word_len: 1
 max_word_len: 1
+corr_type: None
 reward_func: power
 reward_norm_std_mult: -1.0
 reward_beta: 3.0

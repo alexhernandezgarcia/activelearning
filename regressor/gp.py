@@ -168,19 +168,19 @@ class SingleTaskGPRegressor:
             state_pick_fid = torch.cat([states_pick, fidelities], dim=1)
             self._mode = state_pick_fid
 
-    # def evaluate_model(self, env, do_figure=True):
-    #     states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
-    #     y_mean, y_std = self.get_predictions(env, states)
-    #     rmse, nll = self.get_metrics(y_mean, y_std, env, states)
-    #     if hasattr(self, "_mode") == False:
-    #         self.get_modes(states, env)
-    #     mode_mean, mode_std = self.get_predictions(env, self._mode)
-    #     mode_rmse, mode_nll = self.get_metrics(mode_mean, mode_std, env, self._mode)
-    #     if do_figure:
-    #         figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
-    #     else:
-    #         figure = None
-    #     return figure, rmse, nll, mode_rmse, mode_nll
+    def evaluate_model(self, env, do_figure=True):
+        states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
+        y_mean, y_std = self.get_predictions(env, states)
+        rmse, nll = self.get_metrics(y_mean, y_std, env, states)
+        if hasattr(self, "_mode") == False:
+            self.get_modes(states, env)
+        mode_mean, mode_std = self.get_predictions(env, self._mode)
+        mode_rmse, mode_nll = self.get_metrics(mode_mean, mode_std, env, self._mode)
+        if do_figure:
+            figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
+        else:
+            figure = None
+        return figure, rmse, nll, mode_rmse, mode_nll
 
 
 class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):

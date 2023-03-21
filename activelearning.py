@@ -17,7 +17,7 @@ import numpy as np
 from utils.common import get_figure_plots
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="sf_aptamers")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -30,7 +30,7 @@ def main(config):
     # print(torch.cuda.device_count())
 
     print(
-        "\n \tUser-Defined Warning: Oracles must be in increasing order of fidelity. \n Best oracle should be the last one in the config list."
+        "\n \tUser-Defined Warning: Oracles must be in increasing order of fidelity. \n \t Best oracle should be the last one in the config list."
     )
 
     # Logger

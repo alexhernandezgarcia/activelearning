@@ -1,4 +1,4 @@
-from gflownet.envs.amp import AMP as GflowNetAMP
+from gflownet.envs.aptamers import Aptamers as GflowNetAptamers
 import torch
 from torchtyping import TensorType
 from typing import List, Tuple
@@ -7,9 +7,14 @@ from clamp_common_eval.defaults import get_default_data_splits
 from sklearn.model_selection import GroupKFold
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
-class AMP(GFlowNetEnv, GflowNetAMP):
+def split_str(s):
+    return [int(ch) for ch in s]
+
+
+class Aptamers(GFlowNetEnv, GflowNetAptamers):
     def __init__(self, **kwargs):
         super().__init__(
             **kwargs,
@@ -72,7 +77,7 @@ class AMP(GFlowNetEnv, GflowNetAMP):
         if title == None:
             title = "Rewards of Sampled States"
         if scores is None:
-            oracle_states = self.statetorch2oracle(states)
+            oracle_states = self.statebatch2oracle(states)
             scores = oracle(oracle_states)
         if isinstance(scores, TensorType):
             scores = scores.cpu().detach().numpy()
@@ -86,39 +91,12 @@ class AMP(GFlowNetEnv, GflowNetAMP):
             plt.close()
         return ax
 
-    def load_dataset(self, split="D1", nfold=5):
-        # TODO: rename to make_dataset()?
-        source = get_default_data_splits(setting="Target")
-        rng = np.random.RandomState()
-        # returns a dictionary with two keys 'AMP' and 'nonAMP' and values as lists
-        data = source.sample(split, -1)
-        if split == "D1":
-            groups = np.array(source.d1_pos.group)
-        if split == "D2":
-            groups = np.array(source.d2_pos.group)
-        if split == "D":
-            groups = np.concatenate(
-                (np.array(source.d1_pos.group), np.array(source.d2_pos.group))
-            )
-
-        n_pos, n_neg = len(data["AMP"]), len(data["nonAMP"])
-        pos_train, pos_test = next(
-            GroupKFold(nfold).split(np.arange(n_pos), groups=groups)
-        )
-        neg_train, neg_test = next(
-            GroupKFold(nfold).split(
-                np.arange(n_neg), groups=rng.randint(0, nfold, n_neg)
-            )
-        )
-
-        pos_train = [data["AMP"][i] for i in pos_train]
-        neg_train = [data["nonAMP"][i] for i in neg_train]
-        pos_test = [data["AMP"][i] for i in pos_test]
-        neg_test = [data["nonAMP"][i] for i in neg_test]
-        train = pos_train + neg_train
-        test = pos_test + neg_test
-
-        train = [sample for sample in train if len(sample) < self.max_seq_length]
-        test = [sample for sample in test if len(sample) < self.max_seq_length]
-
-        return train, test
+    def initialize_dataset(self, config):
+        train_df = pd.read_csv(config.train.path)
+        states = train_df["indices"].apply(split_str)
+        states = states.values.tolist()
+        states = torch.tensor(states)
+        # such that nucleotide count lies in 0 -3
+        states = states - 1
+        scores = train_df["energies"]
+        return states, scores
