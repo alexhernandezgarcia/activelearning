@@ -1,9 +1,15 @@
-_target_: model.transformer.Transformer
 # Incomplete. Need to add transofmer specific parameters like embedding_dim
+_target_: model.mlp.Transformer
 activation: 'relu'
+
+hidden_dim: 256
+num_layer: 2
+dropout_prob: 0.0
 num_output: 1
-embed_dim: 256
+num_head: 8
+pre_ln: True
+factor: 2
+activation: 'relu'
 mlp:
-  hidden_dim: 128
   num_layer: 2
   dropout_prob: 0.1

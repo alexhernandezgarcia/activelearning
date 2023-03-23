@@ -2,12 +2,13 @@ from gflownet.proxy.base import Proxy
 import torch
 import numpy as np
 
+
 class DropoutRegressor(Proxy):
     def __init__(self, regressor, num_dropout_samples, **kwargs) -> None:
         super().__init__(**kwargs)
         self.regressor = regressor
         self.num_dropout_samples = num_dropout_samples
-        if not self.regressor.load_model():
+        if hasattr(self.regressor, "load_model") and not self.regressor.load_model():
             raise FileNotFoundError
 
     def __call__(self, inputs):

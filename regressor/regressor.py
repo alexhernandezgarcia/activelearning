@@ -6,12 +6,15 @@ import os
 from torch.optim import Adam
 import hydra
 from tqdm import tqdm
+from utils.multifidelity_toy import plot_predictions
+from gflownet.utils.common import set_device, set_float_precision
 
 
 class DropoutRegressor:
     def __init__(
         self,
         device,
+        float_precision,
         checkpoint,
         eps,
         max_epochs,
@@ -37,7 +40,10 @@ class DropoutRegressor:
         self.config_model = config_model
         self.config_env = config_env
 
-        self.device = device
+        # Device
+        self.device = set_device(device)
+        # Float precision
+        self.float = set_float_precision(float_precision)
 
         # Training Parameters
         self.eps = eps
@@ -52,21 +58,28 @@ class DropoutRegressor:
 
         # Dataset
         self.dataset = dataset
+        self.n_fid = self.dataset.n_fid
 
         # Logger
         self.progress = self.logger.progress
         if checkpoint:
             self.logger.set_proxy_path(checkpoint)
 
-    def init_model(self):
+    def initialize_model(self):
         """
         Initialize the network (MLP, Transformer, RNN)
         """
-        self.model = hydra.utils.instantiate(
-            self.config_model,
-            config_env=self.config_env,
-            _recursive_=False,
-        ).to(self.device)
+        self.model = (
+            hydra.utils.instantiate(
+                self.config_model,
+                n_fid=self.n_fid,
+                config_env=self.config_env,
+                _recursive_=False,
+                device=self.device,
+            )
+            .to(self.device)
+            .to(self.float)
+        )
         self.optimizer = Adam(
             self.model.parameters(),
             lr=self.lr,
@@ -83,12 +96,13 @@ class DropoutRegressor:
         )
         path = self.logger.proxy_ckpt_path.parent / name
 
-        self.init_model()
+        self.initialize_model()
         if os.path.exists(path):
+            # make the following line cpu compatible
             checkpoint = torch.load(path, map_location="cuda:0")
             self.model.load_state_dict(checkpoint["model_state_dict"])
             self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-            self.model.to(self.device)
+            self.model.to(self.device).to(self.float)
             for state in self.optimizer.state.values():  # move optimizer to GPU
                 for k, v in state.items():
                     if isinstance(v, torch.Tensor):
@@ -103,7 +117,7 @@ class DropoutRegressor:
         Trains the model and saves it once convergence is attained.
         """
         # we reset the model, cf primacy bias, here we train on more and more data
-        self.init_model()
+        self.initialize_model()
 
         # for statistics we save the tr and te errors
         [self.err_train_hist, self.err_test_hist] = [[], []]
@@ -117,7 +131,6 @@ class DropoutRegressor:
         for epoch in pbar:
             self.test(test_loader)
 
-            # if model is the best so far
             self.logger.save_proxy(self.model, self.optimizer, final=False, epoch=epoch)
 
             self.train(train_loader)
@@ -151,8 +164,9 @@ class DropoutRegressor:
         err_train = []
         self.model.train(True)
         for x_batch, y_batch in tqdm(train_loader, disable=True):
-            output = self.model(x_batch.to(self.device))
-            loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
+            # Move self.device to class dataset instead
+            output = self.model(x_batch)
+            loss = F.mse_loss(output[:, 0], y_batch)
             if self.logger:
                 self.logger.log_metric("proxy_train_mse", loss.item())
             err_train.append(loss.data)
@@ -169,8 +183,8 @@ class DropoutRegressor:
         self.model.eval()
         with torch.no_grad():
             for x_batch, y_batch in tqdm(test_loader, disable=True):
-                output = self.model(x_batch.to(self.device))
-                loss = F.mse_loss(output[:, 0], y_batch.float().to(self.device))
+                output = self.model(x_batch)
+                loss = F.mse_loss(output[:, 0], y_batch)
                 if self.logger:
                     self.logger.log_metric("proxy_val_mse", loss.item())
                 err_test.append(loss.data)
@@ -209,7 +223,5 @@ class DropoutRegressor:
     def forward_with_uncertainty(self, x, num_dropout_samples=10):
         self.model.train()
         with torch.no_grad():
-            outputs = torch.hstack(
-                [self.model(x.to(self.device)) for _ in range(num_dropout_samples)]
-            )
+            outputs = torch.hstack([self.model(x) for _ in range(num_dropout_samples)])
         return outputs

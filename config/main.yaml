@@ -4,7 +4,8 @@ defaults:
   - gflownet: gflownet
   - proxy: dropout_regressor
   # TODO: change to grid once continuous is merged
-  - oracle: grid_corners
+  - oracle@_oracle_dict.1: grid_corners
+  - oracle@_oracle_dict.2: grid_corners
   - dataset: dataset
   - regressor: dropout_regressor
   - model: mlp

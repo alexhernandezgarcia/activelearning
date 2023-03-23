@@ -1,0 +1,4 @@
+_target_: proxy.branin.MultiFidelityBranin
+fid: 1
+cost: 1
+maximize: False
