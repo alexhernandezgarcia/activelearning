@@ -52,14 +52,20 @@ class MLP(nn.Module):
 
 
 class AptamersMLP(Proxy):
-    def __init__(self, **kwargs):
+    def __init__(self, cost, **kwargs):
         super().__init__(**kwargs)
         NUM_TOKEN = 4
-        SEQ_LEN = 30
-        IN_DIM = SEQ_LEN * NUM_TOKEN
+        self.max_seq_length = 30
+        self.cost = cost
+        IN_DIM = self.max_seq_length * NUM_TOKEN
         NUM_OUTPUT = 1
         HIDDEN_FC = [1024, 1024, 1024, 1024, 1024]
         DROPOUT = 0.0
+        # Came from the dataset creation in ActiveLearningPipeline
+        # https://github.com/alexhernandezgarcia/ActiveLearningPipeline/blob/main/oracle.py#L376
+        # as the indices were used to train the MLP
+        # Amd the indices were assigned in the numbers2letters() function linked above
+        self.lookup = {"A": 1, "T": 2, "C": 3, "G": 4}
 
         self.model = MLP(
             IN_DIM,
@@ -68,15 +74,21 @@ class AptamersMLP(Proxy):
             DROPOUT,
             device=self.device,
             transformerCall=False,
-            NUM_TOKEN=4,
-            seq_len=SEQ_LEN,
+            num_token=NUM_TOKEN,
+            seq_len=self.max_seq_length,
         )
+        # self.model.load_state_dict(
+        # "/home/mila/n/nikita.saxena/activelearning/storage/dna/length30/mlp_100k.pt"
+        # )
         self.model.load_state_dict(
-            "/home/mila/n/nikita.saxena/activelearning/storage/model_dna/length30/best_model.pt"
+            torch.load(
+                "/home/mila/n/nikita.saxena/activelearning/storage/dna/length30/mlp100k_correct.pt"
+            )
         )
         self.model.eval()
+        self.model.to(self.device)
 
-    def __call__(self, x):
+    def __call__(self, sequences):
         """
         Args:
             x: torch.Tensor of shape (batch_size, input_dim)
@@ -84,4 +96,12 @@ class AptamersMLP(Proxy):
             torch.Tensor of shape (batch_size, output_dim)
         Transformation (one-hot etc) done within model
         """
-        return self.model(x)
+        encoded_readable = [
+            torch.tensor([self.lookup[el] for el in seq]) for seq in sequences
+        ]
+        states = torch.nn.utils.rnn.pad_sequence(
+            encoded_readable, batch_first=True, padding_value=0.0
+        )
+        states = states.to(self.device)
+        result = self.model(states)
+        return result.squeeze(-1)

@@ -10,6 +10,12 @@ from botorch.test_functions.synthetic import Branin as BotorchBranin
 
 class Branin(Proxy):
     def __init__(self, **kwargs):
+        """
+        Modes compatible with 100x100 grid"""
+        self.modes = [
+            [31.47, 22.75],
+            [94.24, 24.75],
+        ]
         super().__init__(**kwargs)
 
     def plot_true_rewards(self, env, ax, rescale):
@@ -69,7 +75,8 @@ class MultiFidelityBranin(Branin):
 
 
 class SingleFidelityBranin(Branin):
-    def __init__(self, **kwargs):
+    def __init__(self, cost, **kwargs):
+        self.cost = cost
         super().__init__(**kwargs)
         # minimisation problem so negate = False
         self.task = BotorchBranin(negate=False)

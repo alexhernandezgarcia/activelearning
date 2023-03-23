@@ -1,4 +1,4 @@
 defaults:
   - base
-_target_: proxy.mes.GaussianProcessSingleFidelityMES
+_target_: proxy.mes.DeepKernelSingleFidelityMES
 maximize: True

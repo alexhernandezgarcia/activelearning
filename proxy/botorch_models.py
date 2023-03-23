@@ -176,7 +176,7 @@ class MultifidelityOracleModel(Model):
         covar_mm = torch.FloatTensor(
             [
                 [self.oracle[0].sigma ** 2, (0.015) ** 2, (5e-3) ** 2],
-                [(0.015**2), self.oracle[1].sigma ** 2, (4e-3) ** 2],
+                [(0.015 ** 2), self.oracle[1].sigma ** 2, (4e-3) ** 2],
                 [(5e-3) ** 2, (4e-3) ** 2, self.oracle[2].sigma ** 2],
             ]
         )

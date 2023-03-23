@@ -20,6 +20,7 @@ from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 from gpytorch.functions import inv_quad
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from regressor.regressor import DropoutRegressor as SurrogateDropoutRegressor
+from regressor.gp import SingleFidelitySingleTaskRegressor
 
 CLAMP_LB = 1.0e-8
 from botorch.models.utils import check_no_nans
@@ -39,6 +40,9 @@ class SingleFidelityMES(Proxy):
         if isinstance(self.regressor, SurrogateDropoutRegressor):
             # TODO: Check if model weights are loaded.
             model = ProxyBotorchMES(self.regressor, self.num_dropout_samples)
+        elif isinstance(self.regressor, SingleFidelitySingleTaskRegressor):
+            model = self.regressor.model
+            model.eval()
         else:
             model = self.regressor.surrogate
             model.eval()
@@ -61,10 +65,13 @@ class SingleFidelityMES(Proxy):
         state_proxy = self.env.statebatch2proxy(state)
         if isinstance(self.regressor, DeepKernelRegressor) == True:
             features = self.regressor.surrogate.get_features(state_proxy)
+        else:
+            # In the case of a GP, proxy input is the candidate_set
+            features = state_proxy
         return features
 
 
-class GaussianProcessSingleFidelityMES(SingleFidelityMES):
+class DeepKernelSingleFidelityMES(SingleFidelityMES):
     """
     Specifically for Deep Kernel Methods right now
     """
@@ -78,6 +85,20 @@ class GaussianProcessSingleFidelityMES(SingleFidelityMES):
         features = features.unsqueeze(-2)
         mes = self.acqf(features)
         return mes
+
+
+class GaussianProcessSingleFidelityMES(SingleFidelityMES):
+    """
+    Specifically for Deep Kernel Methods right now
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __call__(self, inputs):
+        inputs = inputs.unsqueeze(-2)
+        acq_values = self.acqf(inputs)
+        return acq_values
 
 
 class NeuralNetworkSingleFidelityMES(SingleFidelityMES):
@@ -295,7 +316,7 @@ class OracleMultiFidelityMES(MES):
         states = torch.tensor(
             self.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
-        n_states = self.env.env.length**2
+        n_states = self.env.env.length ** 2
         states_input_proxy = states.clone()
         states_proxy = self.env.statetorch2proxy(states_input_proxy)
         # states_proxy = torch.cat((states_proxy[0], states_proxy[1].unsqueeze(-1)), dim=1)
@@ -449,7 +470,7 @@ class GaussianProcessMultiFidelityMES(MES):
         states = torch.tensor(
             self.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
-        n_states = self.env.env.length**2
+        n_states = self.env.env.length ** 2
         states_input_proxy = states.clone()
         states_proxy = self.env.statetorch2proxy(states_input_proxy)
         scores = self(states_proxy).detach().cpu().numpy()
@@ -496,7 +517,7 @@ class GaussianProcessMultiFidelityMES(MES):
 
 class VariationalGPMultiFidelityMES(MES):
     """
-    For stachastic GPs
+    For stochastic GPs
     Project function differes from above
     """
 

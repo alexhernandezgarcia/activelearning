@@ -44,6 +44,7 @@ class DataHandler:
         split,
         device,
         float_precision,
+        is_mes,
         n_samples=None,
         fidelity=None,
         rescale=None,
@@ -58,7 +59,9 @@ class DataHandler:
         self.logger = logger
         self.fidelity = fidelity
         self.progress = self.logger.progress
-        self.oracle = oracle
+        self.target_factor = 1.0
+        if oracle.maximize is False and is_mes is True:
+            self.target_factor = -1.0
         self.logger.set_data_path(self.path.dataset)
         self.device = device
         if hasattr(env, "n_fid"):
@@ -104,7 +107,18 @@ class DataHandler:
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalized data is saved as npy
         """
         if hasattr(self.env, "initialize_dataset"):
-            states, scores = self.env.initialize_dataset(self.path.oracle_dataset)
+            if self.path.type == "sf":
+                states, scores = self.sfenv.initialize_dataset(
+                    self.path, self.n_samples
+                )
+            elif hasattr(self.sfenv, "initialize_dataset"):
+                states, scores = self.env.initialize_dataset(self.path, self.n_samples)
+
+            if self.n_fid > 1:
+                fidelities = states[:, -1].tolist()
+            else:
+                fidelities = None
+        """
         else:
             if self.path.oracle_dataset:
                 # when one dataset without fidelity is given
@@ -139,6 +153,14 @@ class DataHandler:
                     states = [
                         torch.tensor(self.env.readable2state(sample))
                         for sample in states
+                    ]
+                    train_states = [
+                        torch.tensor(self.env.readable2state(sample))
+                        for sample in train_states
+                    ]
+                    test_states = [
+                        torch.tensor(self.env.readable2state(sample))
+                        for sample in test_states
                     ]
                 states = torch.stack(states)
             else:
@@ -183,11 +205,12 @@ class DataHandler:
             state_oracle = self.env.statetorch2oracle(states_oracle_input)
             scores = self.env.oracle(state_oracle)
             fidelities = None
-        elif self.n_fid > 1 and self.fidelity.do == False:
+        elif self.n_fid > 1 and self.path.type == "mf": 
+        # self.fidelity.do == False:
             print(
                 "Scores were not calculated and fidelity was not assigned. Directly taken from dataset"
             )
-
+"""
         get_figure_plots(
             self.env,
             states,
@@ -198,6 +221,8 @@ class DataHandler:
             key="inital_dataset",
             use_context=True,
         )
+
+        scores = scores * self.target_factor
 
         if self.split == "random":
             # if (
@@ -221,6 +246,15 @@ class DataHandler:
             train_scores = scores.to(self.device)
             test_states = torch.Tensor([])
             test_scores = torch.Tensor([])
+        elif self.split == "given":
+            assert train_states is not None
+            train_states = torch.vstack(train_states)
+            assert test_states is not None
+            test_states = torch.vstack(test_states)
+            assert train_scores is not None
+            train_scores = torch.tensor(train_scores)
+            assert test_scores is not None
+            test_scores = torch.tensor(test_scores)
         else:
             raise ValueError("Split type not implemented")
         # if hasattr(self.sfenv, "statetorch2readable"):

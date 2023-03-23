@@ -17,7 +17,7 @@ import numpy as np
 from utils.common import get_figure_plots
 
 
-@hydra.main(config_path="./config", config_name="sf_aptamers")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -125,6 +125,11 @@ def main(config):
         else:
             BUDGET = oracles[-1].cost * config.al_n_rounds * config.n_samples
 
+    if "mes" in config.proxy._target_.lower():
+        is_mes = True
+    else:
+        is_mes = False
+
     if config.multifidelity.proxy == True:
         data_handler = hydra.utils.instantiate(
             config.dataset,
@@ -134,6 +139,7 @@ def main(config):
             device=config.device,
             float_precision=config.float_precision,
             rescale=rescale,
+            is_mes=is_mes,
         )
     # check if path exists
     elif config.multifidelity.proxy == False:
@@ -249,13 +255,13 @@ def main(config):
             if proxy is not None:
                 maximize = proxy.maximize
             if maximize is None:
-                if hasattr(regressor, "target_factor"):
-                    if regressor.target_factor == -1:
-                        maximize = not oracle.maximize
-                    else:
-                        maximize = oracle.maximize
+                # if hasattr(regressor, "target_factor"):
+                if data_handler.target_factor == -1:
+                    maximize = not oracle.maximize
                 else:
                     maximize = oracle.maximize
+                # else:
+                # maximize = oracle.maximize
             idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
             picked_states = [states[i] for i in idx_pick]
 

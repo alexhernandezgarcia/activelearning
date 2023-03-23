@@ -91,12 +91,13 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
             plt.close()
         return ax
 
-    def initialize_dataset(self, config):
-        train_df = pd.read_csv(config.train.path)
+    def initialize_dataset(self, config, n_samples, **kwargs):
+        train_df = pd.read_csv(config.oracle_dataset.train.path)
         states = train_df["indices"].apply(split_str)
         states = states.values.tolist()
         states = torch.tensor(states)
         # such that nucleotide count lies in 0 -3
         states = states - 1
-        scores = train_df["energies"]
+        scores = train_df["energies"].values.tolist()
+        scores = torch.tensor(scores)
         return states, scores

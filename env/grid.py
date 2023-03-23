@@ -4,6 +4,9 @@ from torchtyping import TensorType
 from typing import List, Tuple
 from .base import GFlowNetEnv
 import matplotlib.pyplot as plt
+import numpy as np
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import pandas as pd
 
 
 class Grid(GFlowNetEnv, GflowNetGrid):
@@ -58,6 +61,8 @@ class Grid(GFlowNetEnv, GflowNetGrid):
         if oracle is None:
             oracle = self.oracle
         if scores is None:
+            if isinstance(states, torch.Tensor) == False:
+                states = torch.tensor(states, device=self.device, dtype=self.float)
             oracle_states = self.statetorch2oracle(states)
             scores = oracle(oracle_states)
         if isinstance(scores, TensorType):
@@ -114,3 +119,37 @@ class Grid(GFlowNetEnv, GflowNetGrid):
             plt.tight_layout()
             plt.close()
         return ax
+
+    def initialize_dataset(self, config, n_samples, **kwargs):
+        train_scores = []
+        test_scores = []
+        train_samples = []
+        test_samples = []
+
+        if config.oracle_dataset is not None:
+            if config.oracle_dataset.train is not None:
+                train = pd.read_csv(config.oracle_dataset.train.path)
+                train_samples = train["samples"].values.tolist()
+                if config.oracle_dataset.train.get_scores == False:
+                    train_scores = train["scores"].values.tolist()
+
+            if config.oracle_dataset.test is not None:
+                test = pd.read_csv(config.oracle_dataset.test.path)
+                test_samples = test["samples"].values.tolist()
+                if config.oracle_dataset.test.get_scores == False:
+                    test_scores = test["energies"].values.tolist()
+
+        if train_samples == [] and test_samples == []:
+            states = torch.tensor(
+                self.get_uniform_terminating_states(n_samples), dtype=self.float
+            )
+        else:
+            samples = train_samples + test_samples
+            states = [torch.tensor(self.readable2state(sample)) for sample in samples]
+            states = torch.stack(states)
+        scores = train_scores + test_scores
+        if scores == []:
+            states_oracle_input = states.clone()
+            state_oracle = self.statetorch2oracle(states_oracle_input)
+            scores = self.oracle(state_oracle)
+        return states, scores

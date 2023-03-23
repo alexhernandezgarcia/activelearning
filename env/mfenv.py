@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import itertools
 import copy
 from .grid import Grid
+import pandas as pd
 
 
 class MultiFidelityEnvWrapper(GFlowNetEnv):
@@ -694,17 +695,19 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
         for fid in range(0, self.n_fid):
             if isinstance(samples, TensorType):
-                samples_fid = samples[:, :-1].tolist()
-            else:
-                samples_fid = [sample[:-1] for sample in samples if sample[-1] == fid]
+                samples = samples.tolist()
+                # samples_fid = samples[:, ]
+            # else:
+            samples_fid = [sample[:-1] for sample in samples if sample[-1] == fid]
             if hasattr(self.env, "plot_samples_frequency"):
                 axs[fid] = self.env.plot_samples_frequency(
                     samples_fid, axs[fid], "Fidelity {}".format(fid)
                 )
             else:
                 return None
-        if title is None:
-            title = "Frequency of Coordinates Sampled"
+        # if title is None:
+        # title = "Frequency of Coordinates Sampled"
+        fig.suptitle(kwargs.get("title", "Frequency of Coordinates Sampled"))
         fig.suptitle(title)
         plt.tight_layout()
         plt.show()
@@ -728,7 +731,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     )
             elif scores is not None:
                 title = kwargs.get("title", None)
-                if title == "Initial Dataset":
+                if "Initial Dataset" in title:
                     idx_fid = [i for i in range(len(scores)) if int(fidelity[i]) == fid]
                 else:
                     idx_fid = [
@@ -744,7 +747,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     )
             else:
                 return None
-        fig.suptitle("Rewards of Sequences Sampled")
+        fig.suptitle(kwargs.get("title", "Reward Distribution"))
         plt.tight_layout()
         plt.show()
         plt.close()
@@ -753,8 +756,13 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def get_cost(self, samples, fidelities=None):
         if fidelities is None:
             fidelities = [sample[-1] for sample in samples]
-        fidelity_of__oracle = [self.oracle[int(fid)].fid for fid in fidelities]
-        costs = [self.fidelity_costs[fid] for fid in fidelity_of__oracle]
+            fidelity_of_oracle = [self.oracle[int(fid)].fid for fid in fidelities]
+            fidelities = fidelity_of_oracle
+        if isinstance(fidelities, TensorType):
+            if fidelities.ndim == 2:
+                fidelities = fidelities.squeeze(-1)
+            fidelities = fidelities.tolist()
+        costs = [self.fidelity_costs[fid] for fid in fidelities]
         return costs
 
     def get_pairwise_distance(self, samples_set1, samples_set2=None):
@@ -769,6 +777,52 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             return self.env.get_distance_from_D0(samples, dataset_obs)
         else:
             return torch.zeros(len(samples))
+
+    def generate_fidelities(self, n_samples, config):
+        if config.fid_type == "random":
+            fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1)).to(
+                self.float
+            )
+        else:
+            raise NotImplementedError
+        return fidelities
+
+    def initialize_dataset(self, config, n_samples):
+        train_scores = []
+        test_scores = []
+        train_samples = []
+        test_samples = []
+
+        if config.oracle_dataset is not None:
+            # Train Path Given
+            if config.train is not None:
+                train = pd.read_csv(config.oracle_dataset.train.path)
+                train_samples = train["samples"].values.tolist()
+                if config.train.get_scores == False:
+                    train_scores = train["scores"].values.tolist()
+            # Test Path Given
+            if config.test is not None:
+                test = pd.read_csv(config.oracle_dataset.test.path)
+                test_samples = test["samples"].values.tolist()
+                if config.test.get_scores == False:
+                    test_scores = test["energies"].values.tolist()
+
+        # If neither were given, generate dataset
+        if train_samples == [] and test_samples == []:
+            # Make it generalised to generate states for any environment not just grid
+            states = self.get_uniform_terminating_states(n_samples)
+            states = torch.tensor(states, dtype=self.float)
+        else:
+            samples = train_samples + test_samples
+            states = [torch.tensor(self.readable2state(sample)) for sample in samples]
+            states = torch.stack(states)
+
+        scores = train_scores + test_scores
+        if scores == []:
+            states_oracle_input = states.clone()
+            state_oracle, fid = self.statetorch2oracle(states_oracle_input)
+            scores = self.call_oracle_per_fidelity(state_oracle, fid)
+        return states, scores
 
     # def get_trajectories(
     #     self, traj_list, traj_actions_list, current_traj, current_actions

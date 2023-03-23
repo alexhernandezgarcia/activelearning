@@ -7,6 +7,7 @@ from clamp_common_eval.defaults import get_default_data_splits
 from sklearn.model_selection import GroupKFold
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 class AMP(GFlowNetEnv, GflowNetAMP):
@@ -85,6 +86,15 @@ class AMP(GFlowNetEnv, GflowNetAMP):
             plt.tight_layout()
             plt.close()
         return ax
+
+    # def initialize_dataset(self, config):
+    #     train_df = pd.read_csv(config.train.path)
+    #     train_states = train_df["samples"]
+    #     train_states = train_states.values.tolist()
+    #     train_states = torch.tensor(states)
+    #     # such that nucleotide count lies in 0 -3
+    #     scores = train_df["energies"]
+    #     return states, scores
 
     def load_dataset(self, split="D1", nfold=5):
         # TODO: rename to make_dataset()?

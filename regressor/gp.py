@@ -34,10 +34,11 @@ class SingleTaskGPRegressor:
 
         # Logger
         self.progress = self.logger.progress
-        if maximize == False:
-            self.target_factor = -1
-        else:
-            self.target_factor = 1
+        self.target_factor = self.dataset.target_factor
+        # if maximize == False:
+        # self.target_factor = -1
+        # else:
+        # self.target_factor = 1
 
     @abstractmethod
     def init_model(self, train_x, train_y):
@@ -50,7 +51,7 @@ class SingleTaskGPRegressor:
         train = self.dataset.train_dataset
         train_x = train["states"]
         train_y = train["energies"].unsqueeze(-1)
-        train_y = train_y * self.target_factor
+        # train_y = train_y * self.target_factor
 
         self.init_model(train_x, train_y)
         with debug(state=True):
