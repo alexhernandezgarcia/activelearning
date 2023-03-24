@@ -51,8 +51,6 @@ class SingleTaskGPRegressor:
         train = self.dataset.train_dataset
         train_x = train["states"]
         train_y = train["energies"].unsqueeze(-1)
-        # train_y = train_y * self.target_factor
-
         self.init_model(train_x, train_y)
         with debug(state=True):
             self.mll = fit_gpytorch_mll(self.mll)

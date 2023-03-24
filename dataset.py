@@ -218,7 +218,7 @@ class DataHandler:
             fidelities,
             logger=self.logger,
             title="Initial Dataset",
-            key="inital_dataset",
+            key="initial_dataset",
             use_context=True,
         )
 
@@ -412,7 +412,7 @@ class DataHandler:
         }
         self.logger.save_dataset(readable_dataset, "sampled")
         energies = torch.tensor(energies, dtype=self.float, device=self.device)
-
+        # fidelity = [state[-1] for state in states]
         get_figure_plots(
             self.env,
             states,
@@ -425,6 +425,7 @@ class DataHandler:
         )
 
         states = self.env.statebatch2proxy(states)
+        energies = energies * self.target_factor
         if isinstance(states, TensorType) == False:
             states = torch.tensor(
                 np.array(states), device=self.device

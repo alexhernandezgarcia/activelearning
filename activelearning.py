@@ -255,13 +255,10 @@ def main(config):
             if proxy is not None:
                 maximize = proxy.maximize
             if maximize is None:
-                # if hasattr(regressor, "target_factor"):
                 if data_handler.target_factor == -1:
                     maximize = not oracle.maximize
                 else:
                     maximize = oracle.maximize
-                # else:
-                # maximize = oracle.maximize
             idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
             picked_states = [states[i] for i in idx_pick]
 
@@ -289,7 +286,6 @@ def main(config):
                     (cumulative_sampled_fidelities, picked_fidelity)
                 )
 
-            # if config.do_figure:
             get_figure_plots(
                 env,
                 cumulative_sampled_states,

@@ -795,16 +795,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
         if config.oracle_dataset is not None:
             # Train Path Given
-            if config.train is not None:
+            if config.oracle_dataset.train is not None:
                 train = pd.read_csv(config.oracle_dataset.train.path)
                 train_samples = train["samples"].values.tolist()
-                if config.train.get_scores == False:
+                if config.oracle_dataset.train.get_scores == False:
                     train_scores = train["scores"].values.tolist()
             # Test Path Given
-            if config.test is not None:
+            if config.oracle_dataset.test is not None:
                 test = pd.read_csv(config.oracle_dataset.test.path)
                 test_samples = test["samples"].values.tolist()
-                if config.test.get_scores == False:
+                if config.oracle_dataset.test.get_scores == False:
                     test_scores = test["energies"].values.tolist()
 
         # If neither were given, generate dataset

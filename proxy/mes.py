@@ -94,11 +94,59 @@ class GaussianProcessSingleFidelityMES(SingleFidelityMES):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        fig = self.plot_acquisition_rewards()
+        if fig is not None:
+            self.logger.log_figure("acquisition_rewards", fig, use_context=True)
 
     def __call__(self, inputs):
         inputs = inputs.unsqueeze(-2)
         acq_values = self.acqf(inputs)
         return acq_values
+
+    def plot_acquisition_rewards(self, **kwargs):
+        if self.env.n_dim != 2:
+            return None
+        if hasattr(self.env, "get_all_terminating_states") == False:
+            return None
+        states = torch.tensor(
+            self.env.get_all_terminating_states(), dtype=self.float
+        ).to(self.device)
+        states_input_proxy = states.clone()
+        states_proxy = self.env.statetorch2proxy(states_input_proxy)
+        scores = self(states_proxy).detach().cpu().numpy()
+        width = 5
+        fig, axs = plt.subplots(1, 1, figsize=(width, 5))
+        if self.env.rescale != 1:
+            step = int(self.env.length / self.env.rescale)
+        else:
+            step = 1
+        index = states.long().detach().cpu().numpy()
+        grid_scores = np.zeros((self.env.length, self.env.length))
+        grid_scores[index[:, 0], index[:, 1]] = scores
+        axs.set_xticks(
+            np.arange(
+                start=0,
+                stop=self.env.length,
+                step=step,
+            )
+        )
+        axs.set_yticks(
+            np.arange(
+                start=0,
+                stop=self.env.length,
+                step=step,
+            )
+        )
+        axs.imshow(grid_scores)
+        axs.set_title("GP-UCB Reward")
+        im = axs.imshow(grid_scores)
+        divider = make_axes_locatable(axs)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig
 
 
 class NeuralNetworkSingleFidelityMES(SingleFidelityMES):
