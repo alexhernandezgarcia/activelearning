@@ -144,8 +144,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def statetorch2state_longFid(self, states: TensorType["batch", "state_dim"]):
         state = states[:, :-1]
-        state = self.env.statetorch2state(state)
         fid = states[:, -1].unsqueeze(-1)
+        state = self.env.statetorch2state(state)
         states = torch.cat([state, fid], dim=-1)
         return states
 
@@ -165,10 +165,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         #     torch.unique(fidelities).sort()[0], torch.arange(self.n_fid).to(fidelities.device).sort()[0]
         # ).all()
         # TODO: Assertion breaks when all fidelities aren't sampled by the gflownet
+        updated_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
-            fidelities[idx_fid] = self.oracle[fid].fid
-        states = torch.cat([states, fidelities], dim=-1)
+            updated_fidelities[idx_fid] = self.oracle[fid].fid
+        states = torch.cat([states, updated_fidelities], dim=-1)
         return states
 
     def statetorch2state(self, states):
@@ -185,10 +186,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         #     torch.unique(fidelities).sort()[0], torch.arange(self.n_fid).to(fidelities.device).sort()[0]
         # ).all()
         # TODO: Assertion breaks when all fidelities aren't sampled by the gflownet
+        updated_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
-            fidelities[idx_fid] = self.oracle[fid].fid
-        states = torch.cat([states, fidelities.unsqueeze(-1)], dim=-1)
+            updated_fidelities[idx_fid] = self.oracle[fid].fid
+        states = torch.cat([states, updated_fidelities.unsqueeze(-1)], dim=-1)
         return states
 
     def state_from_statefid(self, states):

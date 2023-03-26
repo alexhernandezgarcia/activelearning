@@ -73,7 +73,7 @@ class SingleFidelityMES(Proxy):
 
 class DeepKernelSingleFidelityMES(SingleFidelityMES):
     """
-    Specifically for Deep Kernel Methods right now
+    Specifically for Deep Kernel Methods right now and SVGP
     """
 
     def __init__(self, **kwargs):
@@ -124,7 +124,7 @@ class DeepKernelSingleFidelityMES(SingleFidelityMES):
             )
         )
         axs.imshow(grid_scores)
-        axs.set_title("GP-MES Reward")
+        axs.set_title("DKL SF MES Reward")
         im = axs.imshow(grid_scores)
         divider = make_axes_locatable(axs)
         cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -186,7 +186,7 @@ class GaussianProcessSingleFidelityMES(SingleFidelityMES):
             )
         )
         axs.imshow(grid_scores)
-        axs.set_title("GP-MES Reward")
+        axs.set_title("GP SF MES Reward")
         im = axs.imshow(grid_scores)
         divider = make_axes_locatable(axs)
         cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -487,6 +487,9 @@ class DeepKernelMultiFidelityMES(MES):
         return candidate_features
 
     def project(self, states):
+        """
+        Input is the candidate features only
+        """
         input_dim = states.ndim
         # print(
         #     "User Defined Warning: In MES-project, fidelity is being replace by the INDEX (not oracle.fid) of the maximum fidelity."
@@ -567,7 +570,7 @@ class DeepKernelMultiFidelityMES(MES):
             )
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
-                "GP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+                "DKL-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
             )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])
@@ -604,6 +607,7 @@ class GaussianProcessMultiFidelityMES(MES):
         input_dim = states.ndim
         states = states.to(self.device)
         max_fid = torch.ones((states.shape[0], 1), device=self.device).long() * (
+            # self.n_fid - 1
             self.env.oracle[self.n_fid - 1].fid
         )
         if input_dim == 3:
@@ -714,6 +718,8 @@ class VariationalGPMultiFidelityMES(MES):
         return states
 
     def plot_acquisition_rewards(self, **kwargs):
+        if hasattr(self.env, "n_dim") == False:
+            return None
         if self.env.n_dim > 2:
             return None
         if hasattr(self.env, "get_all_terminating_states") == False:
@@ -754,7 +760,7 @@ class VariationalGPMultiFidelityMES(MES):
             )
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
-                "GP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+                "SVGP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
             )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])

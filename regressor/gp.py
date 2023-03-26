@@ -176,10 +176,12 @@ class SingleTaskGPRegressor:
         mode_mean, mode_std = self.get_predictions(env, self._mode)
         mode_rmse, mode_nll = self.get_metrics(mode_mean, mode_std, env, self._mode)
         if do_figure:
-            figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
+            figure1 = self.plot_predictions(states, y_mean, env.length, env.rescale)
+            figure2 = self.plot_predictions(states, y_std, env.length, env.rescale)
+            fig = [figure1, figure2]
         else:
             figure = None
-        return figure, rmse, nll, mode_rmse, mode_nll
+        return fig, rmse, nll, mode_rmse, mode_nll
 
 
 class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):

@@ -465,19 +465,23 @@ class DeepKernelRegressor:
 
     def get_predictions(self, env, states):
         self.surrogate.eval()
+        self.surrogate.clear_cache()
+        self.surrogate.requires_grad_(False)
         states = torch.tensor(states, device=self.device, dtype=self.float)
         states_proxy_input = states.clone()
         states_proxy = env.statetorch2proxy(states_proxy_input)
         y_mean, y_std, f_std = [], [], []
         with torch.no_grad():
-            features = self.surrogate.get_features(
-                states_proxy.to(self.device), transform=None
-            )
-            f_dist = self.surrogate(features)
-            y_dist = self.surrogate.likelihood(f_dist)
-            f_std.append(f_dist.variance.sqrt().cpu())
-            y_mean.append(y_dist.mean.cpu())
-            y_std.append(y_dist.variance.sqrt().cpu())
+            for batch in range(0, len(states_proxy), 32):
+                states_proxy_batch = states_proxy[batch : batch + 32]
+                features = self.surrogate.get_features(
+                    states_proxy_batch.to(self.device), transform=None
+                )
+                f_dist = self.surrogate(features)
+                y_dist = self.surrogate.likelihood(f_dist)
+                f_std.append(f_dist.variance.sqrt().cpu())
+                y_mean.append(y_dist.mean.cpu())
+                y_std.append(y_dist.variance.sqrt().cpu())
         cat_dim = 0
         f_std = torch.cat(f_std, cat_dim).view(len(states), -1)
         y_mean = torch.cat(y_mean, cat_dim).view(len(states), -1)
@@ -492,7 +496,9 @@ class DeepKernelRegressor:
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
         y_mean, y_std = self.get_predictions(env, states)
         if do_figure:
-            figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
+            figure1 = self.plot_predictions(states, y_mean, env.length, env.rescale)
+            figure2 = self.plot_predictions(states, y_std, env.length, env.rescale)
+            figure = [figure1, figure2]
         else:
             figure = None
         return figure, 0.0, 0.0, 0.0, 0.0

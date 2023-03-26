@@ -58,9 +58,11 @@ class MultiFidelityBranin(Branin):
         self.cost = cost
 
     def __call__(self, states: TensorType["batch", "state_dim"]) -> TensorType["batch"]:
+        fid_dict = {0: 0.5, 1: 0.75, 2: 1.0}
+        fid = self.fid
+        fid = fid_dict[fid]
         fidelity = (
-            torch.ones((len(states), 1), device=self.device, dtype=self.float)
-            * self.fid
+            torch.ones((len(states), 1), device=self.device, dtype=self.float) * fid
         )
         if isinstance(states, TensorType) == False:
             states = torch.tensor(states, device=self.device, dtype=self.float)
