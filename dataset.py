@@ -107,12 +107,12 @@ class DataHandler:
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalized data is saved as npy
         """
         if hasattr(self.env, "initialize_dataset"):
-            if self.path.type == "sf":
-                states, scores = self.sfenv.initialize_dataset(
-                    self.path, self.n_samples
-                )
-            elif hasattr(self.sfenv, "initialize_dataset"):
-                states, scores = self.env.initialize_dataset(self.path, self.n_samples)
+            # if self.path.type == "sf":
+            #     states, scores = self.sfenv.initialize_dataset(
+            #         self.path, self.n_samples
+            #     )
+            # elif hasattr(self.sfenv, "initialize_dataset"):
+            states, scores = self.env.initialize_dataset(self.path, self.n_samples)
 
             if self.n_fid > 1:
                 fidelities = states[:, -1].tolist()

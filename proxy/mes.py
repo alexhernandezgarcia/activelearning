@@ -78,6 +78,9 @@ class DeepKernelSingleFidelityMES(SingleFidelityMES):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        fig = self.plot_acquisition_rewards()
+        if fig is not None:
+            self.logger.log_figure("acquisition_rewards", fig, use_context=True)
 
     def __call__(self, states):
         if isinstance(self.regressor, DeepKernelRegressor) == True:
@@ -86,10 +89,55 @@ class DeepKernelSingleFidelityMES(SingleFidelityMES):
         mes = self.acqf(features)
         return mes
 
+    def plot_acquisition_rewards(self, **kwargs):
+        if self.env.n_dim != 2:
+            return None
+        if hasattr(self.env, "get_all_terminating_states") == False:
+            return None
+        states = torch.tensor(
+            self.env.get_all_terminating_states(), dtype=self.float
+        ).to(self.device)
+        states_input_proxy = states.clone()
+        states_proxy = self.env.statetorch2proxy(states_input_proxy)
+        scores = self(states_proxy).detach().cpu().numpy()
+        width = 5
+        fig, axs = plt.subplots(1, 1, figsize=(width, 5))
+        if self.env.rescale != 1:
+            step = int(self.env.length / self.env.rescale)
+        else:
+            step = 1
+        index = states.long().detach().cpu().numpy()
+        grid_scores = np.zeros((self.env.length, self.env.length))
+        grid_scores[index[:, 0], index[:, 1]] = scores
+        axs.set_xticks(
+            np.arange(
+                start=0,
+                stop=self.env.length,
+                step=step,
+            )
+        )
+        axs.set_yticks(
+            np.arange(
+                start=0,
+                stop=self.env.length,
+                step=step,
+            )
+        )
+        axs.imshow(grid_scores)
+        axs.set_title("GP-MES Reward")
+        im = axs.imshow(grid_scores)
+        divider = make_axes_locatable(axs)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig
+
 
 class GaussianProcessSingleFidelityMES(SingleFidelityMES):
     """
-    Specifically for Deep Kernel Methods right now
+    Specifically for GP right now
     """
 
     def __init__(self, **kwargs):
@@ -138,7 +186,7 @@ class GaussianProcessSingleFidelityMES(SingleFidelityMES):
             )
         )
         axs.imshow(grid_scores)
-        axs.set_title("GP-UCB Reward")
+        axs.set_title("GP-MES Reward")
         im = axs.imshow(grid_scores)
         divider = make_axes_locatable(axs)
         cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -402,6 +450,9 @@ class DeepKernelMultiFidelityMES(MES):
     def __init__(self, regressor, **kwargs):
         self.regressor = regressor
         super().__init__(**kwargs)
+        fig = self.plot_acquisition_rewards()
+        if fig is not None:
+            self.logger.log_figure("acquisition_rewards", fig, use_context=True)
 
     def load_model(self):
         return self.regressor.surrogate
@@ -472,6 +523,60 @@ class DeepKernelMultiFidelityMES(MES):
         features = features.unsqueeze(-2)
         acq_values = self.acqf(features)
         return acq_values
+
+    def plot_acquisition_rewards(self, **kwargs):
+        if hasattr(self.env, "n_dim") == False:
+            return None
+        if self.env.n_dim > 2:
+            return None
+        if hasattr(self.env, "get_all_terminating_states") == False:
+            return None
+        states = torch.tensor(
+            self.env.get_all_terminating_states(), dtype=self.float
+        ).to(self.device)
+        n_states = self.env.env.length ** 2
+        states_input_proxy = states.clone()
+        states_proxy = self.env.statetorch2proxy(states_input_proxy)
+        scores = self(states_proxy).detach().cpu().numpy()
+        states = states[:n_states]
+        width = (self.n_fid) * 5
+        fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        if self.env.rescale != 1:
+            step = int(self.env.env.length / self.env.rescale)
+        else:
+            step = 1
+        for fid in range(0, self.n_fid):
+            index = states.long().detach().cpu().numpy()
+            grid_scores = np.zeros((self.env.env.length, self.env.env.length))
+            grid_scores[index[:, 0], index[:, 1]] = scores[
+                fid * len(states) : (fid + 1) * len(states)
+            ]
+            axs[fid].set_xticks(
+                np.arange(
+                    start=0,
+                    stop=self.env.env.length,
+                    step=step,
+                )
+            )
+            axs[fid].set_yticks(
+                np.arange(
+                    start=0,
+                    stop=self.env.env.length,
+                    step=step,
+                )
+            )
+            axs[fid].imshow(grid_scores)
+            axs[fid].set_title(
+                "GP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+            )
+            im = axs[fid].imshow(grid_scores)
+            divider = make_axes_locatable(axs[fid])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+            plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig
 
 
 class GaussianProcessMultiFidelityMES(MES):
@@ -572,6 +677,9 @@ class VariationalGPMultiFidelityMES(MES):
     def __init__(self, regressor, **kwargs):
         self.regressor = regressor
         super().__init__(**kwargs)
+        fig = self.plot_acquisition_rewards()
+        if fig is not None:
+            self.logger.log_figure("acquisition_rewards", fig, use_context=True)
 
     def load_model(self):
         return self.regressor.surrogate
@@ -604,3 +712,55 @@ class VariationalGPMultiFidelityMES(MES):
             states = states[:, :-1]
             states = torch.cat([states, max_fid], dim=1)
         return states
+
+    def plot_acquisition_rewards(self, **kwargs):
+        if self.env.n_dim > 2:
+            return None
+        if hasattr(self.env, "get_all_terminating_states") == False:
+            return None
+        states = torch.tensor(
+            self.env.get_all_terminating_states(), dtype=self.float
+        ).to(self.device)
+        n_states = self.env.env.length ** 2
+        states_input_proxy = states.clone()
+        states_proxy = self.env.statetorch2proxy(states_input_proxy)
+        scores = self(states_proxy).detach().cpu().numpy()
+        states = states[:n_states]
+        width = (self.n_fid) * 5
+        fig, axs = plt.subplots(1, self.n_fid, figsize=(width, 5))
+        if self.env.rescale != 1:
+            step = int(self.env.env.length / self.env.rescale)
+        else:
+            step = 1
+        for fid in range(0, self.n_fid):
+            index = states.long().detach().cpu().numpy()
+            grid_scores = np.zeros((self.env.env.length, self.env.env.length))
+            grid_scores[index[:, 0], index[:, 1]] = scores[
+                fid * len(states) : (fid + 1) * len(states)
+            ]
+            axs[fid].set_xticks(
+                np.arange(
+                    start=0,
+                    stop=self.env.env.length,
+                    step=step,
+                )
+            )
+            axs[fid].set_yticks(
+                np.arange(
+                    start=0,
+                    stop=self.env.env.length,
+                    step=step,
+                )
+            )
+            axs[fid].imshow(grid_scores)
+            axs[fid].set_title(
+                "GP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+            )
+            im = axs[fid].imshow(grid_scores)
+            divider = make_axes_locatable(axs[fid])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+            plt.show()
+        plt.tight_layout()
+        plt.close()
+        return fig

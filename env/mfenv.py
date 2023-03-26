@@ -779,7 +779,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             return torch.zeros(len(samples))
 
     def generate_fidelities(self, n_samples, config):
-        if config.fid_type == "random":
+        if config.oracle_dataset.fid_type == "random":
             fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1)).to(
                 self.float
             )
@@ -814,8 +814,18 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             states = torch.tensor(states, dtype=self.float)
         else:
             samples = train_samples + test_samples
-            states = [torch.tensor(self.readable2state(sample)) for sample in samples]
+            if config.type == "sf":
+                states = [
+                    torch.tensor(self.env.readable2state(sample)) for sample in samples
+                ]
+            else:
+                states = [
+                    torch.tensor(self.readable2state(sample)) for sample in samples
+                ]
             states = torch.stack(states)
+            if config.type == "sf":
+                fidelties = self.generate_fidelities(len(states), config)
+                states = torch.cat([states, fidelties], dim=-1)
 
         scores = train_scores + test_scores
         if scores == []:

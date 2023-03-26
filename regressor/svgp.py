@@ -8,6 +8,9 @@ import math
 from tqdm import tqdm
 from model.shared_elements import check_early_stopping
 import wandb
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.pyplot as plt
+import numpy as np
 
 # TODO: Change this to a class that DOES NOT inherit from nn.Module
 # Breaks line 348 in model/gp_models.py
@@ -44,6 +47,7 @@ class SingleTaskSVGP(DeepKernelRegressor):
 
         # Dataset
         self.dataset = dataset
+        self.n_fid = self.dataset.n_fid
 
         self.language_model = AsItIs()
 
@@ -200,25 +204,80 @@ class SingleTaskSVGP(DeepKernelRegressor):
         self.surrogate.eval()
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
 
-    def evaluate(self, **kwargs):
-        # INCORRECT AS BOTH STOPPING AND SELECTING CRIT IS TEST_NLL
+    def evaluate_model(self, env, do_figure):
         test_nll = self.best_score
         test_rmse = self.best_loss
-        return test_rmse, test_nll, 0.0, 0.0, None
+        if hasattr(env, "n_dim") and env.n_dim > 2:
+            return None, 0.0, 0.0, 0.0, 0.0
+        states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
+        y_mean, y_std = self.get_predictions(env, states)
+        if do_figure:
+            figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
+        else:
+            figure = None
+        return figure, 0.0, 0.0, 0.0, 0.0
 
-    def get_predictions(self, env, states):
-        states = torch.tensor(states, device=self.device, dtype=self.float)
-        states_proxy_input = states.clone()
-        states_proxy = env.statetorch2proxy(states_proxy_input)
-        model = self.surrogate
-        model.eval()
-        model.likelihood.eval()
-        with torch.no_grad():
-            f_dist = model(states_proxy)
-            y_dist = model.likelihood(f_dist)
-            y_mean = y_dist.mean
-            y_std = y_dist.variance.sqrt()
-        return y_mean, y_std
+    # def plot_predictions(self, states, scores, length, rescale=1):
+    #     n_fid = self.n_fid
+    #     n_states = int(length * length)
+    #     if states.shape[-1] == 3:
+    #         states = states[:, :2]
+    #         states = torch.unique(states, dim=0)
+    #     # states = states[:n_states]
+    #     width = (n_fid) * 5
+    #     fig, axs = plt.subplots(1, n_fid, figsize=(width, 5))
+    #     scores = scores.squeeze(-1).detach().cpu().numpy()
+    #     for fid in range(0, n_fid):
+    #         index = states.long().detach().cpu().numpy()
+    #         grid_scores = np.zeros((length, length))
+    #         grid_scores[index[:, 0], index[:, 1]] = scores[
+    #             fid * n_states : (fid + 1) * n_states
+    #         ]
+    #         if n_fid == 1:
+    #             ax = axs
+    #         else:
+    #             ax = axs[fid]
+    #         if rescale != 1:
+    #             step = int(length / rescale)
+    #         else:
+    #             step = 1
+    #         ax.set_xticks(np.arange(start=0, stop=length, step=step))
+    #         ax.set_yticks(np.arange(start=0, stop=length, step=step))
+    #         ax.imshow(grid_scores)
+    #         if n_fid == 1:
+    #             title = "GP Predictions"
+    #         else:
+    #             title = "GP Predictions with fid {}/{}".format(fid + 1, n_fid)
+    #         ax.set_title(title)
+    #         im = ax.imshow(grid_scores)
+    #         divider = make_axes_locatable(ax)
+    #         cax = divider.append_axes("right", size="5%", pad=0.05)
+    #         plt.colorbar(im, cax=cax)
+    #         plt.show()
+    #     plt.tight_layout()
+    #     plt.close()
+    #     return fig
+
+    # def get_predictions(self, env, states):
+    #     self.surrogate.eval()
+    #     states = torch.tensor(states, device=self.device, dtype=self.float)
+    #     states_proxy_input = states.clone()
+    #     states_proxy = env.statetorch2proxy(states_proxy_input)
+    #     y_mean, y_std, f_std = [], [], []
+    #     with torch.no_grad():
+    #         features = self.surrogate.get_features(
+    #                 states_proxy.to(self.device), transform=None
+    #             )
+    #         f_dist = self.surrogate(features)
+    #         y_dist = self.surrogate.likelihood(f_dist)
+    #         f_std.append(f_dist.variance.sqrt().cpu())
+    #         y_mean.append(y_dist.mean.cpu())
+    #         y_std.append(y_dist.variance.sqrt().cpu())
+    #     cat_dim = 0
+    #     f_std = torch.cat(f_std, cat_dim).view(len(states), -1)
+    #     y_mean = torch.cat(y_mean, cat_dim).view(len(states), -1)
+    #     y_std = torch.cat(y_std, cat_dim).view(len(states), -1)
+    #     return y_mean, y_std
 
 
 class SingleTaskMultiFidelitySVGP(SingleTaskSVGP):
