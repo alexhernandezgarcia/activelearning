@@ -189,12 +189,13 @@ class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
         super().__init__(logger, device, dataset, **kwargs)
 
     def init_model(self, train_x, train_y):
+        fid_column = train_x.shape[-1] - 1
         self.model = SingleTaskMultiFidelityGP(
             train_x,
             train_y,
             outcome_transform=Standardize(m=1),
             # fid column
-            data_fidelity=self.n_fid - 1,
+            data_fidelity=fid_column,
         )
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
             self.model.likelihood, self.model

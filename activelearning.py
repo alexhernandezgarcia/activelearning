@@ -4,6 +4,7 @@ Runnable script with hydra capabilities
 import sys
 import os
 import random
+from typing import List
 import hydra
 from omegaconf import OmegaConf
 import torch
@@ -17,7 +18,7 @@ import numpy as np
 from utils.common import get_figure_plots
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_hartmann")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -203,7 +204,12 @@ def main(config):
                     plt.tight_layout()
                     plt.show()
                     plt.close()
-                    logger.log_figure("gp_predictions", fig, use_context=True)
+                    if isinstance(fig, list) == False:
+                        logger.log_figure("gp_predictions", fig, use_context=True)
+                    else:
+                        logger.log_figure("gp_predictions", fig[0], use_context=True)
+                        logger.log_figure("uncertainties", fig[1], use_context=True)
+
                 logger.log_metrics(metrics, use_context=False)
         if "proxy" in config:
             proxy = hydra.utils.instantiate(
