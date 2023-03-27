@@ -851,10 +851,10 @@ class SingleTaskMultiFidelitySVGP(
         active_dims = torch.arange(feature_dim).to(device)
         if out_dim == 1:
             if kernel == "matern":
-                # active_dims = active_dims
                 covar_module_x = kernels.MaternKernel(
                     ard_num_dims=feature_dim,
                     lengthscale_prior=lengthscale_prior,
+                    active_dims=active_dims,
                 )
             elif kernel == "rbf":
                 covar_module_x = kernels.RBFKernel(
