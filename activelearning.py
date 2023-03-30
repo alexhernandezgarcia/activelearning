@@ -16,9 +16,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from utils.common import get_figure_plots
+from torchtyping import TensorType
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -126,7 +127,7 @@ def main(config):
         else:
             BUDGET = oracles[-1].cost * config.al_n_rounds * config.n_samples
 
-    if "mes" in config.proxy._target_.lower():
+    if "proxy" in config and "mes" in config.proxy._target_.lower():
         is_mes = True
     else:
         is_mes = False
@@ -256,7 +257,7 @@ def main(config):
             if proxy is not None:
                 scores = env.proxy(state_proxy)
             else:
-                scores, _ = regressor.get_predictions(env, states)
+                scores, _ = regressor.get_predictions(env, states, denorm=True)
             num_pick = min(config.n_samples, len(states))
             if proxy is not None:
                 maximize = proxy.maximize
@@ -308,9 +309,9 @@ def main(config):
                 cumulative_cost += np.sum(cost_al_round)
                 avg_cost = np.mean(cost_al_round)
                 logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
-                logger.log_metrics(
-                    {"post_al_cum_cost": cumulative_cost}, use_context=False
-                )
+                # logger.log_metrics(
+                #     {"post_al_cum_cost": cumulative_cost}, use_context=False
+                # )
             else:
                 cost_al_round = torch.ones(len(picked_states))
                 if hasattr(oracle, "cost"):
@@ -318,9 +319,9 @@ def main(config):
                 avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
                 cumulative_cost += torch.sum(cost_al_round).detach().cpu().numpy()
                 logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
-                logger.log_metrics(
-                    {"post_al_cum_cost": cumulative_cost}, use_context=False
-                )
+                # logger.log_metrics(
+                #     {"post_al_cum_cost": cumulative_cost}, use_context=False
+                # )
 
             if config.env.proxy_state_format != "oracle":
                 gflownet.evaluate(
@@ -329,6 +330,7 @@ def main(config):
                     oracle.maximize,
                     modes=modes,
                     dataset_states=data_handler.train_dataset["states"],
+                    cumulative_cost=cumulative_cost,
                 )
             if N_FID == 1 or config.multifidelity.proxy == True:
                 data_handler.update_dataset(
