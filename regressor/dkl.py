@@ -24,6 +24,8 @@ from model.regressive import RegressiveMLP
 from model.mlp import MLP
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
+from torch.optim.lr_scheduler import MultiStepLR
+from torchtyping import TensorType
 
 # import pytorch_lightning as pl
 # from apex.optimizers import FusedAdam
@@ -123,6 +125,8 @@ class DeepKernelRegressor:
         tokenizer,
         checkpoint,
         encoder_obj="mlm",
+        optim="adam",
+        lr_sched_type="plateau",
         batch_size=32,
         **kwargs,
     ):
@@ -172,6 +176,9 @@ class DeepKernelRegressor:
             self.mlm_eval_epoch = self.language_model.eval_epoch
         else:
             self.mlm_eval_epoch = mlm_eval_epoch_lm
+
+        self.optim = optim
+        self.lr_sched_type = lr_sched_type
 
     def initialize_surrogate(self, X_train, Y_train):
         # X_train = torch.Size([5119, 51])
@@ -297,12 +304,26 @@ class DeepKernelRegressor:
         best_loss, best_loss_epoch = None, 0
         stop = False
 
-        optimizer = torch.optim.Adam(self.surrogate.param_groups)
-        lr_sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            patience=math.ceil(self.surrogate.patience / 2.0),
-            threshold=1e-3,
-        )
+        if self.optim == "adam":
+            optimizer = torch.optim.Adam(self.surrogate.param_groups)
+        else:
+            optimizer = torch.optim.SGD(self.surrogate.param_groups)
+        if self.lr_sched_type == "plateau":
+            lr_sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                patience=math.ceil(self.surrogate.patience / 2.0),
+                threshold=1e-3,
+            )
+        elif self.lr_sched_type == "step":
+            lr_sched = MultiStepLR(
+                optimizer,
+                milestones=[
+                    0.25 * self.surrogate.num_epochs,
+                    0.5 * self.surrogate.num_epochs,
+                    0.75 * self.surrogate.num_epochs,
+                ],
+                gamma=0.1,
+            )
 
         print("\n---- fitting all SVGP params ----")
         pbar = tqdm(range(1, self.surrogate.num_epochs + 1), disable=not self.progress)
@@ -312,6 +333,8 @@ class DeepKernelRegressor:
             avg_mlm_loss = 0.0
             avg_gp_loss = 0.0
             self.surrogate.train()
+            if self.encoder_obj != "mlm":
+                mlm_loss = torch.tensor(0.0, device=self.surrogate.device)
             # with torch.profiler.profile(
             #         schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
             #         on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/resnet18'),
@@ -333,14 +356,6 @@ class DeepKernelRegressor:
                         target_batch=targets,
                         n_fid=self.n_fid,
                     )
-                # elif isinstance(surrogate.encoder, LanguageModel) and encoder_obj == 'lanmt':
-                #     surrogate.encoder.requires_grad_(True)
-                #     mlm_loss, _, _ = lanmt_train_step(
-                #         surrogate.encoder.model, gp_optimizer, inputs, loss_scale=1.
-                #     )
-                # else:
-                #     mlm_loss = torch.zeros(1, device=surrogate.device)
-                # train all params through supervised MLL objective
                 self.surrogate.requires_grad_(True)
                 gp_loss = self.gp_train_step(optimizer, inputs, targets, self.mll)
                 avg_train_loss += (mlm_loss.detach() + gp_loss.detach()) / len(
@@ -377,11 +392,13 @@ class DeepKernelRegressor:
                             loader=test_loader,
                         )
                     )
-                    if self.progress:
-                        description = "Train Loss: {:.4f} | Test NLL: {:.4f} | Test RMSE {:.4f}".format(
-                            avg_train_loss, metrics["test_nll"], metrics["test_rmse"]
-                        )
-                        pbar.set_description(description)
+            if self.progress:
+                description = (
+                    "Train Loss: {:.4f} | Test NLL: {:.4f} | Test RMSE {:.4f}".format(
+                        avg_train_loss, metrics["test_nll"], metrics["test_rmse"]
+                    )
+                )
+                pbar.set_description(description)
                 # elif has_encoder and encoder_obj == "lanmt":
                 #     if val_loader is not None:
                 #         metrics.update(
@@ -463,11 +480,16 @@ class DeepKernelRegressor:
     #     test_rmse = self.best_loss
     #     return test_rmse, test_nll, 0.0, 0.0, None
 
-    def get_predictions(self, env, states):
+    def get_predictions(self, env, states, denorm=False):
         self.surrogate.eval()
         self.surrogate.clear_cache()
         self.surrogate.requires_grad_(False)
-        states = torch.tensor(states, device=self.device, dtype=self.float)
+        if isinstance(states[0], list):
+            states = torch.tensor(states)
+        elif isinstance(states, TensorType):
+            pass
+        elif isinstance(states[0], TensorType):
+            states = torch.vstack(states)
         states_proxy_input = states.clone()
         states_proxy = env.statetorch2proxy(states_proxy_input)
         y_mean, y_std, f_std = [], [], []
@@ -486,12 +508,22 @@ class DeepKernelRegressor:
         f_std = torch.cat(f_std, cat_dim).view(len(states), -1)
         y_mean = torch.cat(y_mean, cat_dim).view(len(states), -1)
         y_std = torch.cat(y_std, cat_dim).view(len(states), -1)
+        if denorm == True and self.dataset.normalize_data == True:
+            y_mean = (
+                y_mean
+                * (
+                    self.dataset.train_stats["max"].cpu()
+                    - self.dataset.train_stats["min"].cpu()
+                )
+                + self.dataset.train_stats["min"].cpu()
+            )
+            y_mean = y_mean.squeeze(-1)
         return y_mean, y_std
 
     def evaluate_model(self, env, do_figure):
         test_nll = self.best_score
         test_rmse = self.best_loss
-        if hasattr(env, "n_dim") and env.n_dim > 2:
+        if hasattr(env, "n_dim") == False or env.n_dim > 2:
             return None, 0.0, 0.0, 0.0, 0.0
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
         y_mean, y_std = self.get_predictions(env, states)

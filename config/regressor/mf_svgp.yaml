@@ -1,6 +1,7 @@
 _target_: regressor.svgp.SingleTaskMultiFidelitySVGP
 
 checkpoint: proxy
+optim: adam
 
 surrogate:
   _target_: model.gp_models.SingleTaskMultiFidelitySVGP

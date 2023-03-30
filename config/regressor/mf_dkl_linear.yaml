@@ -1,10 +1,10 @@
-_target_: regressor.svgp.SingleTaskSVGP
+_target_: regressor.dkl.DeepKernelRegressor
 
 checkpoint: proxy
 optim: adam
 
 surrogate:
-  _target_: model.gp_models.SingleTaskSVGP
+  _target_: model.gp_models.SingleTaskMultiFidelityLikeBotorchSVGP
   max_shift: 0
   mask_size: 0
   bootstrap_ratio: null
@@ -15,27 +15,21 @@ surrogate:
   enc_lr: 1e-3
   bs: ${dataset.dataloader.train.batch_size}
   eval_bs: ${dataset.dataloader.test.batch_size}
-  num_epochs: 2048
+  num_epochs: 512
   holdout_ratio: 0.1 #0.2
   early_stopping: True
   patience: 32
-  eval_period: 1
-  # Specific to the synthetic functions based on grid
-  feature_dim: ${env.n_dim}
+  eval_period: 5
+  feature_dim: ${model.feature_dim}
   out_dim: 1
   num_inducing_points: 64
   learn_inducing_points: True
   encoder_wd: 1e-4
   mll_beta: 1e-2
   lengthscale_prior:
-    _target_: gpytorch.priors.GammaPrior
-    concentration: 3.0
-    rate: 6.0
+    _target_: gpytorch.priors.NormalPrior
+    loc: ${regressor.surrogate.lengthscale_init}
+    scale: 1e-2
   noise_constraint:
     _target_: gpytorch.constraints.GreaterThan
     lower_bound: 1e-4
-  noise_prior:
-    _target_: gpytorch.priors.GammaPrior
-    concentration: 1.1
-    rate: 5e-2
-  kernel: matern

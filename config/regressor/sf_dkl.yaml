@@ -1,6 +1,7 @@
 _target_: regressor.dkl.DeepKernelRegressor
 
 checkpoint: proxy
+optim: adam
 
 surrogate:
   _target_: model.gp_models.SingleTaskSVGP

@@ -1,0 +1,23 @@
+_target_: model.lm_elements.LanguageModel
+name: mlm_transformer
+
+model:
+  _target_: model.shared_elements.Transformer
+  tokenizer: null
+  max_len: ${env.max_seq_length}
+  embed_dim: 64
+  latent_dim: 64
+  ff_dim: 256
+  num_heads: 8
+  num_layers: 8
+  out_dim: 64
+  p: 0.
+  max_len_delta: 0
+
+batch_size: 32
+num_epochs: 128
+patience: 32
+lr: 1e-3
+max_shift: 0
+mask_ratio: 0.125
+feature_dim: ${model.model.out_dim}

@@ -18,6 +18,7 @@ class FidelityCostModel(CostAwareUtility):
 
     def forward(self, X, deltas, **kwargs):
         fidelity = X[:, 0, -1]
+        # print(deltas)
         scaled_deltas = torch.zeros(X.shape[0], dtype=self.float).to(self.device)
         for fid in self.fidelity_weights.keys():
             idx_fid = torch.where(fidelity == fid)[0]
@@ -26,6 +27,7 @@ class FidelityCostModel(CostAwareUtility):
             )
             scaled_deltas[idx_fid] = (deltas[0, idx_fid] / cost_fid) + self.fixed_cost
         scaled_deltas = scaled_deltas.unsqueeze(0)
+        # print(scaled_deltas)
         return scaled_deltas
 
 
@@ -176,7 +178,7 @@ class MultifidelityOracleModel(Model):
         covar_mm = torch.FloatTensor(
             [
                 [self.oracle[0].sigma ** 2, (0.015) ** 2, (5e-3) ** 2],
-                [(0.015 ** 2), self.oracle[1].sigma ** 2, (4e-3) ** 2],
+                [(0.015**2), self.oracle[1].sigma ** 2, (4e-3) ** 2],
                 [(5e-3) ** 2, (4e-3) ** 2, self.oracle[2].sigma ** 2],
             ]
         )

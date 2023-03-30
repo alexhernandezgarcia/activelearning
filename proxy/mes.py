@@ -90,7 +90,7 @@ class DeepKernelSingleFidelityMES(SingleFidelityMES):
         return mes
 
     def plot_acquisition_rewards(self, **kwargs):
-        if self.env.n_dim != 2:
+        if hasattr(self.env, "n_dim") == False or self.env.n_dim != 2:
             return None
         if hasattr(self.env, "get_all_terminating_states") == False:
             return None
@@ -412,7 +412,7 @@ class OracleMultiFidelityMES(MES):
         states = torch.tensor(
             self.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
-        n_states = self.env.env.length ** 2
+        n_states = self.env.env.length**2
         states_input_proxy = states.clone()
         states_proxy = self.env.statetorch2proxy(states_input_proxy)
         # states_proxy = torch.cat((states_proxy[0], states_proxy[1].unsqueeze(-1)), dim=1)
@@ -464,10 +464,11 @@ class DeepKernelMultiFidelityMES(MES):
         state = [self.env.readable2state(sample) for sample in samples]
         state_proxy = self.env.statebatch2proxy(state)  # [: self.regressor.n_samples]
         fid_proxy = state_proxy[..., -1]
-        if self.regressor.language_model.is_fid_param is False:
-            state_proxy = state_proxy[..., :-1]
+        # if self.regressor.language_model.is_fid_param is False:
+        #     state_proxy = state_proxy[..., :-1]
         if isinstance(self.regressor, DeepKernelRegressor) == True:
             if hasattr(self.regressor.language_model, "get_token_features"):
+                state_proxy = state_proxy[..., :-1]
                 (
                     input_tok_features,
                     input_mask,
@@ -508,10 +509,11 @@ class DeepKernelMultiFidelityMES(MES):
 
     def __call__(self, inputs):
         fid = inputs[..., -1]
-        if self.regressor.language_model.is_fid_param is False:
-            inputs = inputs[..., :-1]
+
         if isinstance(self.regressor, DeepKernelRegressor) == True:
             if hasattr(self.regressor.language_model, "get_token_features"):
+                if self.regressor.language_model.is_fid_param is False:
+                    inputs = inputs[..., :-1]
                 (
                     input_tok_features,
                     input_mask,
@@ -537,7 +539,7 @@ class DeepKernelMultiFidelityMES(MES):
         states = torch.tensor(
             self.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
-        n_states = self.env.env.length ** 2
+        n_states = self.env.env.length**2
         states_input_proxy = states.clone()
         states_proxy = self.env.statetorch2proxy(states_input_proxy)
         scores = self(states_proxy).detach().cpu().numpy()
@@ -627,7 +629,7 @@ class GaussianProcessMultiFidelityMES(MES):
         states = torch.tensor(
             self.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
-        n_states = self.env.env.length ** 2
+        n_states = self.env.env.length**2
         states_input_proxy = states.clone()
         states_proxy = self.env.statetorch2proxy(states_input_proxy)
         scores = self(states_proxy).detach().cpu().numpy()
@@ -727,7 +729,7 @@ class VariationalGPMultiFidelityMES(MES):
         states = torch.tensor(
             self.env.get_all_terminating_states(), dtype=self.float
         ).to(self.device)
-        n_states = self.env.env.length ** 2
+        n_states = self.env.env.length**2
         states_input_proxy = states.clone()
         states_proxy = self.env.statetorch2proxy(states_input_proxy)
         scores = self(states_proxy).detach().cpu().numpy()
