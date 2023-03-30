@@ -107,110 +107,17 @@ class DataHandler:
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalized data is saved as npy
         """
         if hasattr(self.env, "initialize_dataset"):
-            # if self.path.type == "sf":
-            #     states, scores = self.sfenv.initialize_dataset(
-            #         self.path, self.n_samples
-            #     )
-            # elif hasattr(self.sfenv, "initialize_dataset"):
             states, scores = self.env.initialize_dataset(self.path, self.n_samples)
 
             if self.n_fid > 1:
                 fidelities = states[:, -1].tolist()
             else:
                 fidelities = None
-        """
         else:
-            if self.path.oracle_dataset:
-                # when one dataset without fidelity is given
-                # load dataset and convert to states
-                if self.path.oracle_dataset.train is not None:
-                    train = pd.read_csv(self.path.oracle_dataset.train.path)
-                    train_states = train["samples"].values.tolist()
-                    if self.path.oracle_dataset.train.get_scores:
-                        train_scores = []
-                    else:
-                        train_scores = train["energies"].values.tolist()
-                if self.path.oracle_dataset.test is not None:
-                    test = pd.read_csv(self.path.oracle_dataset.test.path)
-                    test_states = test["samples"].values.tolist()
-                    if self.path.oracle_dataset.train.get_scores:
-                        test_scores = []
-                    else:
-                        test_scores = test["energies"].values.tolist()
-                else:
-                    test_states = []
-                    test_scores = []
-                states = train_states + test_states
-                scores = train_scores + test_scores
-                if scores == []:
-                    scores = None
-                if self.path.oracle_dataset.type != "mf":
-                    states = [
-                        torch.tensor(self.sfenv.readable2state(sample))
-                        for sample in states
-                    ]
-                else:
-                    states = [
-                        torch.tensor(self.env.readable2state(sample))
-                        for sample in states
-                    ]
-                    train_states = [
-                        torch.tensor(self.env.readable2state(sample))
-                        for sample in train_states
-                    ]
-                    test_states = [
-                        torch.tensor(self.env.readable2state(sample))
-                        for sample in test_states
-                    ]
-                states = torch.stack(states)
-            else:
-                # for AMP this is the implementation
-                # dataset = self.env.load_dataset()
-                # for grid, I call uniform states. Need to make it uniform
-                if self.progress:
-                    print("\nCreating dataset of size: ", self.n_samples)
-                if self.n_samples is not None:
-                    states = (
-                        torch.tensor(
-                            self.sfenv.get_uniform_terminating_states(self.n_samples)
-                        ).to(self.device)
-                        # .to(self.float)
-                    )
-                else:
-                    raise ValueError(
-                        "Train Dataset size is not provided. n_samples is None"
-                    )
-                scores = None
-
-        if scores is not None:
-            scores = torch.tensor(scores, dtype=self.float, device=self.device)
-            if self.n_fid > 1:
-                fidelities = states[:, -1]
-                fidelities = fidelities.tolist()
-            else:
-                fidelities = None
-        if self.n_fid > 1 and self.fidelity.do == True:
-            # TODO: Use mfenv.get_uniform_terminating_states instead
-            states, fidelities = self.generate_fidelities(states)
-            fidelities = fidelities.to(states.device)
-            states = torch.cat([states, fidelities], dim=1)  # .long()
-            states_oracle_input = states.clone()
-            state_oracle, fid = self.env.statetorch2oracle(states_oracle_input)
-            fidelities = fidelities.squeeze(-1).tolist()
-            if scores is None:
-                scores = self.env.call_oracle_per_fidelity(state_oracle, fid)
-        # TODO: add clause for when n_fid> 1 but fidelity.do=False
-        elif self.n_fid == 1 and scores is None:
-            states_oracle_input = states.clone()
-            state_oracle = self.env.statetorch2oracle(states_oracle_input)
-            scores = self.env.oracle(state_oracle)
-            fidelities = None
-        elif self.n_fid > 1 and self.path.type == "mf": 
-        # self.fidelity.do == False:
-            print(
-                "Scores were not calculated and fidelity was not assigned. Directly taken from dataset"
+            raise NotImplementedError(
+                "Dataset initialisation not implemented for this environment"
             )
-"""
+
         get_figure_plots(
             self.env,
             states,

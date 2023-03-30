@@ -801,7 +801,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 train = pd.read_csv(config.oracle_dataset.train.path)
                 train_samples = train["samples"].values.tolist()
                 if config.oracle_dataset.train.get_scores == False:
-                    train_scores = train["scores"].values.tolist()
+                    train_scores = train["energies"].values.tolist()
             # Test Path Given
             if config.oracle_dataset.test is not None:
                 test = pd.read_csv(config.oracle_dataset.test.path)
@@ -834,6 +834,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             states_oracle_input = states.clone()
             state_oracle, fid = self.statetorch2oracle(states_oracle_input)
             scores = self.call_oracle_per_fidelity(state_oracle, fid)
+        if isinstance(scores, List):
+            scores = torch.tensor(scores, dtype=self.float)
         return states, scores
 
     # def get_trajectories(

@@ -96,6 +96,48 @@ class AMP(GFlowNetEnv, GflowNetAMP):
     #     scores = train_df["energies"]
     #     return states, scores
 
+    def initialize_dataset(self, config, n_samples, **kwargs):
+        train_scores = torch.tensor([])
+        test_scores = torch.tensor([])
+        train_states = torch.tensor([])
+        test_states = torch.tensor([])
+
+        if config.oracle_dataset is not None:
+            if config.oracle_dataset.train is not None:
+                train_df = pd.read_csv(config.oracle_dataset.train.path)
+                train_states = train_df["samples"].values.tolist()
+                train_states = [
+                    torch.tensor(self.readable2state(sample)) for sample in train_states
+                ]
+                train_states = torch.vstack(train_states)
+                if config.oracle_dataset.train.get_scores == False:
+                    train_scores = train_df["energies"].values.tolist()
+                    train_scores = torch.tensor(train_scores)
+
+            if config.oracle_dataset.test is not None:
+                test_df = pd.read_csv(config.oracle_dataset.test.path)
+                test_states = test_df["samples"].values.tolist()
+                test_states = [
+                    torch.tensor(self.readable2state(sample)) for sample in test_states
+                ]
+                test_states = torch.vstack(test_states)
+                if config.oracle_dataset.test.get_scores == False:
+                    test_scores = test_df["energies"].values.tolist()
+                    test_scores = torch.tensor(test_scores)
+
+        if len(train_states) == 0 and len(test_states) == 0:
+            states = self.get_random_terminating_states(n_samples)
+        else:
+            states = torch.cat((train_states, test_states))
+            scores = torch.cat((train_scores, test_scores))
+
+        if len(scores) == 0 or len(scores) != len(states):
+            states_oracle_input = states.clone()
+            oracle_states = self.statetorch2oracle(states_oracle_input)
+            scores = self.oracle(oracle_states)
+
+        return states, scores
+
     def load_dataset(self, split="D1", nfold=5):
         # TODO: rename to make_dataset()?
         source = get_default_data_splits(setting="Target")
