@@ -332,6 +332,7 @@ class DeepKernelRegressor:
             #     self.surrogate.encoder.requires_grad_(
             #             False
             #         )
+
             metrics = {}
             avg_train_loss = 0.0
             avg_mlm_loss = 0.0

@@ -19,7 +19,7 @@ from utils.common import get_figure_plots
 from torchtyping import TensorType
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_hartmann")
 def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
