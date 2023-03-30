@@ -21,6 +21,8 @@ class RegressiveMLP(nn.Module):
         device,
         # In OHE, this is num_fid, but in Hartmann this is 1
         feature_dim,
+        beta1=0.9,
+        beta2=0.999,
         **kwargs,
     ):
         """
@@ -114,6 +116,7 @@ class RegressiveMLP(nn.Module):
             self.activation,
             nn.Linear(self.fid_num_hidden, self.num_output),
         )
+        self.betas = (beta1, beta2)
 
     def get_feature_seq_regressive(self, input):
         """
@@ -256,7 +259,9 @@ class RegressiveMLP(nn.Module):
         return output_masked
 
     def param_groups(self, lr, weight_decay):
-        shared_group = dict(params=[], lr=lr, weight_decay=weight_decay)
+        shared_group = dict(
+            params=[], lr=lr, weight_decay=weight_decay, betas=self.betas
+        )
         for p_name, param in self.named_parameters():
             shared_group["params"].append(param)
         return [shared_group]

@@ -314,7 +314,7 @@ class DataHandler:
         # Log the dataset statistics
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
-            print("\nDataset Statistics (Prior to Normalization)")
+            print("\nProxy Dataset Statistics")
             print(
                 "Train Data \n \t Mean Score:{:.2f} \n \t Std:{:.2f} \n \t Min Score:{:.2f} \n \t Max Score:{:.2f}".format(
                     self.train_stats["mean"],
@@ -406,11 +406,7 @@ class DataHandler:
         Updates the dataset stats
         Saves the updated dataset if save_data=True
         """
-        readable_dataset = {
-            "samples": [self.env.state2readable(state) for state in states],
-            "energies": energies,
-        }
-        self.logger.save_dataset(readable_dataset, "sampled")
+
         energies = torch.tensor(energies, dtype=self.float, device=self.device)
         # fidelity = [state[-1] for state in states]
         get_figure_plots(
@@ -423,9 +419,15 @@ class DataHandler:
             key="post_al_iter_sampled_dataset",
             use_context=True,
         )
+        energies = energies * self.target_factor
+        # Write dataset only after multiplying by target factor as was done in initialize_dataset
+        readable_dataset = {
+            "samples": [self.env.state2readable(state) for state in states],
+            "energies": energies.tolist(),
+        }
+        self.logger.save_dataset(readable_dataset, "sampled")
 
         states = self.env.statebatch2proxy(states)
-        energies = energies * self.target_factor
         if isinstance(states, TensorType) == False:
             states = torch.tensor(
                 np.array(states), device=self.device

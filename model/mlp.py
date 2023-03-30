@@ -19,6 +19,8 @@ class MLP(nn.Module):
         dropout_prob,
         activation,
         feature_dim,
+        beta1=0.9,
+        beta2=0.999,
         transformerCall=False,
         config_env=None,
         input_dim=None,
@@ -76,6 +78,7 @@ class MLP(nn.Module):
             )
         self.feature_extractor = nn.Sequential(*layers)
         self.output_layer = nn.Linear(self.hidden_layers[-1], self.out_dim)
+        self.betas = (beta1, beta2)
 
         # layers.append(nn.Linear(self.hidden_layers[-1], self.out_dim))
 
@@ -99,15 +102,25 @@ class MLP(nn.Module):
         return feature
 
     def param_groups(self, lr, weight_decay):
-        shared_group = dict(params=[], lr=lr, weight_decay=weight_decay)
+        shared_group = dict(
+            params=[], lr=lr, weight_decay=weight_decay, betas=self.betas
+        )
         for p_name, param in self.named_parameters():
             shared_group["params"].append(param)
         return [shared_group]
 
     def train_step(
-        self, input_batch, optimizer, target_batch, criterion=nn.MSELoss(), **kwargs
+        self,
+        input_batch,
+        optimizer,
+        target_batch,
+        n_fid=1,
+        criterion=nn.MSELoss(),
+        **kwargs,
     ):
         optimizer.zero_grad()
+        if n_fid > 1:
+            input_batch = input_batch[..., :-1]
         output = self(input_batch)
         loss = criterion(output, target_batch.unsqueeze(-1))
         # self.zero_grad()
@@ -115,12 +128,15 @@ class MLP(nn.Module):
         optimizer.step()
         return loss
 
-    def eval_epoch(self, loader, criterion=nn.MSELoss(), **kwargs):
+    def eval_epoch(self, loader, criterion=nn.MSELoss(), n_fid=1, **kwargs):
+
         metrics = {"loss": 0.0}
         self.eval()
         with torch.no_grad():
             for (x, y) in loader:
                 x = x.to("cuda")
+                if n_fid > 1:
+                    x = x[..., :-1]
                 y = y.to("cuda").unsqueeze(-1)
                 y_hat = self(x)
                 loss = criterion(y_hat, y)

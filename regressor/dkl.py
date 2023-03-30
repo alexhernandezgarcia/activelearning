@@ -328,6 +328,10 @@ class DeepKernelRegressor:
         print("\n---- fitting all SVGP params ----")
         pbar = tqdm(range(1, self.surrogate.num_epochs + 1), disable=not self.progress)
         for epoch_idx in pbar:  # 128
+            # if (epoch_idx%2==0):
+            #     self.surrogate.encoder.requires_grad_(
+            #             False
+            #         )
             metrics = {}
             avg_train_loss = 0.0
             avg_mlm_loss = 0.0

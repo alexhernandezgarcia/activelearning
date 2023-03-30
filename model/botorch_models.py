@@ -50,6 +50,7 @@ class SingleTaskMultiFidelityVariationalGP(ApproximateGPyTorchModel):
         likelihood: Optional[Likelihood] = None,
         num_outputs: int = 1,
         learn_inducing_points: bool = True,
+        # covar_module: Optional[Kernel] = None,
         covar_module_x: Optional[Kernel] = None,
         covar_module_fidelity: Optional[Kernel] = None,
         mean_module: Optional[Mean] = None,
@@ -104,6 +105,7 @@ class SingleTaskMultiFidelityVariationalGP(ApproximateGPyTorchModel):
             self._is_custom_likelihood = True
 
         if inducing_point_allocator is None:
+            # self._inducing_point_allocator = GreedyVarianceReduction()
             self._inducing_point_allocator = MultiFidelityGreedyVarianceReduction()
         else:
             self._inducing_point_allocator = inducing_point_allocator
@@ -113,6 +115,7 @@ class SingleTaskMultiFidelityVariationalGP(ApproximateGPyTorchModel):
             train_Y=train_Y,
             num_outputs=num_outputs,
             learn_inducing_points=learn_inducing_points,
+            # covar_module=covar_module,
             covar_module_x=covar_module_x,
             covar_module_fidelity=covar_module_fidelity,
             mean_module=mean_module,
@@ -160,6 +163,7 @@ class SingleTaskMultiFidelityVariationalGP(ApproximateGPyTorchModel):
             num_inducing = var_strat.inducing_points.size(-2)
             inducing_points = self._inducing_point_allocator.allocate_inducing_points(
                 inputs=inputs,
+                # covar_module=self.model.covar_module,
                 covar_module_x=self.model.covar_module_x,
                 covar_module_fidelity=self.model.covar_module_fidelity,
                 num_inducing=num_inducing,
@@ -181,6 +185,7 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
         train_Y: Optional[Tensor] = None,
         num_outputs: int = 1,
         learn_inducing_points=True,
+        # covar_module: Optional[Kernel] = None,
         covar_module_x: Optional[Kernel] = None,
         covar_module_fidelity: Optional[Kernel] = None,
         mean_module: Optional[Mean] = None,
@@ -198,6 +203,11 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
 
         if mean_module is None:
             mean_module = ConstantMean(batch_shape=self._aug_batch_shape).to(train_X)
+
+        # if covar_module is None:
+        #     raise NotImplementedError(
+        #         "UserDefinedError: Covariance module must be provided."
+        #     )
 
         if covar_module_x is None or covar_module_fidelity is None:
             raise NotImplementedError(
@@ -266,10 +276,15 @@ class _SingleTaskMultiFidelityVariationalGP(ApproximateGP):
             # )
         super().__init__(variational_strategy=variational_strategy_instance)
         self.mean_module = mean_module
+        # self.covar_module = covar_module
         self.covar_module_x = covar_module_x
         self.covar_module_fidelity = covar_module_fidelity
 
     def forward(self, input) -> MultivariateNormal:
+        # mean_x = self.mean_module(input)
+        # covar_x = self.covar_module(input)
+        # latent_dist = MultivariateNormal(mean_x, covar_x)
+
         x = input[..., :-1]
         i = input[..., -1]
         i = i.unsqueeze(-1)
