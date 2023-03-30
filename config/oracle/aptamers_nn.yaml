@@ -1,0 +1,3 @@
+_target_: proxy.aptamers_nn.AptamersNN
+cost: 1
+maximize: False
