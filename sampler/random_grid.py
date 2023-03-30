@@ -15,6 +15,8 @@ class RandomSampler:
 
         if hasattr(env, "get_uniform_terminating_states"):
             states = env.get_uniform_terminating_states(n_samples)
+        elif hasattr(env, "get_random_terminating_states"):
+            states = env.get_random_terminating_states(n_samples)
         else:
             raise NotImplementedError(
                 "Not implemented for when env does not have get_uniform_terminating_states"
@@ -25,12 +27,38 @@ class RandomSampler:
         pass
 
     def evaluate(
-        self, samples, energies, maximize, modes=None, dataset_states=None, **kwargs
+        self,
+        samples,
+        energies,
+        maximize,
+        cumulative_cost,
+        modes=None,
+        dataset_states=None,
+        **kwargs,
     ):
-        if maximize:
-            energies = torch.sort(energies, descending=True)[0]
-        else:
-            energies = torch.sort(energies)[0]
+        do_novelty = False
+        self.logger.define_metric("mean_energy_top100", step_metric="post_al_cum_cost")
+        self.logger.define_metric(
+            "mean_pairwise_distance_top100", step_metric="post_al_cum_cost"
+        )
+        self.logger.define_metric(
+            "mean_min_distance_from_mode_top100", step_metric="post_al_cum_cost"
+        )
+        self.logger.define_metric("mean_energy_top10", step_metric="post_al_cum_cost")
+        self.logger.define_metric(
+            "mean_pairwise_distance_top10", step_metric="post_al_cum_cost"
+        )
+        self.logger.define_metric(
+            "mean_min_distance_from_mode_top10", step_metric="post_al_cum_cost"
+        )
+        self.logger.define_metric("mean_energy_top1", step_metric="post_al_cum_cost")
+        self.logger.define_metric(
+            "mean_pairwise_distance_top1", step_metric="post_al_cum_cost"
+        )
+        self.logger.define_metric(
+            "mean_min_distance_from_mode_top1", step_metric="post_al_cum_cost"
+        )
+        energies = torch.sort(energies, descending=maximize)[0]
         if hasattr(self.env, "get_pairwise_distance"):
             pairwise_dists = self.env.get_pairwise_distance(samples)
             pairwise_dists = torch.sort(pairwise_dists, descending=True)[0]
@@ -38,10 +66,12 @@ class RandomSampler:
                 min_dist_from_mode = self.env.get_pairwise_distance(samples, modes)
                 # Sort in ascending order because we want minimum distance from mode
                 min_dist_from_mode = torch.sort(min_dist_from_mode, descending=False)[0]
+            else:
+                min_dist_from_mode = torch.zeros_like(energies)
         else:
             pairwise_dists = torch.zeros_like(energies)
             min_dist_from_mode = torch.zeros_like(energies)
-
+        metrics_dict = {}
         dict_topk = {}
         for k in self.logger.oracle.k:
             print(f"\n Top-{k} Performance")
@@ -64,5 +94,7 @@ class RandomSampler:
                 print(f"\t Mean Energy: {mean_energy_topk}")
                 print(f"\t Mean Pairwise Distance: {mean_pairwise_dist_topk}")
                 print(f"\t Mean Min Distance from Mode: {mean_min_dist_from_mode_topk}")
+            metrics_dict.update(dict_topk)
 
-            self.logger.log_metrics(dict_topk, use_context=False)
+        metrics_dict.update({"post_al_cum_cost": cumulative_cost})
+        self.logger.log_metrics(metrics_dict, use_context=False)

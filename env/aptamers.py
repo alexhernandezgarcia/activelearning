@@ -101,3 +101,10 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
         scores = train_df["energies"].values.tolist()
         scores = torch.tensor(scores)
         return states, scores
+
+    def get_random_terminating_states(self, n_samples, **kwargs):
+        states = torch.randint(low=0, high=4, size=(5 * n_samples, self.max_seq_length))
+        # select unique states
+        states = torch.unique(states, dim=0)[:n_samples]
+        list_of_states = list(states)
+        return list_of_states
