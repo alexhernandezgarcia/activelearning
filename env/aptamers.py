@@ -3,8 +3,6 @@ import torch
 from torchtyping import TensorType
 from typing import List, Tuple
 from .base import GFlowNetEnv
-from clamp_common_eval.defaults import get_default_data_splits
-from sklearn.model_selection import GroupKFold
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
