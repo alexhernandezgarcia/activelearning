@@ -32,7 +32,7 @@ class MultiFidelityInducingPointAllocator(InducingPointAllocator):
         covar_module_fidelity = covar_module_fidelity.to(inputs.device)
 
         x_input = inputs[..., :-1]
-        f_input = inputs[..., -1].long()
+        f_input = inputs[..., -1].unsqueeze(-1)
         x_output = covar_module_x(x_input)
         f_output = covar_module_fidelity(f_input)
         output = x_output.mul(f_output)
