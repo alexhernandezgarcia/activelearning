@@ -48,6 +48,7 @@ class MultiFidelityInducingPointAllocator(InducingPointAllocator):
                 kernel_matrix=train_train_kernel,
                 max_length=num_inducing,
                 quality_scores=quality_scores,
+                epsilon = 1e-15,
             )
         else:
             raise NotImplementedError("Not copied from Botorch yet")
