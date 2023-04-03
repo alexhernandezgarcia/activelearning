@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typing import List, Tuple
 import numpy.typing as npt
 from torchtyping import TensorType
-from gflownet.envs.base import GFlowNetEnv
+from env.base import GFlowNetEnv
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -19,38 +19,44 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Does not require the different oracles as scoring is performed by GFN not env
     """
 
-    def __init__(self, env, n_fid, oracle, proxy_state_format=None, **kwargs):
+    def __init__(self, env, n_fid, **kwargs):
         # TODO: super init kwargs
-        super().__init__(**kwargs)
         self.env = env
         self.is_state_list = True
         if isinstance(self.env.source, TensorType):
             self.is_state_list = False
         self.n_fid = n_fid
-        self.fid = self.env.eos + 1
-        # Required for variables like reward_norm, reward_beta
         vars(self).update(vars(self.env))
-        self.reset()
-        self.action_space = self.get_actions_space()
-        self.fixed_policy_output = self.get_fixed_policy_output()
-        self.policy_input_dim = len(self.state2policy())
-        self.policy_output_dim = len(self.fixed_policy_output)
-        self.random_policy_output = self.fixed_policy_output
-        if proxy_state_format == "oracle":
+        if self.is_state_list:
+            self.source = self.env.source + [-1]
+        else:
+            self.source = torch.cat((self.env.source, torch.tensor([-1])))
+        self._test_traj_list = []
+        self._test_traj_actions_list = []
+        super().__init__(**kwargs)
+        # self.fid = self.env.eos + 1
+        # Required for variables like reward_norm, reward_beta
+        # self.reset()
+        # self.action_space = self.get_actions_space()
+        # self.fixed_policy_output = self.get_fixed_policy_output()
+        # self.policy_input_dim = len(self.state2policy())
+        # self.policy_output_dim = len(self.fixed_policy_output)
+        # self.random_policy_output = self.fixed_policy_output
+        if self.proxy_state_format == "oracle":
             # Assumes that all oracles required the same kind of transformed dtata
             self.statebatch2proxy = self.statebatch2oracle_joined
             self.statetorch2proxy = self.statetorch2oracle_joined
-        elif proxy_state_format == "ohe":
+        elif self.proxy_state_format == "ohe":
             self.statebatch2proxy = self.statebatch2policy
             self.statetorch2proxy = self.statetorch2policy
-        elif proxy_state_format == "state":
+        elif self.proxy_state_format == "state":
             self.statebatch2proxy = self.statebatch2state
             self.statetorch2proxy = self.statetorch2state
             if isinstance(self.env, Grid):
                 # only for branin
                 self.statetorch2oracle = self.state_from_statefid
                 self.statebatch2oracle = self.state_from_statefid
-        elif proxy_state_format == "state_fidIdx":
+        elif self.proxy_state_format == "state_fidIdx":
             self.statebatch2proxy = self.statebatch2state_longFid
             self.statetorch2proxy = self.statetorch2state_longFid
             if isinstance(self.env, Grid):
@@ -59,31 +65,25 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 self.statebatch2oracle = self.state_from_statefid
         else:
             raise ValueError("Invalid proxy_state_format")
-        self.oracle = oracle
+        # self.oracle = oracle
         self.fidelity_costs = self.set_fidelity_costs()
-        if self.is_state_list:
-            self.source = self.env.source + [-1]
-        else:
-            self.source = torch.cat((self.env.source, torch.tensor([-1])))
-        self._test_traj_list = []
-        self._test_traj_actions_list = []
 
-    def set_proxy(self, proxy):
-        self.proxy = proxy
-        if hasattr(self, "proxy_factor"):
-            return
-        if self.proxy is not None and self.proxy.maximize is not None:
-            # can be None for dropout regressor/UCB
-            maximize = self.proxy.maximize
-        elif self.oracle is not None:
-            maximize = self.oracle[0].maximize
-            print("\nAssumed that all Oracles have same maximize value.")
-        else:
-            raise ValueError("Proxy and Oracle cannot be None together.")
-        if maximize:
-            self.proxy_factor = 1.0
-        else:
-            self.proxy_factor = -1.0
+    # def set_proxy(self, proxy):
+    #     self.proxy = proxy
+    #     if hasattr(self, "proxy_factor"):
+    #         return
+    #     if self.proxy is not None and self.proxy.maximize is not None:
+    #         # can be None for dropout regressor/UCB
+    #         maximize = self.proxy.maximize
+    #     elif self.oracle is not None:
+    #         maximize = self.oracle[0].maximize
+    #         print("\nAssumed that all Oracles have same maximize value.")
+    #     else:
+    #         raise ValueError("Proxy and Oracle cannot be None together.")
+    #     if maximize:
+    #         self.proxy_factor = 1.0
+    #     else:
+    #         self.proxy_factor = -1.0
 
     def unpad_function(self, states_term):
         if hasattr(self.env, "unpad_function") == False:
@@ -270,20 +270,28 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 scores[idx_fid] = self.oracle[fid](states)
         return scores
 
-    def get_actions_space(self):
-        actions = self.env.get_actions_space()
-        for fid_index in range(self.n_fid):
-            actions = actions + [(self.fid, fid_index)]
-        self.action_max_length = max(len(action) for action in actions)
-        # assumes all actions in the sf-env are of the same length
-        # TODO: remove self.action_max_length if we can make the above assumption
-        self.action_pad_length = self.action_max_length - len(actions[0])
-        if self.action_pad_length > 0:
-            actions = [
-                tuple(list(action) + [0] * (self.action_max_length - len(action)))
-                for action in actions
-            ]
-        return actions
+    def get_action_space(self):
+        actions = self.env.get_action_space()
+        action_max_length = len(actions[0])
+        updated_actions = []
+        for action in actions:
+            action_list = list(action)
+            action = tuple(action_list + [0])
+            updated_actions.append(action)
+        for fid_index in range(1, self.n_fid+1):
+            fid_action = tuple([0 for _ in range(action_max_length)] + [fid_index])
+            updated_actions.append(fid_action)
+        self.action_max_length = action_max_length + 1
+        # self.action_max_length = max(len(action) for action in actions)
+        # # assumes all actions in the sf-env are of the same length
+        # # TODO: remove self.action_max_length if we can make the above assumption
+        # self.action_pad_length = self.action_max_length - len(actions[0])
+        # if self.action_pad_length > 0:
+        #     actions = [
+        #         tuple(list(action) + [0] * (self.action_max_length - len(action)))
+        #         for action in actions
+        #     ]
+        return updated_actions
 
     def reset(self, env_id=None, fid: int = -1):
         # Fid in the state should range from 0 to self.n_fid -1 for easy one hot encoding
@@ -463,9 +471,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # But the parent_a would be eos
             return [], []
         parents_no_fid, actions = self.env.get_parents(state[:-1])
-        if self.action_pad_length > 0:
-            actions = [
-                tuple(list(action) + [0] * (self.action_pad_length))
+        # if self.action_pad_length > 0:
+        actions = [
+                tuple(list(action) + [0])
                 for action in actions
             ]
         # If fidelity has not been chosen in the state, then fidelity has not been chosen in the parent as well
@@ -492,7 +500,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     torch.cat([parent, fid_tensor], dim=-1) for parent in parents_no_fid
                 ]
                 fid_parent = torch.cat([state[:-1], torch.tensor([-1])], dim=-1)
-            actions.append(tuple([self.fid, fid] + [0] * (self.action_max_length - 2)))
+            actions.append(tuple([fid] + [0] * (self.action_max_length - 1)))
             parents.append(fid_parent)
         return parents, actions
 
@@ -547,7 +555,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             )
             raise ValueError("Action has been sampled despite environment being done")
             # return self.state, action, False
-        if action[0] == self.fid:
+        if action[-1] != 0:
             if self.fid_done == False:
                 self.state[-1] = action[1]
                 self.fid_done = True
