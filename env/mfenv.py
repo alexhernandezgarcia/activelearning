@@ -278,7 +278,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             action_list = list(action)
             action = tuple(action_list + [0])
             updated_actions.append(action)
-        for fid_index in range(1, self.n_fid+1):
+        for fid_index in range(1, self.n_fid + 1):
             fid_action = tuple([0 for _ in range(action_max_length)] + [fid_index])
             updated_actions.append(fid_action)
         self.action_max_length = action_max_length + 1
@@ -472,10 +472,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             return [], []
         parents_no_fid, actions = self.env.get_parents(state[:-1])
         # if self.action_pad_length > 0:
-        actions = [
-                tuple(list(action) + [0])
-                for action in actions
-            ]
+        actions = [tuple(list(action) + [0]) for action in actions]
         # If fidelity has not been chosen in the state, then fidelity has not been chosen in the parent as well
         if state[-1] == -1:
             if self.is_state_list:
