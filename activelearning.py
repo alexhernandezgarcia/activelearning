@@ -16,7 +16,7 @@ import numpy as np
 from utils.common import get_figure_plots
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="sf_aptamers")
 def main(config):
     if config.logger.logdir.root == "./logs":
         cwd = os.getcwd()
@@ -165,7 +165,10 @@ def main(config):
     cumulative_sampled_energies = torch.tensor([], device=env.device, dtype=env.float)
     cumulative_sampled_fidelities = torch.tensor([], device=env.device, dtype=env.float)
     iter = 1
+
+    env.reward_beta = env.reward_beta/env.beta_factor
     while cumulative_cost < BUDGET:
+        env.reward_beta = env.reward_beta*env.beta_factor
         # for iter in range(1, config.al_n_rounds + 1):
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
