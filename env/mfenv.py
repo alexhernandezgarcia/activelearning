@@ -789,7 +789,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             raise NotImplementedError
         return fidelities
 
-    def initialize_dataset(self, config, n_samples):
+    def initialize_dataset(self, config, n_samples, resume):
         train_scores = []
         test_scores = []
         train_samples = []
@@ -817,26 +817,61 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         else:
             samples = train_samples + test_samples
             if config.type == "sf":
-                states = [
-                    torch.tensor(self.env.readable2state(sample)) for sample in samples
+                train_states = [
+                    torch.tensor(self.env.readable2state(sample))
+                    for sample in train_samples
                 ]
+                test_states = [
+                    torch.tensor(self.env.readable2state(sample))
+                    for sample in test_samples
+                ]
+                states = train_states + test_states
+
+                # states = [
+                # torch.tensor(self.env.readable2state(sample)) for sample in samples
+                # ]
             else:
-                states = [
-                    torch.tensor(self.readable2state(sample)) for sample in samples
+                train_states = [
+                    torch.tensor(self.readable2state(sample))
+                    for sample in train_samples
                 ]
+                test_states = [
+                    torch.tensor(self.readable2state(sample)) for sample in test_samples
+                ]
+                states = train_states + test_states
+                # train_states = torch.tensor(train_states, dtype=self.float)
+                # test_states = torch.tensor(test_states, dtype=self.float)
+                # states = [
+                # torch.tensor(self.readable2state(sample)) for sample in samples
+                # ]
+            train_states = torch.stack(train_states)
+            if test_scores != []:
+                test_states = torch.stack(test_states)
             states = torch.stack(states)
             if config.type == "sf":
                 fidelties = self.generate_fidelities(len(states), config)
                 states = torch.cat([states, fidelties], dim=-1)
 
         scores = train_scores + test_scores
+        # if isinstance(train_scores, List):
+        #     scores = torch.tensor([train_scores + test_scores], dtype = self.float)
+        # else:scores
+        #      = torch.cat([train_scores, test_scores], dim=0)
         if scores == []:
             states_oracle_input = states.clone()
             state_oracle, fid = self.statetorch2oracle(states_oracle_input)
             scores = self.call_oracle_per_fidelity(state_oracle, fid)
         if isinstance(scores, List):
             scores = torch.tensor(scores, dtype=self.float)
-        return states, scores
+        if resume == False:
+            return states, scores
+        else:
+            if isinstance(train_scores, List):
+                train_scores = torch.tensor(train_scores, dtype=self.float)
+            if isinstance(test_scores, List):
+                test_scores = torch.tensor(test_scores, dtype=self.float)
+            return train_states, train_scores, test_states, test_scores
+        # return state_score_tuple
 
     # def get_trajectories(
     #     self, traj_list, traj_actions_list, current_traj, current_actions

@@ -96,7 +96,7 @@ class AMP(GFlowNetEnv, GflowNetAMP):
     #     scores = train_df["energies"]
     #     return states, scores
 
-    def initialize_dataset(self, config, n_samples, **kwargs):
+    def initialize_dataset(self, config, n_samples, resume, **kwargs):
         train_scores = torch.tensor([])
         test_scores = torch.tensor([])
         train_states = torch.tensor([])
@@ -136,7 +136,10 @@ class AMP(GFlowNetEnv, GflowNetAMP):
             oracle_states = self.statetorch2oracle(states_oracle_input)
             scores = self.oracle(oracle_states)
 
-        return states, scores
+        if resume == False:
+            return states, scores
+        else:
+            return train_states, train_scores, test_states, test_scores
 
     def load_dataset(self, split="D1", nfold=5):
         # TODO: rename to make_dataset()?
