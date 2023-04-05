@@ -79,6 +79,8 @@ class AL_Logger(Logger):
             name = Path(self.data_path.stem + "_" + type + ".csv")
             path = self.data_path.parent / name
             data.to_csv(path)
+        if self.do.online:
+            # return
             wandb_path = Path(
                 self.wandb.run.dir + "/" + self.data_path.stem + "_" + type + ".csv"
             )
