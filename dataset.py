@@ -117,21 +117,6 @@ class DataHandler:
                     "get_scores": False,
                 },
             }
-            # self.path.oracle_dataset.train.path = str(self.logger.data_path.parent / Path("data_train.csv"))
-            # self.path.oracle_dataset.train.get_scores = False
-            # self.path.oracle_dataset.test = {
-            # "path": str(self.logger.data_path.parent / Path("data_test.csv")),
-            # "get_scores": False,
-            # }
-            # test_path = self.logger.data_path.parent / Path("data_test.csv")
-            # train_path = Path(self.logger.wandb.run.dir + "/data_train.csv")
-            # test_path = Path(self.logger.wandb.run.dir + "/data_test.csv")
-            # train_data = pd.read_csv(train_path)
-            # test_data = pd.read_csv(test_path)
-            # train_states = torch.from_numpy(train_data["samples"].values)
-            # train_scores = torch.from_numpy(train_data["energies"].values)
-            # test_states = torch.from_numpy(test_data["samples"].values)
-            # test_scores = torch.from_numpy(test_data["energies"].values)
         if hasattr(self.env, "initialize_dataset"):
             state_score_tuple = self.env.initialize_dataset(
                 self.path, self.n_samples, self.logger.resume
@@ -183,13 +168,13 @@ class DataHandler:
             test_scores = torch.Tensor([])
         elif self.split == "given":
             assert train_states is not None
-            # train_states = torch.vstack(train_states)
             assert test_states is not None
-            # test_states = torch.vstack(test_states)
             assert train_scores is not None
-            # train_scores = torch.tensor(train_scores)
             assert test_scores is not None
-            # test_scores = torch.tensor(test_scores)
+            train_states = train_states.to(self.device)
+            test_states = test_states.to(self.device)
+            train_scores = train_scores.to(self.float).to(self.device)
+            test_scores = test_scores.to(self.float).to(self.device)
         else:
             raise ValueError("Split type not implemented")
 
