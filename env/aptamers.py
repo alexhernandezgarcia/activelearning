@@ -90,6 +90,10 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
         return ax
 
     def initialize_dataset(self, config, n_samples, resume, **kwargs):
+        train_states = torch.tensor([])
+        train_scores = torch.tensor([])
+        test_states = torch.tensor([])
+        test_scores = torch.tensor([])
         if config.oracle_dataset is not None:
             if config.oracle_dataset.train is not None:
                 train_df = pd.read_csv(config.oracle_dataset.train.path)
@@ -109,8 +113,14 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
                 test_states = test_states - 1
                 test_scores = test_df["energies"].values.tolist()
                 test_scores = torch.tensor(test_scores)
-        states = train_states + test_states
-        scores = train_scores + test_scores
+        if test_states.shape[0] == 0:
+            states = train_states
+            scores = train_scores
+        else:
+            states = torch.vstack([train_states, test_states])
+            scores = torch.cat([train_scores, test_scores])
+        # states = train_states + test_states
+        # scores = train_scores + test_scores
         if resume == False:
             return states, scores
         else:
