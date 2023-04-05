@@ -12,17 +12,18 @@ from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import make_dataset
 import matplotlib.pyplot as plt
 from regressor.dkl import Tokenizer
-from pathlib import Path
-import pandas as pd
 import numpy as np
 from utils.common import get_figure_plots
-from torchtyping import TensorType
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
-    cwd = os.getcwd()
-    config.logger.logdir.root = cwd
+    if config.logger.logdir.root == "./logs":
+        cwd = os.getcwd()
+        config.logger.logdir.root = cwd
+    else:
+        os.chdir(config.logger.logdir.root)
+
     # Reset seed for job-name generation in multirun jobs
     random.seed(None)
     # Set other random seeds
@@ -100,6 +101,8 @@ def main(config):
             oracle=oracles,
             proxy_state_format=config.env.proxy_state_format,
             rescale=rescale,
+            device=config.device,
+            float_precision=config.float_precision,
         )
         # Best fidelity
         env.env.oracle = oracles[-1]

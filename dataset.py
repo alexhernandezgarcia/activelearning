@@ -106,28 +106,56 @@ class DataHandler:
 
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalized data is saved as npy
         """
+        if self.logger.resume:
+            self.path.oracle_dataset = {
+                "train": {
+                    "path": str(self.logger.data_path.parent / Path("data_train.csv")),
+                    "get_scores": False,
+                },
+                "test": {
+                    "path": str(self.logger.data_path.parent / Path("data_test.csv")),
+                    "get_scores": False,
+                },
+            }
+            # self.path.oracle_dataset.train.path = str(self.logger.data_path.parent / Path("data_train.csv"))
+            # self.path.oracle_dataset.train.get_scores = False
+            # self.path.oracle_dataset.test = {
+            # "path": str(self.logger.data_path.parent / Path("data_test.csv")),
+            # "get_scores": False,
+            # }
+            # test_path = self.logger.data_path.parent / Path("data_test.csv")
+            # train_path = Path(self.logger.wandb.run.dir + "/data_train.csv")
+            # test_path = Path(self.logger.wandb.run.dir + "/data_test.csv")
+            # train_data = pd.read_csv(train_path)
+            # test_data = pd.read_csv(test_path)
+            # train_states = torch.from_numpy(train_data["samples"].values)
+            # train_scores = torch.from_numpy(train_data["energies"].values)
+            # test_states = torch.from_numpy(test_data["samples"].values)
+            # test_scores = torch.from_numpy(test_data["energies"].values)
         if hasattr(self.env, "initialize_dataset"):
-            states, scores = self.env.initialize_dataset(self.path, self.n_samples)
-
+            state_score_tuple = self.env.initialize_dataset(
+                self.path, self.n_samples, self.logger.resume
+            )
+            if self.logger.resume == True:
+                self.split = "given"
+                train_states = state_score_tuple[0]
+                train_scores = state_score_tuple[1]
+                test_states = state_score_tuple[2]
+                test_scores = state_score_tuple[3]
+                states = torch.cat((train_states, test_states), dim=0)
+                scores = torch.cat((train_scores, test_scores), dim=0)
+            else:
+                states = state_score_tuple[0]
+                scores = state_score_tuple[1]
             if self.n_fid > 1:
                 fidelities = states[:, -1].tolist()
             else:
                 fidelities = None
+
         else:
             raise NotImplementedError(
                 "Dataset initialisation not implemented for this environment"
             )
-
-        get_figure_plots(
-            self.env,
-            states,
-            scores,
-            fidelities,
-            logger=self.logger,
-            title="Initial Dataset",
-            key="initial_dataset",
-            use_context=True,
-        )
 
         scores = scores * self.target_factor
 
@@ -155,15 +183,37 @@ class DataHandler:
             test_scores = torch.Tensor([])
         elif self.split == "given":
             assert train_states is not None
-            train_states = torch.vstack(train_states)
+            # train_states = torch.vstack(train_states)
             assert test_states is not None
-            test_states = torch.vstack(test_states)
+            # test_states = torch.vstack(test_states)
             assert train_scores is not None
-            train_scores = torch.tensor(train_scores)
+            # train_scores = torch.tensor(train_scores)
             assert test_scores is not None
-            test_scores = torch.tensor(test_scores)
+            # test_scores = torch.tensor(test_scores)
         else:
             raise ValueError("Split type not implemented")
+
+        get_figure_plots(
+            self.env,
+            train_states,
+            train_scores,
+            fidelities,
+            logger=self.logger,
+            title="Initial Train Dataset",
+            key="initial_train_dataset",
+            use_context=True,
+        )
+
+        get_figure_plots(
+            self.env,
+            test_states,
+            test_scores,
+            fidelities,
+            logger=self.logger,
+            title="Initial Test Dataset",
+            key="initial_test_dataset",
+            use_context=True,
+        )
         # if hasattr(self.sfenv, "statetorch2readable"):
         readable_train_samples = [
             self.env.statetorch2readable(sample) for sample in train_states
