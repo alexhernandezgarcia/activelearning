@@ -17,7 +17,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Multi-fidelity environment for GFlowNet.
     Assumes same data transformation required for all oracles.
     Does not require the different oracles as scoring is performed by GFN not env
-    Fidelity is from 1 to n now
+    Fidelity in state is from 0 to n-1
     Fidelity action is (0, 0, 1)..(0, 0, n) for n fidelities
 
     """
