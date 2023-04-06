@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_dkl")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     if config.logger.logdir.root == "./logs":
         cwd = os.getcwd()
@@ -181,9 +181,9 @@ def main(config):
         iter = logger.resume_dict["iter"] + 1
 
     env.reward_beta = env.reward_beta / env.beta_factor
+    initial_reward_beta = env.reward_beta
     while cumulative_cost < BUDGET:
-        env.reward_beta = env.reward_beta * env.beta_factor
-        # for iter in range(1, config.al_n_rounds + 1):
+        env.reward_beta = initial_reward_beta * env.beta_factor * iter
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
             # Different number of inducing points calculated by cholesky method in each iteration
@@ -365,9 +365,10 @@ def main(config):
                 "cumulative_cost": cumulative_cost,
                 "iter": iter,
             }
-            path = os.path.join(logger.wandb.run.dir, "cumulative_stats.pkl")
-            with open(path, "wb") as f:
-                pickle.dump(cumulative_stats, f)
+            if logger.do.online:
+                path = os.path.join(logger.wandb.run.dir, "cumulative_stats.pkl")
+                with open(path, "wb") as f:
+                    pickle.dump(cumulative_stats, f)
 
         del gflownet
         del proxy
