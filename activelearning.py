@@ -181,8 +181,9 @@ def main(config):
         iter = logger.resume_dict["iter"] + 1
 
     env.reward_beta = env.reward_beta / env.beta_factor
+    initial_reward_beta = env.reward_beta
     while cumulative_cost < BUDGET:
-        env.reward_beta = env.reward_beta * env.beta_factor
+        env.reward_beta = initial_reward_beta * env.beta_factor * iter
         # for iter in range(1, config.al_n_rounds + 1):
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
