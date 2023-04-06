@@ -11,31 +11,35 @@ defaults:
   - oracle@_oracle_dict.3: branin3
   - gflownet: trajectorybalance
   - user: nikita
-  - proxy: mf_mes_dkl #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
+  - proxy: mf_mes_gp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
   - dataset: dataset
-  - regressor: mf_dkl #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
-  - model: regressive #regressive
+  - regressor: mf_gp #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
+  # - model: regressive #regressive
   - logger: wandb
 
-proxy:
-  cost_type: user
+# proxy:
+#   cost_type: user
 
-model:
-  beta1: 0.0
-  beta2: 0.01
+# model:
+#   beta1: 0.0
+#   beta2: 0.01
 
-regressor:
-  optim: adam
-  surrogate:
-    eval_period: 1
-    num_epochs: 2048
-    patience: 100
-    num_inducing_points: 64
-  encoder_obj: no_train
-  lr_sched_type: plateau #step
+# regressor:
+#   optim: adam
+#   surrogate:
+#     eval_period: 1
+#     num_epochs: 2048
+#     patience: 100
+#     num_inducing_points: 64
+#   encoder_obj: no_train
+#   lr_sched_type: plateau #step
 
 logger:
-  project_name: "MF-Grid"
+  # resume: True 
+  # logdir: 
+  #   root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-04-06_18-31-55
+  # run_id: 694bvn10
+  project_name: "Scratch"
   lightweight: False
   plot:
     period: -1

@@ -179,7 +179,9 @@ class AMP(GFlowNetEnv, GflowNetAMP):
         return train, test
 
     def get_random_terminating_states(self, n_samples, **kwargs):
-        states = torch.randint((5 * n_samples, self.max_seq_length), 0, 19)
+        states = torch.randint(
+            low=0, high=19, size=(5 * n_samples, self.max_seq_length)
+        )
         # select unique states
         states = torch.unique(states, dim=0)[:n_samples]
         list_of_states = list(states)
