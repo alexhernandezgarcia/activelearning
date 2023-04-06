@@ -120,7 +120,7 @@ class Grid(GFlowNetEnv, GflowNetGrid):
             plt.close()
         return ax
 
-    def initialize_dataset(self, config, n_samples, **kwargs):
+    def initialize_dataset(self, config, n_samples, resume, **kwargs):
         train_scores = []
         test_scores = []
         train_samples = []
@@ -144,12 +144,23 @@ class Grid(GFlowNetEnv, GflowNetGrid):
                 self.get_uniform_terminating_states(n_samples), dtype=self.float
             )
         else:
-            samples = train_samples + test_samples
-            states = [torch.tensor(self.readable2state(sample)) for sample in samples]
-            states = torch.stack(states)
+            # samples = train_samples + test_samples
+            train_states = [
+                torch.tensor(self.readable2state(sample)) for sample in train_samples
+            ]
+            test_states = [
+                torch.tensor(self.readable2state(sample)) for sample in test_samples
+            ]
+            states = torch.stack(train_states + test_states)
+            # states = torch.cat([train_states, test_states])
         scores = train_scores + test_scores
         if scores == []:
             states_oracle_input = states.clone()
             state_oracle = self.statetorch2oracle(states_oracle_input)
             scores = self.oracle(state_oracle)
-        return states, scores
+
+        if resume == False:
+            return states, scores
+        else:
+            return train_states, train_scores, test_states, test_scores
+        # return states, scores

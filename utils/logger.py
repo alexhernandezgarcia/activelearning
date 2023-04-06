@@ -79,6 +79,12 @@ class AL_Logger(Logger):
             name = Path(self.data_path.stem + "_" + type + ".csv")
             path = self.data_path.parent / name
             data.to_csv(path)
+        if self.do.online:
+            # return
+            wandb_path = Path(
+                self.wandb.run.dir + "/" + self.data_path.stem + "_" + type + ".csv"
+            )
+            data.to_csv(wandb_path)
 
     def log_figure(self, key, fig, use_context):
         if not self.do.online and fig is not None:

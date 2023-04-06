@@ -12,17 +12,19 @@ from env.mfenv import MultiFidelityEnvWrapper
 from utils.multifidelity_toy import make_dataset
 import matplotlib.pyplot as plt
 from regressor.dkl import Tokenizer
-from pathlib import Path
-import pandas as pd
 import numpy as np
 from utils.common import get_figure_plots
-from torchtyping import TensorType
+import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="mf_dkl")
 def main(config):
-    cwd = os.getcwd()
-    config.logger.logdir.root = cwd
+    if config.logger.logdir.root == "./logs":
+        cwd = os.getcwd()
+        config.logger.logdir.root = cwd
+    else:
+        os.chdir(config.logger.logdir.root)
+
     # Reset seed for job-name generation in multirun jobs
     random.seed(None)
     # Set other random seeds
@@ -100,6 +102,8 @@ def main(config):
             oracle=oracles,
             proxy_state_format=config.env.proxy_state_format,
             rescale=rescale,
+            device=config.device,
+            float_precision=config.float_precision,
         )
         # Best fidelity
         env.env.oracle = oracles[-1]
@@ -155,14 +159,30 @@ def main(config):
                 device=config.device,
                 path=config.multifidelity.candidate_set_path,
             )
+    if logger.resume == False:
+        cumulative_cost = 0.0
+        cumulative_sampled_states = []
+        cumulative_sampled_samples = []
+        cumulative_sampled_energies = torch.tensor(
+            [], device=env.device, dtype=env.float
+        )
+        cumulative_sampled_fidelities = torch.tensor(
+            [], device=env.device, dtype=env.float
+        )
+        iter = 1
+    else:
+        cumulative_cost = logger.resume_dict["cumulative_cost"]
+        cumulative_sampled_states = logger.resume_dict["cumulative_sampled_states"]
+        cumulative_sampled_samples = logger.resume_dict["cumulative_sampled_samples"]
+        cumulative_sampled_energies = logger.resume_dict["cumulative_sampled_energies"]
+        cumulative_sampled_fidelities = logger.resume_dict[
+            "cumulative_sampled_fidelities"
+        ]
+        iter = logger.resume_dict["iter"] + 1
 
-    cumulative_cost = 0.0
-    cumulative_sampled_states = []
-    cumulative_sampled_samples = []
-    cumulative_sampled_energies = torch.tensor([], device=env.device, dtype=env.float)
-    cumulative_sampled_fidelities = torch.tensor([], device=env.device, dtype=env.float)
-    iter = 1
+    env.reward_beta = env.reward_beta / env.beta_factor
     while cumulative_cost < BUDGET:
+        env.reward_beta = env.reward_beta * env.beta_factor
         # for iter in range(1, config.al_n_rounds + 1):
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
@@ -336,6 +356,18 @@ def main(config):
                 data_handler.update_dataset(
                     picked_states, picked_energies.tolist(), picked_fidelity
                 )
+
+            cumulative_stats = {
+                "cumulative_sampled_states": cumulative_sampled_states,
+                "cumulative_sampled_samples": cumulative_sampled_samples,
+                "cumulative_sampled_energies": cumulative_sampled_energies,
+                "cumulative_sampled_fidelities": cumulative_sampled_fidelities,
+                "cumulative_cost": cumulative_cost,
+                "iter": iter,
+            }
+            path = os.path.join(logger.wandb.run.dir, "cumulative_stats.pkl")
+            with open(path, "wb") as f:
+                pickle.dump(cumulative_stats, f)
 
         del gflownet
         del proxy
