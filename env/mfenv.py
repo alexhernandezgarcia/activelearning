@@ -374,7 +374,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         fid_array = np.array(fid_list, dtype=np.int32)
         index = np.where(fid_array != -1)[0]
         if index.size:
-            fid_policy[index, fid_array[index] - 1] = 1
+            fid_policy[index, fid_array[index]] = 1
         if self.is_state_list == False:
             state_policy = state_policy.squeeze(1).detach().cpu().numpy()
         state_fid_policy = np.concatenate((state_policy, fid_policy), axis=1)
@@ -464,17 +464,18 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # 2. The parent with action as choosing that fidelity
         elif state[-1] != -1:
             if self.is_state_list:
-                fid = state[-1]
-                parents = [parent + [fid] for parent in parents_no_fid]
+                state_fid = state[-1]
+                parents = [parent + [state_fid] for parent in parents_no_fid]
                 fid_parent = state[:-1] + [-1]
             else:
-                fid = state[-1].item()
-                fid_tensor = torch.tensor([fid], device=state.device)
+                state_fid = state[-1].item()
+                state_fid_tensor = torch.tensor([state_fid], device=state.device)
                 parents = [
-                    torch.cat([parent, fid_tensor], dim=-1) for parent in parents_no_fid
+                    torch.cat([parent, state_fid_tensor], dim=-1)
+                    for parent in parents_no_fid
                 ]
                 fid_parent = torch.cat([state[:-1], torch.tensor([-1])], dim=-1)
-            actions.append(tuple([0] * (self.action_length - 1) + [fid]))
+            actions.append(tuple([0] * (self.action_length - 1) + [state_fid + 1]))
             parents.append(fid_parent)
         return parents, actions
 
@@ -531,7 +532,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # return self.state, action, False
         if action[-1] != 0:
             if self.fid_done == False:
-                self.state[-1] = action[-1]
+                self.state[-1] = action[-1] - 1
                 self.fid_done = True
                 self.n_actions += 1
             else:
@@ -742,7 +743,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def get_cost(self, samples, fidelities=None):
         if fidelities is None:
             fidelities = [sample[-1] for sample in samples]
-            fidelity_of_oracle = [self.oracle[int(fid) - 1].fid for fid in fidelities]
+            fidelity_of_oracle = [self.oracle[int(fid)].fid for fid in fidelities]
             fidelities = fidelity_of_oracle
         if isinstance(fidelities, TensorType):
             if fidelities.ndim == 2:
