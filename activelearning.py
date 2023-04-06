@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_dkl")
 def main(config):
     if config.logger.logdir.root == "./logs":
         cwd = os.getcwd()
