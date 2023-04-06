@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import wandb
+import glob
+import pickle
+import os
 
 
 class AL_Logger(Logger):
@@ -29,6 +32,28 @@ class AL_Logger(Logger):
         )
         self.data_dir = self.logdir / logdir.data
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        if self.resume is True:
+            run_folders = glob.glob(os.path.join(logdir.root, "wandb/run-*"))
+            run_folders.sort()
+            run_folder = run_folders[-2]
+            path = os.path.join(run_folder, "files/cumulative_stats.pkl")
+            try:
+                with open(path, "rb") as f:
+                    self.resume_dict = pickle.load(f)
+            except:
+                if len(run_folders) > 2:
+                    run_folder = run_folders[-3]
+                    path = os.path.join(
+                        logdir.root, "wandb/{}/files/cumulative_stats.pkl"
+                    )
+                    with open(path, "rb") as f:
+                        self.resume_dict = pickle.load(f)
+                else:
+                    raise FileNotFoundError(
+                        "No cumulative_stats.pkl file found in {} and no other run folder exists for this experiment".format(
+                            path
+                        )
+                    )
 
     def set_proxy_path(self, ckpt_id: str = None):
         if ckpt_id is None:

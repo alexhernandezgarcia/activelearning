@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_dkl")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     if config.logger.logdir.root == "./logs":
         cwd = os.getcwd()
@@ -365,9 +365,10 @@ def main(config):
                 "cumulative_cost": cumulative_cost,
                 "iter": iter,
             }
-            path = os.path.join(logger.wandb.run.dir, "cumulative_stats.pkl")
-            with open(path, "wb") as f:
-                pickle.dump(cumulative_stats, f)
+            if logger.do.online:
+                path = os.path.join(logger.wandb.run.dir, "cumulative_stats.pkl")
+                with open(path, "wb") as f:
+                    pickle.dump(cumulative_stats, f)
 
         del gflownet
         del proxy

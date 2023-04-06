@@ -17,6 +17,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Multi-fidelity environment for GFlowNet.
     Assumes same data transformation required for all oracles.
     Does not require the different oracles as scoring is performed by GFN not env
+    Fidelity is from 1 to n now
+    Fidelity action is (0, 0, 1)..(0, 0, n) for n fidelities
+
     """
 
     def __init__(self, env, n_fid, **kwargs):
@@ -67,23 +70,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             raise ValueError("Invalid proxy_state_format")
         # self.oracle = oracle
         self.fidelity_costs = self.set_fidelity_costs()
-
-    # def set_proxy(self, proxy):
-    #     self.proxy = proxy
-    #     if hasattr(self, "proxy_factor"):
-    #         return
-    #     if self.proxy is not None and self.proxy.maximize is not None:
-    #         # can be None for dropout regressor/UCB
-    #         maximize = self.proxy.maximize
-    #     elif self.oracle is not None:
-    #         maximize = self.oracle[0].maximize
-    #         print("\nAssumed that all Oracles have same maximize value.")
-    #     else:
-    #         raise ValueError("Proxy and Oracle cannot be None together.")
-    #     if maximize:
-    #         self.proxy_factor = 1.0
-    #     else:
-    #         self.proxy_factor = -1.0
 
     def unpad_function(self, states_term):
         if hasattr(self.env, "unpad_function") == False:
@@ -272,25 +258,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_action_space(self):
         actions = self.env.get_action_space()
-        action_max_length = len(actions[0])
+        action_length = len(actions[0])
         updated_actions = []
         for action in actions:
             action_list = list(action)
             action = tuple(action_list + [0])
             updated_actions.append(action)
         for fid_index in range(1, self.n_fid + 1):
-            fid_action = tuple([0 for _ in range(action_max_length)] + [fid_index])
+            fid_action = tuple([0 for _ in range(action_length)] + [fid_index])
             updated_actions.append(fid_action)
-        self.action_max_length = action_max_length + 1
-        # self.action_max_length = max(len(action) for action in actions)
-        # # assumes all actions in the sf-env are of the same length
-        # # TODO: remove self.action_max_length if we can make the above assumption
-        # self.action_pad_length = self.action_max_length - len(actions[0])
-        # if self.action_pad_length > 0:
-        #     actions = [
-        #         tuple(list(action) + [0] * (self.action_max_length - len(action)))
-        #         for action in actions
-        #     ]
+        self.action_length = action_length + 1
         return updated_actions
 
     def reset(self, env_id=None, fid: int = -1):
@@ -397,7 +374,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         fid_array = np.array(fid_list, dtype=np.int32)
         index = np.where(fid_array != -1)[0]
         if index.size:
-            fid_policy[index, fid_array[index]] = 1
+            fid_policy[index, fid_array[index] - 1] = 1
         if self.is_state_list == False:
             state_policy = state_policy.squeeze(1).detach().cpu().numpy()
         state_fid_policy = np.concatenate((state_policy, fid_policy), axis=1)
@@ -497,7 +474,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     torch.cat([parent, fid_tensor], dim=-1) for parent in parents_no_fid
                 ]
                 fid_parent = torch.cat([state[:-1], torch.tensor([-1])], dim=-1)
-            actions.append(tuple([fid] + [0] * (self.action_max_length - 1)))
+            actions.append(tuple([0] * (self.action_length - 1) + [fid]))
             parents.append(fid_parent)
         return parents, actions
 
@@ -554,7 +531,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             # return self.state, action, False
         if action[-1] != 0:
             if self.fid_done == False:
-                self.state[-1] = action[1]
+                self.state[-1] = action[-1]
                 self.fid_done = True
                 self.n_actions += 1
             else:
@@ -582,7 +559,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             return self.state, action, True
         else:
             fid = self.state[-1]
-            env_action = action[: -self.action_pad_length]
+            env_action = action[:-1]
             state, action, valid = self.env.step(env_action)
             if valid:
                 self.n_actions += 1
@@ -593,7 +570,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 self.state = torch.cat([state, fid], dim=-1)
             assert self.fid_done == (self.state[-1] != -1)
             self.done = self.env.done and self.fid_done
-            padded_action = tuple(list(action) + [0] * (self.action_pad_length))
+            padded_action = tuple(
+                list(action) + [0] * (self.action_length - len(action))
+            )
             return self.state, padded_action, valid
 
     def statetorch2policy(
@@ -763,7 +742,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def get_cost(self, samples, fidelities=None):
         if fidelities is None:
             fidelities = [sample[-1] for sample in samples]
-            fidelity_of_oracle = [self.oracle[int(fid)].fid for fid in fidelities]
+            fidelity_of_oracle = [self.oracle[int(fid) - 1].fid for fid in fidelities]
             fidelities = fidelity_of_oracle
         if isinstance(fidelities, TensorType):
             if fidelities.ndim == 2:
