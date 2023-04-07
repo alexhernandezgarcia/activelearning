@@ -43,12 +43,12 @@ logger:
   lightweight: False
   plot:
     period: -1
-    # first_it: True
+    first_it: True
   test:
-    period: 100
-    n: 1000
+    period: 500
+    n: 1
   oracle:
-    period: 1000
+    period: -1
   # ckpts:
   #   policy:
   #     period: 1000
