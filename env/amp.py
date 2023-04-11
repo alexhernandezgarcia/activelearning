@@ -28,7 +28,6 @@ class AMP(GFlowNetEnv, GflowNetAMP):
             raise ValueError(
                 "Invalid proxy_state_format: {}".format(self.proxy_state_format)
             )
-        self.tokenizer = None
 
     def set_tokenizer(self, tokenizer):
         self.tokenizer = tokenizer

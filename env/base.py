@@ -5,10 +5,11 @@ import time
 
 
 class GFlowNetEnv(BaseGFlowNetEnv):
-    def __init__(self, proxy_state_format, beta_factor=1, proxy=None, **kwargs):
+    def __init__(self, proxy_state_format, beta_factor=1, norm_factor=1, proxy=None, **kwargs):
         super().__init__(proxy=proxy, **kwargs)
         self.proxy_state_format = proxy_state_format
         self.beta_factor = beta_factor
+        self.norm_factor = norm_factor
         if proxy is not None:
             self.set_proxy(proxy)
 

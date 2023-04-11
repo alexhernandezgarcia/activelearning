@@ -25,6 +25,7 @@ def main(config):
     else:
         os.chdir(config.logger.logdir.root)
 
+    print(f"\nLogging directory of this run:  {cwd}\n")
     # Reset seed for job-name generation in multirun jobs
     random.seed(None)
     # Set other random seeds
@@ -181,9 +182,12 @@ def main(config):
         iter = logger.resume_dict["iter"] + 1
 
     env.reward_beta = env.reward_beta / env.beta_factor
+    env.reward_norm = env.reward_norm * env.norm_factor
     initial_reward_beta = env.reward_beta
+    initial_reward_norm = env.reward_norm
     while cumulative_cost < BUDGET:
         env.reward_beta = initial_reward_beta * env.beta_factor * iter
+        env.reward_norm = initial_reward_norm / (env.norm_factor * iter)
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
             # Different number of inducing points calculated by cholesky method in each iteration
