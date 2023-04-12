@@ -19,8 +19,12 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     Does not require the different oracles as scoring is performed by GFN not env
     """
 
-    def __init__(self, env, n_fid, oracle, proxy_state_format=None, **kwargs):
+    def __init__(self, env, n_fid, oracle, proxy_state_format=None, fid_embed = 'one_hot', fid_embed_dim = None, **kwargs):
         # TODO: super init kwargs
+        self.fid_embed = fid_embed
+        if self.fid_embed != 'one_hot' and fid_embed_dim is None:
+            raise ValueError("fid_embed_dim cannot be None for non-OHE embedding")
+        self.fid_embed_dim = fid_embed_dim
         super().__init__(**kwargs)
         self.env = env
         self.is_state_list = True
@@ -236,6 +240,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         class_var = self.__dict__.copy()
         class_var.pop("env", None)
         return MultiFidelityEnvWrapper(**class_var, env=env_copy)
+        
 
     def call_oracle_per_fidelity(self, state_oracle, fidelities):
         if fidelities.ndim == 2:
@@ -374,9 +379,16 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             else:
                 state = self.state.clone()
         state_policy = self.env.state2policy(state[:-1])
-        fid_policy = np.zeros((self.n_fid), dtype=np.float32)
-        if len(state) > 0 and state[-1] != -1:
-            fid_policy[state[-1]] = 1
+        fid = state[-1]
+        if self.fid_embed == "one_hot":
+            fid_policy = np.zeros((self.n_fid), dtype=np.float32)
+            if len(state) > 0 and fid != -1:
+                fid_policy[fid] = 1
+        elif self.fid_embed == "thermometer":
+            per_fid_dimension = int(self.fid_embed_dim/self.n_fid)
+            fid_policy = np.zeros((per_fid_dimension*self.n_fid), dtype=np.float32)
+            if len(state) > 0 and fid != -1:
+                fid_policy[0:(fid+1)*per_fid_dimension] = 1
         if self.is_state_list == False:
             state_policy = state_policy.squeeze(0).detach().cpu().numpy()
         state_fid_policy = np.concatenate((state_policy, fid_policy), axis=0)
@@ -387,11 +399,20 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             return np.array(states)
         state_policy, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
         state_policy = self.env.statebatch2policy(state_policy)
-        fid_policy = np.zeros((len(states), self.n_fid), dtype=np.float32)
-        fid_array = np.array(fid_list, dtype=np.int32)
-        index = np.where(fid_array != -1)[0]
-        if index.size:
-            fid_policy[index, fid_array[index]] = 1
+        if self.fid_embed == "one_hot":
+            fid_policy = np.zeros((len(states), self.n_fid), dtype=np.float32)
+            fid_array = np.array(fid_list, dtype=np.int32)
+            index = np.where(fid_array != -1)[0]
+            if index.size:
+                fid_policy[index, fid_array[index]] = 1
+        elif self.fid_embed == "thermometer":
+            per_fid_dimension = int(self.fid_embed_dim/self.n_fid)
+            fid_policy = np.zeros((len(states), per_fid_dimension*self.n_fid), dtype=np.float32)
+            fid_array = np.array(fid_list, dtype=np.int32)
+            fid_array = fid_array + 1
+            upper_lim = fid_array*per_fid_dimension
+            mask = np.arange(fid_policy.shape[1]) < upper_lim[:, np.newaxis]
+            fid_policy[mask] = 1
         if self.is_state_list == False:
             state_policy = state_policy.squeeze(1).detach().cpu().numpy()
         state_fid_policy = np.concatenate((state_policy, fid_policy), axis=1)
@@ -400,9 +421,42 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def policy2state(self, state_policy: List) -> List:
         policy_no_fid = state_policy[:, : -self.n_fid]
         state_no_fid = self.env.policy2state(policy_no_fid)
-        fid = np.argmax(state_policy[:, -self.n_fid :], axis=1)
+        if self.fid_embed == "one_hot":
+            fid = np.argmax(state_policy[:, -self.n_fid :], axis=1)
+        elif self.fid_embed == "thermometer":
+            per_fid_dimension = int(self.fid_embed_dim/self.n_fid)
+            fid = np.argmax(state_policy[:, -self.n_fid*per_fid_dimension:], axis=1)/per_fid_dimension
         state = state_no_fid + fid.to_list()
         return state
+    
+    def statetorch2policy(
+        self, states: TensorType["batch", "state_dim"]
+    ) -> TensorType["batch", "policy_input_dim"]:
+        state_policy = states[:, :-1]
+        state_policy = self.env.statetorch2policy(state_policy)
+        if self.fid_embed == 'one_hot':
+            fid_policy = torch.zeros(
+                (states.shape[0], self.n_fid), dtype=self.float, device=self.device
+            )
+            # check if the last element of state is in the range of fidelity
+            condition = torch.logical_and(
+                states[:, -1] >= 0, states[:, -1] < self.n_fid
+            ).unsqueeze(-1)
+            index = torch.where(condition)[0]
+            if index.size:
+                fid_policy[index, states[index, -1].long()] = 1
+        elif self.fid_embed == 'thermometer':
+            per_fid_dimension = int(self.fid_embed_dim/self.n_fid)
+            fid_tensor = states[:, -1]
+            fid_tensor = fid_tensor + 1
+            upper_lim = fid_tensor*per_fid_dimension
+            fid_policy = torch.zeros(
+                (states.shape[0], per_fid_dimension*self.n_fid), dtype=self.float, device=self.device
+            )
+            mask = torch.arange(fid_policy.shape[1], device = self.device, dtype = self.float) < upper_lim.unsqueeze(-1)
+            fid_policy[mask] = 1
+        state_fid_policy = torch.cat((state_policy, fid_policy), dim=1)
+        return state_fid_policy
 
     def state2readable(self, state=None):
         readable_state = self.env.state2readable(state[:-1])
@@ -592,24 +646,6 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             self.done = self.env.done and self.fid_done
             padded_action = tuple(list(action) + [0] * (self.action_pad_length))
             return self.state, padded_action, valid
-
-    def statetorch2policy(
-        self, states: TensorType["batch", "state_dim"]
-    ) -> TensorType["batch", "policy_input_dim"]:
-        state_policy = states[:, :-1]
-        state_policy = self.env.statetorch2policy(state_policy)
-        fid_policy = torch.zeros(
-            (states.shape[0], self.n_fid), dtype=self.float, device=self.device
-        )
-        # check if the last element of state is in the range of fidelity
-        condition = torch.logical_and(
-            states[:, -1] >= 0, states[:, -1] < self.n_fid
-        ).unsqueeze(-1)
-        index = torch.where(condition)[0]
-        if index.size:
-            fid_policy[index, states[index, -1].long()] = 1
-        state_fid_policy = torch.cat((state_policy, fid_policy), dim=1)
-        return state_fid_policy
 
     def statebatch2oracle(self, states: List[List]):
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
