@@ -105,6 +105,8 @@ def main(config):
             rescale=rescale,
             device=config.device,
             float_precision=config.float_precision,
+            fid_embed = config.multifidelity.fid_embed,
+            fid_embed_dim = config.multifidelity.fid_embed_dim,
         )
         # Best fidelity
         env.env.oracle = oracles[-1]
