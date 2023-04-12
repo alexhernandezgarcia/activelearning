@@ -33,6 +33,15 @@ class Grid(GFlowNetEnv, GflowNetGrid):
                 f"Proxy state format {self.proxy_state_format} not implemented"
             )
 
+    def statetorch2readable(self, state, alphabet={}):
+        """
+        Dataset Handler in activelearning deals only in tensors. This function converts the tesnor to readble format to save the train dataset
+        """
+        assert torch.eq(state.to(torch.long), state).all()
+        state = state.to(torch.long)
+        state = state.detach().cpu().numpy()
+        return str(state).replace("(", "[").replace(")", "]").replace(",", "")
+
     def statebatch2state(self, state_batch):
         """
         Converts a batch of states to AugmentedBranin oracle format

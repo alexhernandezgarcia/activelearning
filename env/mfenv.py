@@ -348,6 +348,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 state = self.state.copy()
             else:
                 state = self.state.clone()
+                if isinstance(fid_done, torch.Tensor):
+                    fid_done = fid_done.item()
         if done is None:
             done = self.done
         if done:
