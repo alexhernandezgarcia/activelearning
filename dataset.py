@@ -107,6 +107,10 @@ class DataHandler:
         If the dataset was initalised and save_data = True, the un-transformed (no proxy transformation) de-normalized data is saved as npy
         """
         if self.logger.resume:
+            if self.n_fid > 1:
+                self.path.type = "mf"
+            else:
+                self.path.type = "sf"
             self.path.oracle_dataset = {
                 "train": {
                     "path": str(self.logger.data_path.parent / Path("data_train.csv")),
