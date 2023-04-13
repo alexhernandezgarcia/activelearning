@@ -70,6 +70,8 @@ class Grid(GFlowNetEnv, GflowNetGrid):
         if oracle is None:
             oracle = self.oracle
         if scores is None:
+            if len(states) == 0:
+                return None
             if isinstance(states, torch.Tensor) == False:
                 states = torch.tensor(states, device=self.device, dtype=self.float)
             oracle_states = self.statetorch2oracle(states)
