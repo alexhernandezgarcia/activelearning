@@ -70,6 +70,8 @@ class Grid(GFlowNetEnv, GflowNetGrid):
         if oracle is None:
             oracle = self.oracle
         if scores is None:
+            if states is None or len(states) == 0:
+                return None
             if isinstance(states, torch.Tensor) == False:
                 states = torch.tensor(states, device=self.device, dtype=self.float)
             oracle_states = self.statetorch2oracle(states)
@@ -97,6 +99,8 @@ class Grid(GFlowNetEnv, GflowNetGrid):
             standalone = True
         else:
             standalone = False
+        if len(samples) == 0:
+            return None
         # assuming the first time this function would be called when the dataset is created
         if self.rescale == None:
             self.rescale = rescale

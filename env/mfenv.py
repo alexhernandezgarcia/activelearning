@@ -165,6 +165,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             ).unsqueeze(-1)
         else:
             fidelities = torch.vstack(fid).to(states.dtype).to(states.device)
+        # states = torch.cat([states, fidelities], dim=-1)
         # assert torch.eq(
         #     torch.unique(fidelities).sort()[0], torch.arange(self.n_fid).to(fidelities.device).sort()[0]
         # ).all()
@@ -186,6 +187,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         states = states[:, :-1]
         states = self.env.statetorch2state(states)
         fidelities = fidelities.to(states.dtype).to(states.device)
+        # states = torch.cat([states, fidelities.unsqueeze(-1)], dim=-1)
         # assert torch.eq(
         #     torch.unique(fidelities).sort()[0], torch.arange(self.n_fid).to(fidelities.device).sort()[0]
         # ).all()
