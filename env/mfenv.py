@@ -153,14 +153,14 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         """
         Input: List of states where states can be tensors or lists
         """
-        state, fid = zip(*[[state[:-1], state[-1]] for state in states])
+        state, fid_list = zip(*[[state[:-1], state[-1]] for state in states])
         states = self.env.statebatch2state(list(state))
         if self.is_state_list:
             fidelities = torch.tensor(
-                fid, device=states.device, dtype=states.dtype
+                fid_list, device=states.device, dtype=states.dtype
             ).unsqueeze(-1)
         else:
-            fidelities = torch.vstack(fid).to(states.dtype).to(states.device)
+            fidelities = torch.vstack(fid_list).to(states.dtype).to(states.device)
         # assert torch.eq(
         #     torch.unique(fidelities).sort()[0], torch.arange(self.n_fid).to(fidelities.device).sort()[0]
         # ).all()
@@ -589,6 +589,10 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 fid = torch.tensor([fid], device=state.device)
                 self.state = torch.cat([state, fid], dim=-1)
             assert self.fid_done == (self.state[-1] != -1)
+            if self.fid_done:
+                assert self.n_actions == self.env.n_actions + 1
+            else:
+                assert self.n_actions == self.env.n_actions
             self.done = self.env.done and self.fid_done
             padded_action = tuple(list(action) + [0] * (self.action_pad_length))
             return self.state, padded_action, valid
