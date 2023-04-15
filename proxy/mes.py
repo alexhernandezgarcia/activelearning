@@ -186,7 +186,7 @@ class GaussianProcessSingleFidelityMES(SingleFidelityMES):
             )
         )
         axs.imshow(grid_scores)
-        axs.set_title("GP SF MES Reward")
+        axs.set_title("GP SF MES AcqF Val")
         im = axs.imshow(grid_scores)
         divider = make_axes_locatable(axs)
         cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -434,7 +434,7 @@ class OracleMultiFidelityMES(MES):
             axs[fid].set_yticks(np.arange(start=0, stop=self.env.env.length, step=step))
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
-                "Oracle-MES Reward with fid {}".format(self.env.oracle[fid].fid)
+                "Oracle-MES AcqF Val with fid {}".format(self.env.oracle[fid].fid)
             )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])
@@ -572,7 +572,7 @@ class DeepKernelMultiFidelityMES(MES):
             )
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
-                "DKL-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+                "DKL-Mes AcqF Val with fid {}".format(self.env.oracle[fid].fid)
             )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])
@@ -662,7 +662,7 @@ class GaussianProcessMultiFidelityMES(MES):
             )
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
-                "GP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+                "GP-Mes AcqF Val with fid {}".format(self.env.oracle[fid].fid)
             )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])
@@ -762,7 +762,7 @@ class VariationalGPMultiFidelityMES(MES):
             )
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
-                "SVGP-Mes Reward with fid {}".format(self.env.oracle[fid].fid)
+                "SVGP-Mes AcqF Val with fid {}".format(self.env.oracle[fid].fid)
             )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])

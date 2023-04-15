@@ -46,7 +46,7 @@ class DataHandler:
         float_precision,
         is_mes,
         n_samples=None,
-        fidelity=None,
+        # fidelity=None,
         rescale=None,
     ):
         self.env = env
@@ -57,7 +57,7 @@ class DataHandler:
         self.split = split
         self.path = path
         self.logger = logger
-        self.fidelity = fidelity
+        # self.fidelity = fidelity
         self.progress = self.logger.progress
         self.target_factor = 1.0
         if oracle.maximize is False and is_mes is True:
@@ -74,25 +74,25 @@ class DataHandler:
         self.rescale = rescale
         self.initialise_dataset()
 
-    def generate_fidelities(self, states):
-        """
-        Generates a list of fidelities for the dataset
-        """
-        n_samples = len(states)
-        if self.fidelity.mixed:
-            fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1)).to(
-                self.float
-            )
-        else:
-            raise NotImplementedError(
-                "Logic not verified for when fidelity.mixed == False"
-            )
-            # One for each sample
-            fidelities = torch.zeros((n_samples * self.n_fid, 1)).to(self.device)
-            for i in range(self.n_fid):
-                fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
-            states = [states for _ in range(self.n_fid)]
-        return states, fidelities
+    # def generate_fidelities(self, states):
+    #     """
+    #     Generates a list of fidelities for the dataset
+    #     """
+    #     n_samples = len(states)
+    #     if self.fidelity.mixed:
+    #         fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1)).to(
+    #             self.float
+    #         )
+    #     else:
+    #         raise NotImplementedError(
+    #             "Logic not verified for when fidelity.mixed == False"
+    #         )
+    #         # One for each sample
+    #         fidelities = torch.zeros((n_samples * self.n_fid, 1)).to(self.device)
+    #         for i in range(self.n_fid):
+    #             fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
+    #         states = [states for _ in range(self.n_fid)]
+    #     return states, fidelities
 
     def initialise_dataset(self):
         # TODO: Modify to ensure validation set has equal number of points across fidelities
