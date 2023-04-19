@@ -19,11 +19,10 @@ import pickle
 
 @hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
-    if config.logger.logdir.root == "./logs":
-        cwd = os.getcwd()
-        config.logger.logdir.root = cwd
-    else:
+    if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
+    cwd = os.getcwd()
+    config.logger.logdir.root = cwd
 
     print(f"\nLogging directory of this run:  {cwd}\n")
     # Reset seed for job-name generation in multirun jobs
