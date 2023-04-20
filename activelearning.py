@@ -19,11 +19,10 @@ import pickle
 
 @hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
-    if config.logger.logdir.root == "./logs":
-        cwd = os.getcwd()
-        config.logger.logdir.root = cwd
-    else:
+    if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
+    cwd = os.getcwd()
+    config.logger.logdir.root = cwd
 
     print(f"\nLogging directory of this run:  {cwd}\n")
     # Reset seed for job-name generation in multirun jobs
@@ -105,6 +104,8 @@ def main(config):
             rescale=rescale,
             device=config.device,
             float_precision=config.float_precision,
+            fid_embed = config.multifidelity.fid_embed,
+            fid_embed_dim = config.multifidelity.fid_embed_dim,
         )
         # Best fidelity
         env.env.oracle = oracles[-1]
