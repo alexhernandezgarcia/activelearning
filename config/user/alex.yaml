@@ -1,2 +1,3 @@
 logdir:
   root: /network/scratch/a/alex.hernandez-garcia/logs/gflownet
+data_path: /home/mila/a/alex.hernandez-garcia/activelearning/storage
