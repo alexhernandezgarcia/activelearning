@@ -112,15 +112,18 @@ def main(config):
         oracle = oracles[0]
         env.oracle = oracle
 
+    config_model = None
+    modes = None
+    extrema = None
+
     if "model" in config:
         config_model = config.model
-    else:
-        config_model = None
 
     if hasattr(oracle, "modes"):
         modes = oracle.modes
-    else:
-        modes = None
+
+    if hasattr(oracle, "extrema"):
+        extrema = oracle.extrema
 
     maximize = None
 
@@ -293,7 +296,9 @@ def main(config):
             idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
             picked_states = [states[i] for i in idx_pick]
             if extrema is not None:
-                proxy_extrema, _ = regressor.get_predictions(env, picked_states[0], denorm=True)
+                proxy_extrema, _ = regressor.get_predictions(
+                    env, picked_states[0], denorm=True
+                )
 
             if N_FID > 1:
                 picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
@@ -357,6 +362,8 @@ def main(config):
                     modes=modes,
                     dataset_states=data_handler.train_dataset["states"],
                     cumulative_cost=cumulative_cost,
+                    proxy_extrema=proxy_extrema,
+                    extrema=extrema,
                 )
             if N_FID == 1 or config.multifidelity.proxy == True:
                 data_handler.update_dataset(
