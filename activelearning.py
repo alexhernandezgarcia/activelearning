@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="sf_aptamers")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -107,8 +107,8 @@ def main(config):
             rescale=rescale,
             device=config.device,
             float_precision=config.float_precision,
-            fid_embed = config.multifidelity.fid_embed,
-            fid_embed_dim = config.multifidelity.fid_embed_dim,
+            fid_embed=config.multifidelity.fid_embed,
+            fid_embed_dim=config.multifidelity.fid_embed_dim,
         )
         # Best fidelity
         env.env.oracle = oracles[-1]
@@ -118,6 +118,7 @@ def main(config):
     config_model = None
     modes = None
     extrema = None
+    proxy_extrema = None
 
     if "model" in config:
         config_model = config.model
@@ -187,13 +188,13 @@ def main(config):
         ]
         iter = logger.resume_dict["iter"] + 1
 
-    env.reward_beta = env.reward_beta / env.beta_factor
-    env.reward_norm = env.reward_norm * env.norm_factor
+    # env.reward_beta = env.reward_beta / env.beta_factor
+    # env.reward_norm = env.reward_norm * env.norm_factor
     initial_reward_beta = env.reward_beta
     initial_reward_norm = env.reward_norm
     while cumulative_cost < BUDGET:
-        env.reward_beta = initial_reward_beta * env.beta_factor * iter
-        env.reward_norm = initial_reward_norm / (env.norm_factor * iter)
+        env.reward_beta = initial_reward_beta * (env.beta_factor ** (iter - 1))
+        env.reward_norm = initial_reward_norm / (env.norm_factor ** (iter - 1))
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
             # Different number of inducing points calculated by cholesky method in each iteration
@@ -299,7 +300,9 @@ def main(config):
             idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
             picked_states = [states[i] for i in idx_pick]
             if extrema is not None:
-                proxy_extrema, _ = regressor.get_predictions(env, picked_states[0], denorm=True)
+                proxy_extrema, _ = regressor.get_predictions(
+                    env, picked_states[0], denorm=True
+                )
 
             if N_FID > 1:
                 picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
