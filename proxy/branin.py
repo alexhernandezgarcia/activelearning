@@ -11,7 +11,7 @@ from botorch.test_functions.synthetic import Branin as BotorchBranin
 class Branin(Proxy):
     def __init__(self, **kwargs):
         """
-        Modes compatible with 150x150 grid"""
+        Modes compatible with 100x100 grid"""
         self.modes = [
             [12.4, 81.833],
             [54.266, 15.16],
