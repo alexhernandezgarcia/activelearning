@@ -56,8 +56,12 @@ class Grid(GFlowNetEnv, GflowNetGrid):
         Converts a batch of states to AugmentedBranin oracle format
         """
         if isinstance(self.oracle, MultiFidelityBranin) == True:
-            state_torch[:, 0] = state_torch[:, 0] - 5 * self.rescale
-        state_torch = state_torch / self.rescale
+            grid_size = self.length
+            state_torch = state_torch / (grid_size - 1)
+            state_torch[:, 0] = state_torch[:, 0] * self.rescale - 5
+            state_torch[:, 1] = state_torch[:, 1] * self.rescale
+        else:
+            state_torch = state_torch / self.rescale
         return state_torch.to(self.float).to(self.device)
 
     def plot_reward_distribution(

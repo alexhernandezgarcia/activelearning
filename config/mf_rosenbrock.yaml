@@ -11,9 +11,9 @@ defaults:
   - oracle@_oracle_dict.3: branin3
   - gflownet: trajectorybalance
   - user: nikita
-  - proxy: mf_mes_dkl #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
+  - proxy: mf_mes_gp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
   - dataset: dataset
-  - regressor: mf_dkl #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
+  - regressor: mf_gp #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
   - model: mlp #regressive
   - logger: wandb
 
@@ -39,7 +39,7 @@ logger:
   # logdir: 
   #   root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-04-06_18-31-55
   # run_id: 694bvn10
-  project_name: "MF-Grid"
+  project_name: "Scratch"
   lightweight: False
   plot:
     period: -1
@@ -72,7 +72,7 @@ env:
   reward_func: power #shift power
   # reward_beta: 1 #1 #80
   length: 100
-  rescale: 10
+  rescale: 15
   reward_norm: 1e-3 #1e-1 #1
   buffer:
     train:
@@ -98,7 +98,7 @@ gflownet:
   optimizer:
     lr: 5e-4
     lr_z_mult: 20
-    n_train_steps: 10000
+    n_train_steps: 5 #10000
     batch_size: 32
   policy:
     forward:
@@ -119,9 +119,9 @@ dataset:
   fidelity: 
     do: False #add dependance on N_FID
     mixed: True
-  n_samples: 300
+  n_samples: 150
   train_fraction: 0.8
-  split: random #random all_train
+  split: all_train #random all_train
   dataloader:
     train:
       batch_size: 256
@@ -129,16 +129,17 @@ dataset:
       batch_size: 256
   path:
     type: mf #mf sf
-    oracle_dataset: null
+    oracle_dataset: 
     # UNCOMMENT FOR GP
-    # COMMENT FOR DKL BECAUSE NEED INDUCING POINTS
-      # fid_type: random
-      # train: 
-      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
-      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid3_100x100.csv
-      #   get_scores: True
-      # # train: null
-      # test: null
+    # # COMMENT FOR DKL BECAUSE NEED INDUCING POINTS
+      fid_type: random
+      train: 
+        path: ${user.data_path}/branin/nfid3_100x100.csv
+        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
+        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid3_100x100.csv
+        get_scores: True
+      # train: null
+      test: null
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
 n_samples: 30
