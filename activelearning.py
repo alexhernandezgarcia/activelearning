@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -107,8 +107,8 @@ def main(config):
             rescale=rescale,
             device=config.device,
             float_precision=config.float_precision,
-            fid_embed = config.multifidelity.fid_embed,
-            fid_embed_dim = config.multifidelity.fid_embed_dim,
+            fid_embed=config.multifidelity.fid_embed,
+            fid_embed_dim=config.multifidelity.fid_embed_dim,
         )
         # Best fidelity
         env.env.oracle = oracles[-1]
@@ -118,10 +118,7 @@ def main(config):
     config_model = None
     modes = None
     extrema = None
-
-    config_model = None
-    modes = None
-    extrema = None
+    proxy_extrema = None
 
     if "model" in config:
         config_model = config.model
