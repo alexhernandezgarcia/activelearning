@@ -16,6 +16,7 @@ class Branin(Proxy):
             [31.47, 22.75],
             [94.24, 24.75],
         ]
+        self.extrema = 0.397887
         super().__init__(**kwargs)
 
     def plot_true_rewards(self, env, ax, rescale):
