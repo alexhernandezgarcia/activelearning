@@ -55,13 +55,15 @@ class SingleTaskGPRegressor:
         with debug(state=True):
             self.mll = fit_gpytorch_mll(self.mll)
 
-    def get_predictions(self, env, states):
+    def get_predictions(self, env, states, **kwargs):
         """Input is states
         Proxy conversion happens within."""
         detach = True
         if isinstance(states, torch.Tensor) == False:
             states = torch.tensor(states, device=self.device, dtype=env.float)
             detach = False
+        if states.ndim == 1:
+            states = states.unsqueeze(0)
         states_proxy_input = states.clone()
         states_proxy = env.statetorch2proxy(states_proxy_input)
         model = self.model

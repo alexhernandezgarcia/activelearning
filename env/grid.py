@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pandas as pd
+from proxy.branin import MultiFidelityBranin
 
 
 class Grid(GFlowNetEnv, GflowNetGrid):
@@ -54,6 +55,8 @@ class Grid(GFlowNetEnv, GflowNetGrid):
         """
         Converts a batch of states to AugmentedBranin oracle format
         """
+        if isinstance(self.oracle, MultiFidelityBranin) == True:
+            state_torch[:, 0] = state_torch[:, 0] - 5 * self.rescale
         state_torch = state_torch / self.rescale
         return state_torch.to(self.float).to(self.device)
 

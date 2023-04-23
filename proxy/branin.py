@@ -11,18 +11,21 @@ from botorch.test_functions.synthetic import Branin as BotorchBranin
 class Branin(Proxy):
     def __init__(self, **kwargs):
         """
-        Modes compatible with 100x100 grid"""
+        Modes compatible with 150x150 grid"""
         self.modes = [
-            [31.47, 22.75],
-            [94.24, 24.75],
+            [81.47, 22.75],
+            [144.24, 24.75],
+            [21.47, 122.75],
         ]
         self.extrema = 0.397887
         super().__init__(**kwargs)
 
     def plot_true_rewards(self, env, ax, rescale):
         states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
-        states_input_oracle = states.clone()
-        states_oracle = env.statetorch2oracle(states_input_oracle)
+        states_oracle = states.clone()
+        states_oracle[:, 0] = states_oracle[:, 0] - 5 * env.rescale
+        states_oracle = states_oracle / env.rescale
+        # states_oracle = env.statetorch2oracle(states_input_oracle)
         scores = self(states_oracle).detach().cpu().numpy()
         if hasattr(self, "fid"):
             title = "Oracle Energy (TrainY) with fid {}".format(self.fid)
