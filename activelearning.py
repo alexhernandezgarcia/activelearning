@@ -292,6 +292,8 @@ def main(config):
                     maximize = oracle.maximize
             idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
             picked_states = [states[i] for i in idx_pick]
+            if extrema is not None:
+                proxy_extrema, _ = regressor.get_predictions(env, picked_states[0], denorm=True)
 
             if N_FID > 1:
                 picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
