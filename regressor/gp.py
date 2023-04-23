@@ -1,7 +1,5 @@
 import torch
 import gpytorch
-from tqdm import tqdm
-import hydra
 from botorch.models.gp_regression_fidelity import (
     SingleTaskMultiFidelityGP,
     SingleTaskGP,

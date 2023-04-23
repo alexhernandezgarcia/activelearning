@@ -568,9 +568,9 @@ class DeepKernelRegressor:
             ax.set_yticks(np.arange(start=0, stop=length, step=step))
             ax.imshow(grid_scores)
             if n_fid == 1:
-                title = "GP Predictions"
+                title = "DKL Predictions"
             else:
-                title = "GP Predictions with fid {}/{}".format(fid + 1, n_fid)
+                title = "DKL Predictions with fid {}/{}".format(fid + 1, n_fid)
             ax.set_title(title)
             im = ax.imshow(grid_scores)
             divider = make_axes_locatable(ax)
@@ -612,22 +612,3 @@ class DeepKernelRegressor:
     #         return True
     #     else:
     #         raise FileNotFoundError
-
-    def define_metric(self):
-        try:
-            self.logger.define_metric("epoch")
-            self.logger.define_metric("1/svgp/best_loss", step_metric="epoch")
-            self.logger.define_metric("1/svgp/test_rmse", step_metric="epoch")
-            self.logger.define_metric("lengthscale", step_metric="epoch")
-            self.logger.define_metric("train_loss", step_metric="epoch")
-            self.logger.define_metric("best_score", step_metric="epoch")
-            self.logger.define_metric("best_loss_epoch", step_metric="epoch")
-            self.logger.define_metric("test_nll", step_metric="epoch")
-            self.logger.define_metric("best_epoch", step_metric="epoch")
-            self.logger.define_metric("test_occ_diff", step_metric="epoch")
-            self.logger.define_metric("test_ece", step_metric="epoch")
-            self.logger.define_metric("test_post_var", step_metric="epoch")
-            self.logger.define_metric("test_s_rho", step_metric="epoch")
-            self.logger.define_metric("noise", step_metric="epoch")
-        except:
-            pass
