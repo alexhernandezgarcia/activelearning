@@ -13,9 +13,9 @@ class Branin(Proxy):
         """
         Modes compatible with 150x150 grid"""
         self.modes = [
-            [81.47, 22.75],
-            [144.24, 24.75],
-            [21.47, 122.75],
+            [12.4, 81.833],
+            [54.266, 15.16],
+            [94.98, 16.5],
         ]
         self.extrema = 0.397887
         super().__init__(**kwargs)
