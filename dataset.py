@@ -122,10 +122,14 @@ class DataHandler:
                 },
             }
         if hasattr(self.env, "initialize_dataset"):
+            if self.split == "given":
+                logger_resume = True
+            else:
+                logger_resume = self.logger.resume
             state_score_tuple = self.env.initialize_dataset(
-                self.path, self.n_samples, self.logger.resume
+                self.path, self.n_samples, logger_resume
             )
-            if self.logger.resume == True:
+            if self.logger.resume == True or self.split == "given":
                 self.split = "given"
                 train_states = state_score_tuple[0]
                 train_scores = state_score_tuple[1]
