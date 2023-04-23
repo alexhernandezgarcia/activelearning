@@ -1241,6 +1241,7 @@ class SingleTaskMultiFidelitySVGP(
         is_fid_param_nn,
         noise_constraint=None,
         lengthscale_prior=None,
+        index_kernel_rank=1,
         outcome_transform=None,
         input_transform=None,
         learn_inducing_points=True,
@@ -1271,7 +1272,9 @@ class SingleTaskMultiFidelitySVGP(
                 noise_constraint=noise_constraint, noise_prior=noise_prior
             )
             likelihood.initialize(noise=self.task_noise_init)
-            covar_module_fidelity = kernels.IndexKernel(num_tasks=n_fid, rank=1)
+            covar_module_fidelity = kernels.IndexKernel(
+                num_tasks=n_fid, rank=index_kernel_rank
+            )
             # active_dims = torch.tensor([feature_dim])
             covar_module = ProductKernel(covar_module_x, covar_module_fidelity)
 
