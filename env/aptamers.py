@@ -127,9 +127,15 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
             scores = torch.cat((train_scores, test_scores))
 
         if len(scores) == 0 or len(scores) != len(states):
-            states_oracle_input = states.clone()
-            oracle_states = self.statetorch2oracle(states_oracle_input)
-            scores = self.oracle(oracle_states)
+            train_states_oracle_input = train_states.clone()
+            train_oracle_states = self.statetorch2oracle(train_states_oracle_input)
+            train_scores = self.oracle(train_oracle_states)
+
+            test_states_oracle_input = test_states.clone()
+            test_oracle_states = self.statetorch2oracle(test_states_oracle_input)
+            test_scores = self.oracle(test_oracle_states)
+
+            scores = torch.cat((train_scores, test_scores))
 
         if resume == False:
             return states, scores

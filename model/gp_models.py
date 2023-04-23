@@ -453,11 +453,8 @@ class SingleTaskExactGP(BaseGPSurrogate, SingleTaskGP):
         # inputs = (426)
         # train_features = torch.Size([426, 16])
         # targets = torch.Size([3, 426])
-        train_features = (
-            self.get_features(inputs, self.bs)
-            if isinstance(inputs, np.ndarray)
-            else inputs
-        )  # torch.Size([426, 16])
+        train_features = self.get_features(inputs)
+        # torch.Size([426, 16])
         SingleTaskGP.set_train_data(
             self, train_features, targets.to(train_features), strict
         )  # strict = False
@@ -482,98 +479,98 @@ class SingleTaskExactGP(BaseGPSurrogate, SingleTaskGP):
     #     return fit_gp_surrogate(**fit_kwargs, **kwargs)
 
 
-class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
-    def __init__(
-        self,
-        feature_dim,
-        out_dim,
-        encoder,
-        likelihood=None,
-        covar_module=None,
-        outcome_transform=None,
-        input_transform=None,
-        *args,
-        **kwargs,
-    ):
+# class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
+#     def __init__(
+#         self,
+#         feature_dim,
+#         out_dim,
+#         encoder,
+#         likelihood=None,
+#         covar_module=None,
+#         outcome_transform=None,
+#         input_transform=None,
+#         *args,
+#         **kwargs,
+#     ):
 
-        # initialize common attributes
-        BaseGPSurrogate.__init__(self, encoder=encoder, *args, **kwargs)
+#         # initialize common attributes
+#         BaseGPSurrogate.__init__(self, encoder=encoder, *args, **kwargs)
 
-        # initialize GP
-        dummy_X = torch.randn(2, feature_dim).to(self.device, self.dtype)
-        dummy_Y = torch.randn(2, out_dim).to(self.device, self.dtype)
-        covar_module = (
-            covar_module
-            if covar_module is None
-            else covar_module.to(self.device, self.dtype)
-        )
-        SingleTaskMultiFidelityGP.__init__(
-            self,
-            dummy_X,
-            dummy_Y,
-            likelihood,
-            covar_module=covar_module,
-            outcome_transform=outcome_transform,
-            input_transform=input_transform,
-            *args,
-            **kwargs,
-        )
-        self.likelihood.initialize(task_noises=self.task_noise_init)
-        self.encoder = encoder.to(self.device, self.dtype)
+#         # initialize GP
+#         dummy_X = torch.randn(2, feature_dim).to(self.device, self.dtype)
+#         dummy_Y = torch.randn(2, out_dim).to(self.device, self.dtype)
+#         covar_module = (
+#             covar_module
+#             if covar_module is None
+#             else covar_module.to(self.device, self.dtype)
+#         )
+#         SingleTaskMultiFidelityGP.__init__(
+#             self,
+#             dummy_X,
+#             dummy_Y,
+#             likelihood,
+#             covar_module=covar_module,
+#             outcome_transform=outcome_transform,
+#             input_transform=input_transform,
+#             *args,
+#             **kwargs,
+#         )
+#         self.likelihood.initialize(task_noises=self.task_noise_init)
+#         self.encoder = encoder.to(self.device, self.dtype)
 
-    def forward(self, X):
-        features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
-        return SingleTaskMultiFidelityGP.forward(self, features)
+#     def forward(self, X):
+#         features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
+#         return SingleTaskMultiFidelityGP.forward(self, features)
 
-    def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
-        features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
-        return SingleTaskMultiFidelityGP.posterior(
-            self, features, output_indices, observation_noise, **kwargs
-        )
+#     def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
+#         features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
+#         return SingleTaskMultiFidelityGP.posterior(
+#             self, features, output_indices, observation_noise, **kwargs
+#         )
 
-    def clear_cache(self):
-        clear_cache_hook(self)
-        self.prediction_strategy = None
+#     def clear_cache(self):
+#         clear_cache_hook(self)
+#         self.prediction_strategy = None
 
-    def set_train_data(self, X=None, targets=None, strict=True):
-        self.clear_cache()
-        train_features = (
-            self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
-        )
-        SingleTaskMultiFidelityGP.set_train_data(
-            self, train_features, targets.to(train_features), strict
-        )
+#     def set_train_data(self, X=None, targets=None, strict=True):
+#         self.clear_cache()
+#         train_features = (
+#             self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
+#         )
+#         SingleTaskMultiFidelityGP.set_train_data(
+#             self, train_features, targets.to(train_features), strict
+#         )
 
-    def fit(
-        self,
-        X_train,
-        Y_train,
-        X_val,
-        Y_val,
-        X_test,
-        Y_test,
-        reset=False,
-        log_prefix="multi_task_gp",
-        **kwargs,
-    ):
-        if reset:
-            raise NotImplementedError
-        fit_kwargs = dict(
-            surrogate=self,
-            mll=ExactMarginalLogLikelihood(self.likelihood, self),
-            X_train=X_train,
-            Y_train=Y_train,
-            X_val=X_val,
-            Y_val=Y_val,
-            X_test=X_test,
-            Y_test=Y_test,
-            train_bs=None,
-            eval_bs=self.bs,
-            shuffle_train=True,
-            log_prefix=log_prefix,
-        )
-        fit_kwargs.update(kwargs)
-        return fit_gp_surrogate(**fit_kwargs)
+#     def fit(
+#         self,
+#         X_train,
+#         Y_train,
+#         X_val,
+#         Y_val,
+#         X_test,
+#         Y_test,
+#         reset=False,
+#         log_prefix="multi_task_gp",
+#         **kwargs,
+#     ):
+#         if reset:
+#             raise NotImplementedError
+#         fit_kwargs = dict(
+#             surrogate=self,
+#             mll=ExactMarginalLogLikelihood(self.likelihood, self),
+#             X_train=X_train,
+#             Y_train=Y_train,
+#             X_val=X_val,
+#             Y_val=Y_val,
+#             X_test=X_test,
+#             Y_test=Y_test,
+#             train_bs=None,
+#             eval_bs=self.bs,
+#             shuffle_train=True,
+#             log_prefix=log_prefix,
+#         )
+#         fit_kwargs.update(kwargs)
+#         return fit_gp_surrogate(**fit_kwargs)
 
 
 class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
