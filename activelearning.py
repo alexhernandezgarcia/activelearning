@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="mf_hartmann")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -111,16 +111,18 @@ def main(config):
     else:
         oracle = oracles[0]
         env.oracle = oracle
+    config_model = None
+    modes = None
+    extrema = None
 
     if "model" in config:
         config_model = config.model
-    else:
-        config_model = None
 
     if hasattr(oracle, "modes"):
         modes = oracle.modes
-    else:
-        modes = None
+
+    if hasattr(oracle, "extrema"):
+        extrema = oracle.extrema
 
     maximize = None
 
@@ -292,6 +294,8 @@ def main(config):
                     maximize = oracle.maximize
             idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
             picked_states = [states[i] for i in idx_pick]
+            if extrema is not None:
+                proxy_extrema, _ = regressor.get_predictions(env, picked_states[0], denorm=True)
 
             if N_FID > 1:
                 picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
@@ -355,6 +359,8 @@ def main(config):
                     modes=modes,
                     dataset_states=data_handler.train_dataset["states"],
                     cumulative_cost=cumulative_cost,
+                    proxy_extrema=proxy_extrema,
+                    extrema=extrema,
                 )
             if N_FID == 1 or config.multifidelity.proxy == True:
                 data_handler.update_dataset(
