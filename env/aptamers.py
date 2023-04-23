@@ -76,6 +76,8 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
             title = "Rewards of Sampled States"
         if scores is None:
             oracle_states = self.statebatch2oracle(states)
+            if states is None or len(states) == 0:
+                return None
             scores = oracle(oracle_states)
         if isinstance(scores, TensorType):
             scores = scores.cpu().detach().numpy()

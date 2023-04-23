@@ -21,6 +21,8 @@ import pickle
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
+    cwd = os.getcwd()
+    config.logger.logdir.root = cwd
 
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
@@ -105,6 +107,8 @@ def main(config):
             rescale=rescale,
             device=config.device,
             float_precision=config.float_precision,
+            fid_embed = config.multifidelity.fid_embed,
+            fid_embed_dim = config.multifidelity.fid_embed_dim,
         )
         # Best fidelity
         env.env.oracle = oracles[-1]
