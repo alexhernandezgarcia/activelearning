@@ -527,6 +527,8 @@ class DeepKernelMultiFidelityMES(MES):
 
         features = features.unsqueeze(-2)
         acq_values = self.acqf(features)
+        if abs(torch.mean(acq_values)-float("inf"))<1e-1:
+            print("Warning: Acqf value is positive")
         return acq_values
 
     def plot_acquisition_rewards(self, **kwargs):

@@ -72,6 +72,8 @@ class AMP(GFlowNetEnv, GflowNetAMP):
         if title == None:
             title = "Rewards of Sampled States"
         if scores is None:
+            if states is None or len(states) == 0:
+                return None
             oracle_states = self.statetorch2oracle(states)
             scores = oracle(oracle_states)
         if isinstance(scores, TensorType):
