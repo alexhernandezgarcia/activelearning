@@ -14,32 +14,32 @@ defaults:
   - proxy: mf_mes_gp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
   - dataset: dataset
   - regressor: mf_gp #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
-  - model: mlp #regressive
+  # - model: mlp #regressive
   - logger: wandb
 
 proxy:
   cost_type: user
 
-model:
-  beta1: 0.9
-  beta2: 0.99
+# model:
+#   beta1: 0.9
+#   beta2: 0.99
 
-regressor:
-  optim: adam
-  surrogate:
-    eval_period: 1
-    num_epochs: 2048
-    patience: 100
-    num_inducing_points: 64
-  encoder_obj: mlm
-  lr_sched_type: plateau #step
+# regressor:
+#   optim: adam
+#   surrogate:
+#     eval_period: 1
+#     num_epochs: 2048
+#     patience: 100
+#     num_inducing_points: 64
+#   encoder_obj: mlm
+#   lr_sched_type: plateau #step
 
 logger:
   # resume: True 
   # logdir: 
   #   root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-04-06_18-31-55
   # run_id: 694bvn10
-  project_name: "Scratch"
+  project_name: "MF-Grid"
   lightweight: False
   plot:
     period: -1
@@ -59,6 +59,7 @@ logger:
     # - r(x) = (80 + x)
     # - r(x) = 10x
     - branin
+    - sanity
     # - test svgp_dkl
     # - single_fidelity
     # - mf-mes
@@ -98,7 +99,7 @@ gflownet:
   optimizer:
     lr: 5e-4
     lr_z_mult: 20
-    n_train_steps: 5 #10000
+    n_train_steps: 5000
     batch_size: 32
   policy:
     forward:
