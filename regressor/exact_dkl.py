@@ -38,5 +38,5 @@ class ExactDKL(DeepKernelRegressor):
         )
 
     def initialize_surrogate(self, X_train, Y_train):
-        self.mll = ExactMarginalLogLikelihood(self.likelihood, self.surrogate)
+        self.mll = ExactMarginalLogLikelihood(self.surrogate.likelihood, self.surrogate)
         self.mll.to(self.surrogate.device)

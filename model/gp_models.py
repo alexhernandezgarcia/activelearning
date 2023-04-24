@@ -168,15 +168,18 @@ class BaseGPSurrogate(abc.ABC):
                 targets.append(
                     target_batch.to(features.device).cpu()
                 )  # targets was an empty list
-                # import pdb; pdb.set_trace()
+                if f_dist.mean.shape != target_batch.shape:  # True
+                    target_batch = target_batch.transpose(-1, -2)
+                    target_batch = target_batch.squeeze(-1)
                 if y_dist.mean.shape == target_batch.shape:  # True
                     f_std.append(f_dist.variance.sqrt().cpu())
                     y_mean.append(y_dist.mean.cpu())
                     y_std.append(y_dist.variance.sqrt().cpu())
-                else:
-                    f_std.append(f_dist.variance.sqrt().cpu().transpose(-1, -2))
-                    y_mean.append(y_dist.mean.cpu().transpose(-1, -2))
-                    y_std.append(y_dist.variance.sqrt().cpu().transpose(-1, -2))
+                # else:
+                # target_batch = target_batch.transpose(-1, -2)
+                # f_std.append(f_dist.variance.sqrt().cpu().transpose(-1, -2))
+                # y_mean.append(y_dist.mean.cpu().transpose(-1, -2))
+                # y_std.append(y_dist.variance.sqrt().cpu().transpose(-1, -2))
 
         # TODO: figure out why these are getting flipped
         try:
@@ -430,9 +433,8 @@ class SingleTaskExactGP(BaseGPSurrogate, SingleTaskGP):
 
     def forward(self, inputs):
         assert isinstance(inputs, torch.Tensor)
-        features = self.get_features(inputs)
         # features = self.get_features(inputs, self.bs) if isinstance(inputs, np.ndarray) else inputs #torch.Size([471, 16]) --> train _ val = 426 + 45 = 471
-        return SingleTaskGP.forward(self, features)
+        return SingleTaskGP.forward(self, inputs)
 
     def posterior(self, inputs, output_indices=None, observation_noise=False, **kwargs):
         features = (
@@ -445,132 +447,111 @@ class SingleTaskExactGP(BaseGPSurrogate, SingleTaskGP):
         )
 
     def reshape_targets(self, targets):
-        if len(targets.shape) == 1:
-            targets = targets.unsqueeze(-1)
-        return targets.transpose(-1, -2)
+        if targets.shape[-1] > 1:
+            return targets
+        else:
+            return targets.unsqueeze(-1)
+        # if len(targets.shape) == 1:
+        #     targets = targets.unsqueeze(-1)
+        # return targets.transpose(-1, -2)
 
     def set_train_data(self, inputs=None, targets=None, strict=True):
         # inputs = (426)
         # train_features = torch.Size([426, 16])
         # targets = torch.Size([3, 426])
-        train_features = self.get_features(inputs)
+        # train_features = self.get_features(inputs)
         # torch.Size([426, 16])
         SingleTaskGP.set_train_data(
-            self, train_features, targets.to(train_features), strict
+            self, inputs, targets.to(inputs), strict
         )  # strict = False
 
-    # def fit(self, X_train, Y_train, X_val, Y_val, X_test, Y_test, reset=False, log_prefix="single_task_gp", **kwargs):
-    #     if reset:
-    #         raise NotImplementedError
-    #     fit_kwargs = dict(
-    #         surrogate=self,
-    #         mll=ExactMarginalLogLikelihood(self.likelihood, self),
-    #         X_train=X_train,
-    #         Y_train=Y_train,
-    #         X_val=X_val,
-    #         Y_val=Y_val,
-    #         X_test=X_test,
-    #         Y_test=Y_test,
-    #         train_bs=None,
-    #         eval_bs=self.bs,
-    #         shuffle_train=False,
-    #         log_prefix=log_prefix
-    #     )
-    #     return fit_gp_surrogate(**fit_kwargs, **kwargs)
 
+class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
+    def __init__(
+        self,
+        feature_dim,
+        out_dim,
+        encoder,
+        device,
+        float_precision,
+        n_fid,
+        is_fid_param_nn,
+        likelihood=None,
+        covar_module=None,
+        outcome_transform=None,
+        input_transform=None,
+        index_kernel_rank=1,
+        *args,
+        **kwargs,
+    ):
+        self.device = device
+        self.dtype = float_precision
+        self.is_fid_param_nn = is_fid_param_nn
+        # initialize common attributes
+        BaseGPSurrogate.__init__(self, encoder=encoder, *args, **kwargs)
 
-# class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
-#     def __init__(
-#         self,
-#         feature_dim,
-#         out_dim,
-#         encoder,
-#         likelihood=None,
-#         covar_module=None,
-#         outcome_transform=None,
-#         input_transform=None,
-#         *args,
-#         **kwargs,
-#     ):
+        # initialize GP
+        dummy_X = torch.randn(2, feature_dim).to(self.device, self.dtype)
+        dummy_Y = torch.randn(2, out_dim).to(self.device, self.dtype)
+        covar_module = (
+            covar_module
+            if covar_module is None
+            else covar_module.to(self.device, self.dtype)
+        )
+        SingleTaskMultiFidelityGP.__init__(
+            self,
+            train_X=dummy_X,
+            train_Y=dummy_Y,
+            likelihood=likelihood,
+            covar_module=covar_module,
+            outcome_transform=outcome_transform,
+            input_transform=input_transform,
+            n_fid=n_fid,
+            index_kernel_rank=index_kernel_rank,
+            *args,
+            **kwargs,
+        )
+        self.likelihood.initialize(task_noises=self.task_noise_init)
+        self.encoder = encoder.to(self.device, self.dtype)
 
-#         # initialize common attributes
-#         BaseGPSurrogate.__init__(self, encoder=encoder, *args, **kwargs)
+    def get_features(self, seq_array, batch_size=None, transform=None):
+        original_shape = seq_array.shape[:-1]
+        flat_seq_array = seq_array.flatten(end_dim=-2)
+        enc_seq_array = seq_array.to(self.device)
+        state_array = enc_seq_array[..., :-1]
+        fid_array = seq_array[..., -1].to(self.device)
+        if self.is_fid_param_nn == True:
+            features = self.encoder.get_features(enc_seq_array)
+        else:
+            features = self.encoder.get_features(state_array)
+        features = torch.cat(
+            [features, fid_array.unsqueeze(-1)], dim=-1
+        )  # torch.Size([32, 17])
+        return features.view(*original_shape, -1)
 
-#         # initialize GP
-#         dummy_X = torch.randn(2, feature_dim).to(self.device, self.dtype)
-#         dummy_Y = torch.randn(2, out_dim).to(self.device, self.dtype)
-#         covar_module = (
-#             covar_module
-#             if covar_module is None
-#             else covar_module.to(self.device, self.dtype)
-#         )
-#         SingleTaskMultiFidelityGP.__init__(
-#             self,
-#             dummy_X,
-#             dummy_Y,
-#             likelihood,
-#             covar_module=covar_module,
-#             outcome_transform=outcome_transform,
-#             input_transform=input_transform,
-#             *args,
-#             **kwargs,
-#         )
-#         self.likelihood.initialize(task_noises=self.task_noise_init)
-#         self.encoder = encoder.to(self.device, self.dtype)
+    def forward(self, features):
+        assert isinstance(features, torch.Tensor)
+        # features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
+        return SingleTaskMultiFidelityGP.forward(self, features)
 
-#     def forward(self, X):
-#         features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
-#         return SingleTaskMultiFidelityGP.forward(self, features)
+    def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
+        features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
+        return SingleTaskMultiFidelityGP.posterior(
+            self, features, output_indices, observation_noise, **kwargs
+        )
 
-#     def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
-#         features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
-#         return SingleTaskMultiFidelityGP.posterior(
-#             self, features, output_indices, observation_noise, **kwargs
-#         )
+    def clear_cache(self):
+        clear_cache_hook(self)
+        self.prediction_strategy = None
 
-#     def clear_cache(self):
-#         clear_cache_hook(self)
-#         self.prediction_strategy = None
-
-#     def set_train_data(self, X=None, targets=None, strict=True):
-#         self.clear_cache()
-#         train_features = (
-#             self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
-#         )
-#         SingleTaskMultiFidelityGP.set_train_data(
-#             self, train_features, targets.to(train_features), strict
-#         )
-
-#     def fit(
-#         self,
-#         X_train,
-#         Y_train,
-#         X_val,
-#         Y_val,
-#         X_test,
-#         Y_test,
-#         reset=False,
-#         log_prefix="multi_task_gp",
-#         **kwargs,
-#     ):
-#         if reset:
-#             raise NotImplementedError
-#         fit_kwargs = dict(
-#             surrogate=self,
-#             mll=ExactMarginalLogLikelihood(self.likelihood, self),
-#             X_train=X_train,
-#             Y_train=Y_train,
-#             X_val=X_val,
-#             Y_val=Y_val,
-#             X_test=X_test,
-#             Y_test=Y_test,
-#             train_bs=None,
-#             eval_bs=self.bs,
-#             shuffle_train=True,
-#             log_prefix=log_prefix,
-#         )
-#         fit_kwargs.update(kwargs)
-#         return fit_gp_surrogate(**fit_kwargs)
+    def set_train_data(self, train_features=None, targets=None, strict=True):
+        self.clear_cache()
+        # train_features = (
+        # self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
+        # )
+        SingleTaskMultiFidelityGP.set_train_data(
+            self, train_features, targets.to(train_features), strict
+        )
 
 
 class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
@@ -1581,7 +1562,7 @@ class SingleTaskMultiFidelitySVGP(
         #     [features, fid_array.unsqueeze(-1)], dim=-1
         # )  # torch.Size([32, 17])
         # original shape = batch_shape
-        return features.view(*original_shape, -1)
+        # return features.view(*original_shape, -1)
 
     def forward(self, features):
         assert isinstance(features, torch.Tensor)

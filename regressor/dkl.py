@@ -26,6 +26,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 from torch.optim.lr_scheduler import MultiStepLR
 from torchtyping import TensorType
+from model.gp_models import SingleTaskGP
 
 # import pytorch_lightning as pl
 # from apex.optimizers import FusedAdam
@@ -249,8 +250,9 @@ class DeepKernelRegressor:
         targets = self.surrogate.reshape_targets(targets).to(
             features.device, dtype=dtype
         )
-        # if isinstance(surrogate, (SingleTaskGP, KroneckerMultiTaskGP)):
-        # surrogate.set_train_data(features, targets, strict=False)
+        #   if isinstance(surrogate, (SingleTaskGP, KroneckerMultiTaskGP)):
+        if isinstance(self.surrogate, SingleTaskGP):
+            self.surrogate.set_train_data(features, targets, strict=False)
 
         output = self.surrogate.forward(features)
         loss = -mll(output, targets).mean()
@@ -271,7 +273,11 @@ class DeepKernelRegressor:
         print("\n---- preparing checkpoint ----")
         self.surrogate.eval()
         self.surrogate.requires_grad_(False)
-        self.surrogate.set_train_data(X_train, Y_train, strict=False)
+        if isinstance(self.surrogate, SingleTaskGP):
+            X_features = self.surrogate.get_features(X_train)
+            self.surrogate.set_train_data(X_features, Y_train, strict=False)
+        else:
+            self.surrogate.set_train_data(X_train, Y_train, strict=False)
         start_metrics = {}
         start_metrics.update(self.surrogate.evaluate(test_loader))
         start_metrics["epoch"] = 0
@@ -328,10 +334,6 @@ class DeepKernelRegressor:
         print("\n---- fitting all SVGP params ----")
         pbar = tqdm(range(1, self.surrogate.num_epochs + 1), disable=not self.progress)
         for epoch_idx in pbar:  # 128
-            # if (epoch_idx%2==0):
-            #     self.surrogate.encoder.requires_grad_(
-            #             False
-            #         )
 
             metrics = {}
             avg_train_loss = 0.0
@@ -340,13 +342,6 @@ class DeepKernelRegressor:
             self.surrogate.train()
             if self.encoder_obj != "mlm":
                 mlm_loss = torch.tensor(0.0, device=self.surrogate.device)
-            # with torch.profiler.profile(
-            #         schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
-            #         on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/resnet18'),
-            #         record_shapes=True,
-            #         profile_memory=True,
-            #         with_stack=True
-            # ) as prof:
             for inputs, targets in train_loader:
                 inputs = inputs.to(self.surrogate.device)
                 targets = targets.to(self.surrogate.device)
@@ -368,7 +363,6 @@ class DeepKernelRegressor:
                 )
                 avg_mlm_loss += mlm_loss.detach() / len(train_loader)
                 avg_gp_loss += gp_loss.detach() / len(train_loader)
-                # prof.step()
 
             lr_sched.step(avg_train_loss)
 
@@ -386,7 +380,11 @@ class DeepKernelRegressor:
 
                 # update train features, use unaugmented train data for evaluation
                 self.surrogate.eval()
-                self.surrogate.set_train_data(X_train, Y_train, strict=False)
+                if isinstance(self.surrogate, SingleTaskGP):
+                    X_features = self.surrogate.get_features(X_train)
+                    self.surrogate.set_train_data(X_features, Y_train, strict=False)
+                else:
+                    self.surrogate.set_train_data(X_train, Y_train, strict=False)
                 metrics.update(self.surrogate.evaluate(test_loader))
                 if self.encoder_obj == "mlm":
                     metrics.update(
@@ -478,7 +476,11 @@ class DeepKernelRegressor:
         self.surrogate.train()  # clear caches
         self.surrogate.clear_cache()
         self.surrogate.eval()
-        self.surrogate.set_train_data(X_train, Y_train, strict=False)
+        if isinstance(self.surrogate, SingleTaskGP):
+            X_features = self.surrogate.get_features(X_train)
+            self.surrogate.set_train_data(X_features, Y_train, strict=False)
+        else:
+            self.surrogate.set_train_data(X_train, Y_train, strict=False)
 
     # def evaluate(self, **kwargs):
     #     test_nll = self.best_score

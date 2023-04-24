@@ -40,6 +40,49 @@ from .inducing_point_allocator import MultiFidelityGreedyVarianceReduction
 from botorch.models.kernels.linear_truncated_fidelity import (
     LinearTruncatedFidelityKernel,
 )
+from botorch.models.gp_regression import SingleTaskGP
+from gpytorch import kernels
+
+
+class SingleTaskMultiFidelityGP(SingleTaskGP):
+    def __init__(
+        self,
+        train_X,
+        train_Y,
+        n_fid,
+        likelihood=None,
+        covar_module=None,
+        mean_module=None,
+        outcome_transform=None,
+        input_transform=None,
+        index_kernel_rank=1,
+    ):
+        super().__init__(
+            train_X,
+            train_Y,
+            likelihood,
+            covar_module,
+            mean_module,
+            outcome_transform,
+            input_transform,
+        )
+        self.covar_module_fidelity = kernels.IndexKernel(
+            num_tasks=n_fid, rank=index_kernel_rank
+        )
+
+    def forward(self, input):
+        if self.training:
+            self._last_x = input
+            input = self.transform_inputs(input)
+        x = input[..., :-1]
+        i = input[..., -1]
+        i = i.unsqueeze(-1)
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        covar_fidelity = self.covar_module_fidelity(i)
+        covar = covar_x.mul(covar_fidelity)
+        latent_dist = MultivariateNormal(mean_x, covar)
+        return latent_dist
 
 
 class SingleTaskMultiFidelityVariationalGP(ApproximateGPyTorchModel):
