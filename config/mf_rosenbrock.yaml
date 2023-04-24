@@ -116,10 +116,6 @@ gflownet:
 
 dataset:
   normalize_data: True
-# TODO can we get rid of "do"
-  fidelity: 
-    do: False #add dependance on N_FID
-    mixed: True
   n_samples: 150
   train_fraction: 0.8
   split: all_train #random all_train
@@ -157,6 +153,8 @@ multifidelity:
   proxy: True
   rescale: 10
   candidate_set_path: null
+  fid_embed: one_hot
+  fid_embed_dim: None
   # /home/mila/n/nikita.saxena/activelearning/storage/branin/mf_train50.csv
   #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
   # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
