@@ -7,8 +7,8 @@ from scipy.stats import spearmanr
 from botorch.models import (
     SingleTaskGP,
     SingleTaskVariationalGP,
-    SingleTaskMultiFidelityGP,
 )
+
 from gpytorch.mlls import ExactMarginalLogLikelihood, VariationalELBO
 from gpytorch.utils.memoize import clear_cache_hook
 from gpytorch import likelihoods, kernels
@@ -20,6 +20,7 @@ from gpytorch.settings import cholesky_jitter
 from gpytorch.lazy import ConstantDiagLazyTensor
 from gpytorch import lazify
 from .botorch_models import (
+    SingleTaskExactMultiFidelityGP,
     SingleTaskMultiFidelityVariationalGP,
     SingleTaskMultiFidelityLikeBotorchVariationalGP,
 )
@@ -466,7 +467,7 @@ class SingleTaskExactGP(BaseGPSurrogate, SingleTaskGP):
         )  # strict = False
 
 
-class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
+class SingleTaskMultiFidelityEGP(BaseGPSurrogate, SingleTaskExactMultiFidelityGP):
     def __init__(
         self,
         feature_dim,
@@ -498,7 +499,7 @@ class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
             if covar_module is None
             else covar_module.to(self.device, self.dtype)
         )
-        SingleTaskMultiFidelityGP.__init__(
+        SingleTaskExactMultiFidelityGP.__init__(
             self,
             train_X=dummy_X,
             train_Y=dummy_Y,
@@ -508,10 +509,8 @@ class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
             input_transform=input_transform,
             n_fid=n_fid,
             index_kernel_rank=index_kernel_rank,
-            *args,
-            **kwargs,
         )
-        self.likelihood.initialize(task_noises=self.task_noise_init)
+        self.likelihood.initialize(noise=self.task_noise_init)
         self.encoder = encoder.to(self.device, self.dtype)
 
     def get_features(self, seq_array, batch_size=None, transform=None):
@@ -532,11 +531,11 @@ class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
     def forward(self, features):
         assert isinstance(features, torch.Tensor)
         # features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
-        return SingleTaskMultiFidelityGP.forward(self, features)
+        return SingleTaskExactMultiFidelityGP.forward(self, features)
 
     def posterior(self, X, output_indices=None, observation_noise=False, **kwargs):
         features = self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
-        return SingleTaskMultiFidelityGP.posterior(
+        return SingleTaskExactMultiFidelityGP.posterior(
             self, features, output_indices, observation_noise, **kwargs
         )
 
@@ -549,7 +548,7 @@ class SingleTaskMultiFidelityGP(BaseGPSurrogate, SingleTaskMultiFidelityGP):
         # train_features = (
         # self.get_features(X, self.bs) if isinstance(X, np.ndarray) else X
         # )
-        SingleTaskMultiFidelityGP.set_train_data(
+        SingleTaskExactMultiFidelityGP.set_train_data(
             self, train_features, targets.to(train_features), strict
         )
 

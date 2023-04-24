@@ -44,7 +44,7 @@ from botorch.models.gp_regression import SingleTaskGP
 from gpytorch import kernels
 
 
-class SingleTaskMultiFidelityGP(SingleTaskGP):
+class SingleTaskExactMultiFidelityGP(SingleTaskGP):
     def __init__(
         self,
         train_X,
@@ -69,6 +69,7 @@ class SingleTaskMultiFidelityGP(SingleTaskGP):
         self.covar_module_fidelity = kernels.IndexKernel(
             num_tasks=n_fid, rank=index_kernel_rank
         )
+        self.covar_module_fidelity.to(self.device, self.dtype)
 
     def forward(self, input):
         if self.training:

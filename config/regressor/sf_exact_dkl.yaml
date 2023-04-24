@@ -1,0 +1,40 @@
+_target_: regressor.exact_dkl.ExactDKL
+
+checkpoint: proxy
+optim: adam
+
+surrogate:
+  _target_: model.gp_models.SingleTaskExactGP
+  max_shift: 0
+  mask_size: 0
+  bootstrap_ratio: null
+  min_num_train: 128
+  task_noise_init: 1e-2
+  gp_lr: 1e-3
+  enc_lr: 1e-3
+  bs: ${dataset.dataloader.train.batch_size}
+  eval_bs: ${dataset.dataloader.test.batch_size}
+  num_epochs: 512
+  holdout_ratio: 0.1 #0.2
+  early_stopping: True
+  patience: 32
+  eval_period: 1
+  feature_dim: ${model.feature_dim}
+  out_dim: 1
+  covar_module:
+    _target_: gpytorch.kernels.MaternKernel
+    ard_num_dims: ${regressor.surrogate.feature_dim}
+    # batch_shape:
+      # - 1
+    lengthscale_prior:
+      _target_: gpytorch.priors.NormalPrior
+      loc: 0.7
+      scale: 1e-2
+  likelihood:
+    _target_: gpytorch.likelihoods.GaussianLikelihood
+    # batch_shape:
+      # - 1
+    noise_constraint:
+      _target_: gpytorch.constraints.GreaterThan
+      lower_bound: 1e-4
+    encoder_wd: 1e-4
