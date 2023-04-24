@@ -11,28 +11,28 @@ defaults:
   - oracle@_oracle_dict.3: branin3
   - gflownet: trajectorybalance
   - user: nikita
-  - proxy: mf_mes_dkl #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
+  - proxy: mf_mes_gp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
   - dataset: dataset
-  - regressor: mf_dkl #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
-  - model: mlp #regressive
+  - regressor: mf_gp #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
+  # - model: mlp #regressive
   - logger: wandb
 
 proxy:
   cost_type: user
 
-model:
-  beta1: 0.9
-  beta2: 0.99
+# model:
+#   beta1: 0.9
+#   beta2: 0.99
 
-regressor:
-  optim: adam
-  surrogate:
-    eval_period: 1
-    num_epochs: 2048
-    patience: 100
-    num_inducing_points: 64
-  encoder_obj: mlm
-  lr_sched_type: plateau #step
+# regressor:
+#   optim: adam
+#   surrogate:
+#     eval_period: 1
+#     num_epochs: 2048
+#     patience: 100
+#     num_inducing_points: 64
+#   encoder_obj: mlm
+#   lr_sched_type: plateau #step
 
 logger:
   # resume: True 
@@ -59,6 +59,7 @@ logger:
     # - r(x) = (80 + x)
     # - r(x) = 10x
     - branin
+    - sanity
     # - test svgp_dkl
     # - single_fidelity
     # - mf-mes
@@ -72,7 +73,7 @@ env:
   reward_func: power #shift power
   # reward_beta: 1 #1 #80
   length: 100
-  rescale: 10
+  rescale: 15
   reward_norm: 1e-3 #1e-1 #1
   buffer:
     train:
@@ -98,7 +99,7 @@ gflownet:
   optimizer:
     lr: 5e-4
     lr_z_mult: 20
-    n_train_steps: 10000
+    n_train_steps: 5000
     batch_size: 32
   policy:
     forward:
@@ -115,13 +116,9 @@ gflownet:
 
 dataset:
   normalize_data: True
-# TODO can we get rid of "do"
-  fidelity: 
-    do: False #add dependance on N_FID
-    mixed: True
-  n_samples: 300
+  n_samples: 150
   train_fraction: 0.8
-  split: random #random all_train
+  split: all_train #random all_train
   dataloader:
     train:
       batch_size: 256
@@ -129,16 +126,17 @@ dataset:
       batch_size: 256
   path:
     type: mf #mf sf
-    oracle_dataset: null
+    oracle_dataset: 
     # UNCOMMENT FOR GP
-    # COMMENT FOR DKL BECAUSE NEED INDUCING POINTS
-      # fid_type: random
-      # train: 
-      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
-      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid3_100x100.csv
-      #   get_scores: True
-      # # train: null
-      # test: null
+    # # COMMENT FOR DKL BECAUSE NEED INDUCING POINTS
+      fid_type: random
+      train: 
+        path: ${user.data_path}/branin/nfid3_100x100.csv
+        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
+        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid3_100x100.csv
+        get_scores: True
+      # train: null
+      test: null
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
 n_samples: 30
@@ -155,6 +153,8 @@ multifidelity:
   proxy: True
   rescale: 10
   candidate_set_path: null
+  fid_embed: one_hot
+  fid_embed_dim: None
   # /home/mila/n/nikita.saxena/activelearning/storage/branin/mf_train50.csv
   #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
   # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
