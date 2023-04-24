@@ -24,9 +24,6 @@ def main(config):
     cwd = os.getcwd()
     config.logger.logdir.root = cwd
 
-    cwd = os.getcwd()
-    config.logger.logdir.root = cwd
-
     print(f"\nLogging directory of this run:  {cwd}\n")
     # Reset seed for job-name generation in multirun jobs
     random.seed(None)
@@ -107,8 +104,8 @@ def main(config):
             rescale=rescale,
             device=config.device,
             float_precision=config.float_precision,
-            fid_embed = config.multifidelity.fid_embed,
-            fid_embed_dim = config.multifidelity.fid_embed_dim,
+            fid_embed=config.multifidelity.fid_embed,
+            fid_embed_dim=config.multifidelity.fid_embed_dim,
         )
         # Best fidelity
         env.env.oracle = oracles[-1]
@@ -118,6 +115,7 @@ def main(config):
     config_model = None
     modes = None
     extrema = None
+    proxy_extrema = None
 
     if "model" in config:
         config_model = config.model
@@ -299,7 +297,9 @@ def main(config):
             idx_pick = torch.argsort(scores, descending=maximize)[:num_pick].tolist()
             picked_states = [states[i] for i in idx_pick]
             if extrema is not None:
-                proxy_extrema, _ = regressor.get_predictions(env, picked_states[0], denorm=True)
+                proxy_extrema, _ = regressor.get_predictions(
+                    env, picked_states[0], denorm=True
+                )
 
             if N_FID > 1:
                 picked_samples, picked_fidelity = env.statebatch2oracle(picked_states)
