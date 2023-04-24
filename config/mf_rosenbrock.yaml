@@ -54,7 +54,7 @@ logger:
   #     period: 1000
   do:
     times: False
-    online: True
+    online: False
   tags:
     # - r(x) = (80 + x)
     # - r(x) = 10x
@@ -152,9 +152,12 @@ float_precision: 64
 al_n_rounds: 15 #1
 do_figure: True
 multifidelity:
-  proxy: True
+  fid_embed: one_hot
+  fid_embed_dim: None
+  proxy: False
   rescale: 10
   candidate_set_path: null
+  #  /home/mila/n/nikita.saxena/activelearning/storage/branin/sf/data_train.csv
   # /home/mila/n/nikita.saxena/activelearning/storage/branin/mf_train50.csv
   #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
   # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
