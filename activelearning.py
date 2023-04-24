@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="sf_aptamers")
+@hydra.main(config_path="./config", config_name="mf_aptamers")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)

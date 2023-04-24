@@ -552,7 +552,6 @@ class SingleTaskMultiFidelityEGP(BaseGPSurrogate, SingleTaskExactMultiFidelityGP
             self, train_features, targets.to(train_features), strict
         )
 
-
 class SingleTaskSVGP(BaseGPSurrogate, SingleTaskVariationalGP):
     def __init__(
         self,
