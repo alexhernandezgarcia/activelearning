@@ -55,13 +55,15 @@ class SingleTaskGPRegressor:
         with debug(state=True):
             self.mll = fit_gpytorch_mll(self.mll)
 
-    def get_predictions(self, env, states):
+    def get_predictions(self, env, states, denorm=False):
         """Input is states
         Proxy conversion happens within."""
         detach = True
         if isinstance(states, torch.Tensor) == False:
             states = torch.tensor(states, device=self.device, dtype=env.float)
             detach = False
+        if states.ndim == 1:
+            states = states.unsqueeze(0)
         states_proxy_input = states.clone()
         states_proxy = env.statetorch2proxy(states_proxy_input)
         model = self.model
@@ -78,6 +80,16 @@ class SingleTaskGPRegressor:
         else:
             y_mean = y_mean.squeeze(-1)
             y_std = y_std.squeeze(-1)
+        if denorm == True and self.dataset.normalize_data == True:
+            y_mean = (
+                y_mean
+                * (
+                    self.dataset.train_stats["max"].cpu()
+                    - self.dataset.train_stats["min"].cpu()
+                )
+                + self.dataset.train_stats["min"].cpu()
+            )
+            y_mean = y_mean.squeeze(-1)
         return y_mean, y_std
 
     def get_metrics(self, y_mean, y_std, env, states):
@@ -193,7 +205,7 @@ class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
         self.model = SingleTaskMultiFidelityGP(
             train_x,
             train_y,
-            outcome_transform=Standardize(m=1),
+            # outcome_transform=Standardize(m=1),
             # fid column
             data_fidelity=fid_column,
         )
@@ -211,7 +223,7 @@ class SingleFidelitySingleTaskRegressor(SingleTaskGPRegressor):
         self.model = SingleTaskGP(
             train_x,
             train_y,
-            outcome_transform=Standardize(m=1),
+            # outcome_transform=Standardize(m=1),
         )
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
             self.model.likelihood, self.model

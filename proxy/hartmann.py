@@ -19,6 +19,7 @@ class Hartmann(Proxy):
             [0.4, 0.9, 0.4, 0.6, 0.0, 0.0],
             [0.4, 0.9, 0.6, 0.6, 0.3, 0.0],
         ]
+        self.extrema = 3.32237
 
 
 class MultiFidelityHartmann(Hartmann):

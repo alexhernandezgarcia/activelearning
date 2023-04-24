@@ -664,7 +664,9 @@ class GaussianProcessMultiFidelityMES(MES):
             )
             axs[fid].imshow(grid_scores)
             axs[fid].set_title(
-                "GP-Mes AcqF Val with fid {} and cost {}".format(self.env.oracle[fid].fid, self.env.oracle[fid].cost)
+                "GP-Mes AcqF Val with fid {} and cost {}".format(
+                    self.env.oracle[fid].fid, self.env.oracle[fid].cost
+                )
             )
             im = axs[fid].imshow(grid_scores)
             divider = make_axes_locatable(axs[fid])

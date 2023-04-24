@@ -26,6 +26,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 from torch.optim.lr_scheduler import MultiStepLR
 from torchtyping import TensorType
+from typing import List
 
 # import pytorch_lightning as pl
 # from apex.optimizers import FusedAdam
@@ -495,6 +496,9 @@ class DeepKernelRegressor:
             pass
         elif isinstance(states[0], TensorType):
             states = torch.vstack(states)
+        elif isinstance(states, List):
+            states = torch.tensor(states)
+            states = states.unsqueeze(0)
         states_proxy_input = states.clone()
         states_proxy = env.statetorch2proxy(states_proxy_input)
         y_mean, y_std, f_std = [], [], []

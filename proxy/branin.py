@@ -13,15 +13,20 @@ class Branin(Proxy):
         """
         Modes compatible with 100x100 grid"""
         self.modes = [
-            [31.47, 22.75],
-            [94.24, 24.75],
+            [12.4, 81.833],
+            [54.266, 15.16],
+            [94.98, 16.5],
         ]
+        self.extrema = 0.397887
         super().__init__(**kwargs)
 
     def plot_true_rewards(self, env, ax, rescale):
         states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
-        states_input_oracle = states.clone()
-        states_oracle = env.statetorch2oracle(states_input_oracle)
+        states_oracle = states.clone()
+        grid_size = env.length
+        states_oracle = states_oracle / (grid_size - 1)
+        states_oracle[:, 0] = states_oracle[:, 0] * rescale - 5
+        states_oracle[:, 1] = states_oracle[:, 1] * rescale
         scores = self(states_oracle).detach().cpu().numpy()
         if hasattr(self, "fid"):
             title = "Oracle Energy (TrainY) with fid {}".format(self.fid)
