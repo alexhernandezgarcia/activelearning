@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="sf_dkl")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -185,16 +185,17 @@ def main(config):
         iter = logger.resume_dict["iter"] + 1
 
     # env.reward_beta = env.reward_beta / env.beta_factor
-    # env.reward_norm = env.reward_norm * env.norm_factor
+    env.reward_norm = env.reward_norm * env.norm_factor
     initial_reward_beta = env.reward_beta
     initial_reward_norm = env.reward_norm
     while cumulative_cost < BUDGET:
         env.reward_beta = initial_reward_beta + (
             initial_reward_beta * env.beta_factor * (iter - 1)
         )
-        env.reward_norm = initial_reward_norm - (
-            initial_reward_norm * env.norm_factor * (iter - 1)
-        )
+        env.reward_norm = initial_reward_norm / (env.norm_factor ** (iter - 1))
+        # env.reward_norm = initial_reward_norm - (
+        #     initial_reward_norm * env.norm_factor * (iter - 1)
+        # )
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
             # Different number of inducing points calculated by cholesky method in each iteration
