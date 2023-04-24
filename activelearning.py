@@ -116,6 +116,7 @@ def main(config):
     modes = None
     extrema = None
     proxy_extrema = None
+    maximize = None
 
     if "model" in config:
         config_model = config.model
@@ -125,8 +126,6 @@ def main(config):
 
     if hasattr(oracle, "extrema"):
         extrema = oracle.extrema
-
-    maximize = None
 
     if "budget" in config:
         BUDGET = config.budget
@@ -185,13 +184,17 @@ def main(config):
         ]
         iter = logger.resume_dict["iter"] + 1
 
-    env.reward_beta = env.reward_beta / env.beta_factor
-    env.reward_norm = env.reward_norm * env.norm_factor
+    # env.reward_beta = env.reward_beta / env.beta_factor
+    # env.reward_norm = env.reward_norm * env.norm_factor
     initial_reward_beta = env.reward_beta
     initial_reward_norm = env.reward_norm
     while cumulative_cost < BUDGET:
-        env.reward_beta = initial_reward_beta * env.beta_factor * iter
-        env.reward_norm = initial_reward_norm / (env.norm_factor * iter)
+        env.reward_beta = initial_reward_beta + (
+            initial_reward_beta * env.beta_factor * (iter - 1)
+        )
+        env.reward_norm = initial_reward_norm - (
+            initial_reward_norm * env.norm_factor * (iter - 1)
+        )
         if config.multifidelity.proxy == True:
             # Moved in AL iter because of inducing point bug:
             # Different number of inducing points calculated by cholesky method in each iteration
