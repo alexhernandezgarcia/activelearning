@@ -6,7 +6,7 @@ do:
 ckpts:
   policy:
    # Period (number of iterations) of saving models
-    period: 1000
+    period: 5000
   regressor:
     period: 10
 # Train metrics
