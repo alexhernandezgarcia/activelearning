@@ -30,7 +30,7 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
             raise ValueError(
                 "Invalid proxy_state_format: {}".format(self.proxy_state_format)
             )
-        self.tokenizer = None
+        # self.tokenizer = None
 
     def set_tokenizer(self, tokenizer):
         self.tokenizer = tokenizer
@@ -75,9 +75,9 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
         if title == None:
             title = "Rewards of Sampled States"
         if scores is None:
-            oracle_states = self.statebatch2oracle(states)
             if states is None or len(states) == 0:
                 return None
+            oracle_states = self.statebatch2oracle(states)
             scores = oracle(oracle_states)
         if isinstance(scores, TensorType):
             scores = scores.cpu().detach().numpy()
