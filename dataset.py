@@ -140,6 +140,8 @@ class DataHandler:
             else:
                 states = state_score_tuple[0]
                 scores = state_score_tuple[1]
+                test_scores = None
+                train_scores = None
             if self.n_fid > 1:
                 fidelities = states[:, -1].tolist()
             else:
@@ -151,6 +153,18 @@ class DataHandler:
             )
 
         scores = scores * self.target_factor
+        indices = torch.where(scores == -0.0)
+        scores[indices] = 0.0
+
+        if train_scores is not None:
+            train_scores = train_scores * self.target_factor
+            indices = torch.where(train_scores == -0.0)
+            train_scores[indices] = 0.0
+
+        if test_scores is not None:
+            test_scores = test_scores * self.target_factor
+            indices = torch.where(test_scores == -0.0)
+            test_scores[indices] = 0.0
 
         if self.split == "random":
             # if (
@@ -207,7 +221,9 @@ class DataHandler:
             key="initial_test_dataset",
             use_context=True,
         )
-        # if hasattr(self.sfenv, "statetorch2readable"):
+        train_scores = train_scores * self.target_factor
+        indices = torch.where(train_scores == -0.0)
+        train_scores[indices] = 0.0
         readable_train_samples = [
             self.env.statetorch2readable(sample) for sample in train_states
         ]
@@ -215,15 +231,10 @@ class DataHandler:
             "samples": readable_train_samples,
             "energies": train_scores.tolist(),
         }
-        # else:
-        #     readable_train_samples = [
-        #         self.env.state2readable(sample) for sample in train_states
-        #     ]
-        #     readable_train_dataset = {
-        #         "samples": readable_train_samples,
-        #         "energies": train_scores.tolist(),
-        #     }
-        # Save the raw (un-normalized) dataset
+        train_scores = train_scores * self.target_factor
+        indices = torch.where(train_scores == -0.0)
+        train_scores[indices] = 0.0
+
         self.logger.save_dataset(readable_train_dataset, "train")
         self.train_dataset = {"states": train_states, "energies": train_scores}
 
@@ -233,7 +244,9 @@ class DataHandler:
         )
 
         if len(test_states) > 0:
-            # if hasattr(self.sfenv, "statetorch2readable"):
+            test_scores = test_scores * self.target_factor
+            indices = torch.where(test_scores == -0.0)
+            test_scores[indices] = 0.0
             readable_test_samples = [
                 self.env.statetorch2readable(sample) for sample in test_states
             ]
@@ -241,14 +254,9 @@ class DataHandler:
                 "samples": readable_test_samples,
                 "energies": test_scores.tolist(),
             }
-            # else:
-            #     readable_test_samples = [
-            #         self.env.state2readable(sample) for sample in test_states
-            #     ]
-            #     readable_test_dataset = {
-            #         "samples": readable_test_samples,
-            #         "energies": test_scores.tolist(),
-            #     }
+            test_scores = test_scores * self.target_factor
+            indices = torch.where(test_scores == -0.0)
+            test_scores[indices] = 0.0
             self.logger.save_dataset(readable_test_dataset, "test")
             self.test_dataset = {"states": test_states, "energies": test_scores}
 
@@ -369,13 +377,15 @@ class DataHandler:
             key="post_al_iter_sampled_dataset",
             use_context=True,
         )
-        energies = energies * self.target_factor
-        # Write dataset only after multiplying by target factor as was done in initialize_dataset
         readable_dataset = {
             "samples": [self.env.state2readable(state) for state in states],
             "energies": energies.tolist(),
         }
         self.logger.save_dataset(readable_dataset, "sampled")
+
+        energies = energies * self.target_factor
+        indices = torch.where(energies == -0.0)
+        energies[indices] = 0.0
 
         states = self.env.statebatch2proxy(states)
         if isinstance(states, TensorType) == False:
@@ -432,16 +442,6 @@ class DataHandler:
         dataset = pd.read_csv(path, index_col=0)
         dataset = pd.concat([dataset, pd.DataFrame(readable_dataset)])
         self.logger.save_dataset(dataset, "train")
-
-    # def reshuffle(self):
-    #     # TODO: Deprecated. Remove once sure it's not used.
-    #     """
-    #     Reshuffle the entire dataset (called before creating train and test subsets)
-    #     """
-    #     self.samples, self.targets = shuffle(
-    #         self.samples.numpy(),
-    #         self.targets.numpy(),
-    #     )
 
     def collate_batch(self, batch):
         """
