@@ -904,9 +904,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                 # states = [
                 # torch.tensor(self.readable2state(sample)) for sample in samples
                 # ]
-            train_states = torch.stack(train_states)
-            if test_scores != []:
+            if train_states != []:
+                train_states = torch.stack(train_states)
+            if test_states != []:
                 test_states = torch.stack(test_states)
+
             states = torch.stack(states)
             if config.type == "sf":
                 fidelties = self.generate_fidelities(len(states), config)
@@ -918,9 +920,22 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # else:scores
         #      = torch.cat([train_scores, test_scores], dim=0)
         if scores == []:
-            states_oracle_input = states.clone()
-            state_oracle, fid = self.statetorch2oracle(states_oracle_input)
-            scores = self.call_oracle_per_fidelity(state_oracle, fid)
+            train_states_oracle_input = train_states.clone()
+            train_state_oracle, fid = self.statetorch2oracle(train_states_oracle_input)
+            train_scores = self.call_oracle_per_fidelity(train_state_oracle, fid)
+
+            if test_states != []:
+                test_states_oracle_input = test_states.clone()
+                test_state_oracle, fid = self.statetorch2oracle(
+                    test_states_oracle_input
+                )
+                test_scores = self.call_oracle_per_fidelity(test_state_oracle, fid)
+            else:
+                test_scores = torch.tensor([], dtype=self.float, device=self.device)
+                test_states = torch.tensor([], dtype=self.float, device=self.device)
+
+            scores = torch.cat([train_scores, test_scores], dim=0)
+
         if isinstance(scores, List):
             scores = torch.tensor(scores, dtype=self.float)
         if resume == False:
@@ -931,49 +946,3 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
             if isinstance(test_scores, List):
                 test_scores = torch.tensor(test_scores, dtype=self.float)
             return train_states, train_scores, test_states, test_scores
-        # return state_score_tuple
-
-    # def get_trajectories(
-    #     self, traj_list, traj_actions_list, current_traj, current_actions
-    # ):
-    #     # TODO: Optimize
-    #     mf_traj_list = []
-    #     mf_traj_actions_list = []
-    #     traj_with_fidelity = current_traj[0]
-    #     fidelity = traj_with_fidelity[-1]
-    #     action_fidelity = (self.fid, fidelity)
-    #     action = tuple(
-    #         list(action_fidelity)
-    #         + [0] * (self.action_max_length - len(action_fidelity))
-    #     )
-    #     current_traj = traj_with_fidelity[:-1]
-    #     single_fid_traj_list, single_fid_traj_actions_list = self.env.get_trajectories(
-    #         [], [], [current_traj], current_actions
-    #     )
-    #     for idx in range(len(single_fid_traj_actions_list)):
-    #         for action_idx in range(len(single_fid_traj_actions_list[idx])):
-    #             action = single_fid_traj_actions_list[idx][action_idx]
-    #             action = tuple(
-    #                 list(action) + [0] * (self.action_max_length - len(action))
-    #             )
-    #             single_fid_traj_actions_list[idx][action_idx] = action
-    #     mf_traj_list = []
-    #     mf_traj_actions_list = []
-    #     for traj_idx in range(len(single_fid_traj_list)):
-    #         num_traj_states = len(single_fid_traj_list[traj_idx])
-    #         for idx in range(num_traj_states):
-    #             trajs = copy.deepcopy(single_fid_traj_list[traj_idx])
-    #             traj_actions = single_fid_traj_actions_list[traj_idx].copy()
-    #             fidelity_traj = trajs[idx].copy()
-    #             fidelity_traj.append(fidelity)
-    #             trajs.insert(idx, fidelity_traj)
-    #             traj_actions.insert(idx, action_fidelity)
-    #             for j in range(idx):
-    #                 trajs[j].append(fidelity)
-    #             for k in range(idx + 1, len(trajs)):
-    #                 trajs[k].append(-1)
-    #             mf_traj_list.append(trajs)
-    #             mf_traj_actions_list.append(traj_actions)
-    #     # self._test_traj_list.append(mf_traj_list)
-    #     # self._test_traj_actions_list.append(mf_traj_actions_list)
-    #     return mf_traj_list, mf_traj_actions_list
