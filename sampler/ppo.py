@@ -199,20 +199,16 @@ class PPOAgent(GFlowNetAgent):
         )
 
         # s, a, r, sp, d, lp, G, A = [torch.cat(i, 0) for i in zip(*[batch[i] for i in idxs])]
-        policy_output = self.forward_policy(self.env.statetorch2policy(states[idxs]))
-        logits, values = policy_output[:, :-1], policy_output[:, -1]
-        # new_logprobs = self.env.get_logprobs(
-        #     policy_output, True, actions, states, masks_s, loginf
-        # )
-        # Categorical used in entropy calculation so env.get_logprobs is not called.
-        new_pol = Categorical(logits=logits)
-        new_logprobs = new_pol.log_prob(actions)
+        policy_outputs = self.forward_policy(self.env.statetorch2policy(states[idxs]))
+        logits, values = policy_outputs[:, :-1], policy_outputs[:, -1]
+        actions, new_logprobs = self.env.sample_actions(
+            logits,
+            mask_invalid_actions=masks_s,
+            temperature=1.0,
+        )
+
         ratio = torch.exp(new_logprobs - logprobs)
 
-        with torch.no_grad():
-            vs = self.model(self.env.torch2policy(states[idxs]))[:, -1]
-            vsp = self.model(self.env.torch2policy(sp[idxs]))[:, -1]
-        A = rewards[idxs] + vsp * (1 - done[idxs]) - vs
         surr1 = ratio * A
         surr2 = torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param) * A
         action_loss = -torch.min(surr1, surr2).mean()
