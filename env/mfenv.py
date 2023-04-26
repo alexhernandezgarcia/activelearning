@@ -117,7 +117,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # Specifically for Oracle MES and Oracle based MF Experiments
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
         state_oracle = self.env.statebatch2oracle(states)
-        fidelities = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
+        fidelities = torch.tensor(fid_list, dtype=torch.long, device=self.device).unsqueeze(-1)
         transformed_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
@@ -181,7 +181,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         updated_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
-            updated_fidelities[idx_fid] = self.oracle[fid].fid
+            if idx_fid.numel() > 0:
+                updated_fidelities[idx_fid] = self.oracle[fid].fid
         states = torch.cat([states, updated_fidelities], dim=-1)
         return states
 
