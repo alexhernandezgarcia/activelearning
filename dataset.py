@@ -74,6 +74,28 @@ class DataHandler:
         self.rescale = rescale
         self.initialise_dataset()
 
+    def convert_to_tensor(self, data):
+        """
+        Converts a list of arrays to a tensor
+        """
+        if isinstance(data, TensorType):
+            return data
+        elif isinstance(data, List) and isinstance(data[0], TensorType):
+            return torch.stack(data).to(self.device)
+        elif isinstance(data, List):
+            return torch.tensor(data, dtype=self.float, device=self.device)
+        else:
+            raise NotImplementedError(
+                "Data type not recognized for conversion to tensor"
+            )
+
+    def scale_by_target_factor(self, data):
+        if data is not None:
+            data = data * self.target_factor
+            indices = torch.where(data == -0.0)
+            data[indices] = 0.0
+        return data
+
     # def generate_fidelities(self, states):
     #     """
     #     Generates a list of fidelities for the dataset
@@ -152,25 +174,11 @@ class DataHandler:
                 "Dataset initialisation not implemented for this environment"
             )
 
-        scores = scores * self.target_factor
-        indices = torch.where(scores == -0.0)
-        scores[indices] = 0.0
-
-        if train_scores is not None:
-            train_scores = train_scores * self.target_factor
-            indices = torch.where(train_scores == -0.0)
-            train_scores[indices] = 0.0
-
-        if test_scores is not None:
-            test_scores = test_scores * self.target_factor
-            indices = torch.where(test_scores == -0.0)
-            test_scores[indices] = 0.0
+        scores = self.scale_by_target_factor(scores)
+        train_scores = self.scale_by_target_factor(train_scores)
+        test_scores = self.scale_by_target_factor(test_scores)
 
         if self.split == "random":
-            # if (
-            #     self.path.oracle_dataset is not None
-            #     and self.path.oracle_dataset.train is not None
-            # ):
             index = torch.randperm(len(states))
             train_index = index[: int(len(states) * self.train_fraction)]
             test_index = index[int(len(states) * self.train_fraction) :]
@@ -221,9 +229,8 @@ class DataHandler:
             key="initial_test_dataset",
             use_context=True,
         )
-        train_scores = train_scores * self.target_factor
-        indices = torch.where(train_scores == -0.0)
-        train_scores[indices] = 0.0
+
+        train_scores = self.scale_by_target_factor(train_scores)
         readable_train_samples = [
             self.env.statetorch2readable(sample) for sample in train_states
         ]
@@ -231,22 +238,16 @@ class DataHandler:
             "samples": readable_train_samples,
             "energies": train_scores.tolist(),
         }
-        train_scores = train_scores * self.target_factor
-        indices = torch.where(train_scores == -0.0)
-        train_scores[indices] = 0.0
-
+        train_scores = self.scale_by_target_factor(train_scores)
         self.logger.save_dataset(readable_train_dataset, "train")
         self.train_dataset = {"states": train_states, "energies": train_scores}
-
         self.train_dataset, self.train_stats = self.preprocess(self.train_dataset)
         self.train_data = Data(
             self.train_dataset["states"], self.train_dataset["energies"]
         )
 
         if len(test_states) > 0:
-            test_scores = test_scores * self.target_factor
-            indices = torch.where(test_scores == -0.0)
-            test_scores[indices] = 0.0
+            test_scores = self.scale_by_target_factor(test_scores)
             readable_test_samples = [
                 self.env.statetorch2readable(sample) for sample in test_states
             ]
@@ -254,9 +255,7 @@ class DataHandler:
                 "samples": readable_test_samples,
                 "energies": test_scores.tolist(),
             }
-            test_scores = test_scores * self.target_factor
-            indices = torch.where(test_scores == -0.0)
-            test_scores[indices] = 0.0
+            test_scores = self.scale_by_target_factor(test_scores)
             self.logger.save_dataset(readable_test_dataset, "test")
             self.test_dataset = {"states": test_states, "energies": test_scores}
 
@@ -377,43 +376,83 @@ class DataHandler:
             key="post_al_iter_sampled_dataset",
             use_context=True,
         )
+
+        samples = [self.env.state2readable(state) for state in states]
         readable_dataset = {
-            "samples": [self.env.state2readable(state) for state in states],
+            "samples": samples,
             "energies": energies.tolist(),
         }
         self.logger.save_dataset(readable_dataset, "sampled")
 
-        energies = energies * self.target_factor
-        indices = torch.where(energies == -0.0)
-        energies[indices] = 0.0
+        energies = self.scale_by_target_factor(energies)
+        states_proxy = self.env.statebatch2proxy(states)
 
-        states = self.env.statebatch2proxy(states)
-        if isinstance(states, TensorType) == False:
-            states = torch.tensor(
-                np.array(states), device=self.device
-            )  # dtype=self.float,
-        else:
-            states = states.to(self.device)  # dtype=self.float
+        train_energies, test_energies = [], []
+        train_states, test_states = [], []
+        train_samples, test_samples = [], []
+        train_states_proxy, test_states_proxy = [], []
+        for sample, state, state_proxy, energy in zip(
+            samples, states, states_proxy, energies
+        ):
+            if np.random.uniform() < (1 / 10):
+                test_samples.append(sample)
+                test_states.append(state)
+                test_states_proxy.append(state_proxy)
+                test_energies.append(energy.item())
+            else:
+                train_samples.append(sample)
+                train_states.append(state)
+                train_states_proxy.append(state_proxy)
+                train_energies.append(energy.item())
+
+        test_states_proxy = self.convert_to_tensor(test_states_proxy)
+        train_states_proxy = self.convert_to_tensor(train_states_proxy)
+        test_energies = self.convert_to_tensor(test_energies)
+        train_energies = self.convert_to_tensor(train_energies)
+
+        # if isinstance(states, TensorType) == False:
+        #     states = torch.tensor(
+        #         np.array(states), device=self.device
+        #     )  # dtype=self.float,
+        # else:
+        #     states = states.to(self.device)  # dtype=self.float
 
         if self.normalize_data:
             self.train_dataset["energies"] = self.denormalize(
                 self.train_dataset["energies"], stats=self.train_stats
             )
+            self.test_dataset["energies"] = self.denormalize(
+                self.test_dataset["energies"], stats=self.test_stats
+            )
 
         self.train_dataset["energies"] = torch.cat(
-            (self.train_dataset["energies"], energies), dim=0
+            (self.train_dataset["energies"], train_energies), dim=0
         )
+        self.test_dataset["energies"] = torch.cat(
+            (self.test_dataset["energies"], test_energies), dim=0
+        )
+
         self.train_dataset["states"] = torch.cat(
-            (self.train_dataset["states"], states), dim=0
+            (self.train_dataset["states"], train_states_proxy), dim=0
+        )
+        self.test_dataset["states"] = torch.cat(
+            (self.test_dataset["states"], test_states_proxy), dim=0
         )
 
         self.train_stats = self.get_statistics(self.train_dataset["energies"])
+        self.test_stats = self.get_statistics(self.test_dataset["energies"])
         if self.normalize_data:
             self.train_dataset["energies"] = self.normalize(
                 self.train_dataset["energies"], self.train_stats
             )
+            self.test_dataset["energies"] = self.normalize(
+                self.test_dataset["energies"], self.test_stats
+            )
         self.train_data = Data(
             self.train_dataset["states"], self.train_dataset["energies"]
+        )
+        self.test_data = Data(
+            self.test_dataset["states"], self.test_dataset["energies"]
         )
 
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
@@ -437,11 +476,26 @@ class DataHandler:
                     )
                 )
 
-        # Update data_train.csv
-        path = self.logger.data_path.parent / Path("data_train.csv")
-        dataset = pd.read_csv(path, index_col=0)
-        dataset = pd.concat([dataset, pd.DataFrame(readable_dataset)])
-        self.logger.save_dataset(dataset, "train")
+        # Update data_train.csv so that buffer can pick it up
+        train_path = self.logger.data_path.parent / Path("data_train.csv")
+        train_dataset = pd.read_csv(train_path, index_col=0)
+        train_energies = self.scale_by_target_factor(train_energies)
+        readable_train_dataset = {
+            "samples": train_samples,
+            "energies": train_energies.tolist(),
+        }
+        train_dataset = pd.concat([train_dataset, pd.DataFrame(readable_train_dataset)])
+        self.logger.save_dataset(train_dataset, "train")
+
+        test_path = self.logger.data_path.parent / Path("data_test.csv")
+        test_dataset = pd.read_csv(test_path, index_col=0)
+        test_energies = self.scale_by_target_factor(test_energies)
+        readable_test_dataset = {
+            "samples": test_samples,
+            "energies": test_energies.tolist(),
+        }
+        test_dataset = pd.concat([test_dataset, pd.DataFrame(readable_test_dataset)])
+        self.logger.save_dataset(test_dataset, "test")
 
     def collate_batch(self, batch):
         """
