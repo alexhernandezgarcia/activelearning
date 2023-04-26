@@ -672,7 +672,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def statebatch2oracle(self, states: List[List]):
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
         state_oracle = self.env.statebatch2oracle(list(states))
-        fidelities = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
+        fidelities = torch.tensor(
+            fid_list, dtype=torch.int64, device=self.device
+        ).unsqueeze(-1)
         transformed_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
@@ -817,15 +819,24 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_cost(self, samples, fidelities=None):
         if fidelities is None:
-            fidelities = [sample[-1] for sample in samples]
-            fidelity_of_oracle = [self.oracle[int(fid)].fid for fid in fidelities]
-            fidelities = fidelity_of_oracle
+            fidelities = [self.oracle[int(sample[-1])].fid for sample in samples]
         if isinstance(fidelities, TensorType):
             if fidelities.ndim == 2:
                 fidelities = fidelities.squeeze(-1)
             fidelities = fidelities.tolist()
         costs = [self.fidelity_costs[fid] for fid in fidelities]
         return costs
+
+        # if fidelities is None:
+        #     fidelities = [sample[-1] for sample in samples]
+        #     fidelity_of_oracle = [self.oracle[int(fid)].fid for fid in fidelities]
+        #     fidelities = fidelity_of_oracle
+        # if isinstance(fidelities, TensorType):
+        #     if fidelities.ndim == 2:
+        #         fidelities = fidelities.squeeze(-1)
+        #     fidelities = fidelities.tolist()
+        # costs = [self.fidelity_costs[fid] for fid in fidelities]
+        # return costs
 
     def get_pairwise_distance(self, samples_set1, samples_set2=None):
         if hasattr(self.env, "get_pairwise_distance"):
