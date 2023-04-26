@@ -8,10 +8,10 @@ from torch.distributions import Categorical
 from tqdm import tqdm
 from gflownet.envs.base import Buffer
 from collections import defaultdict
+
 # from gflownet.gflownet import make_opt
 
 # make self.forward_policy.model MLP and not self.forward_policy directly
-
 
 
 class Policy:
@@ -20,7 +20,7 @@ class Policy:
         self.n_layers = config.n_layers
         self.device = device
         self.float = float_precision
-        self.model =  self.make_mlp(
+        self.model = self.make_mlp(
             [env.policy_input_dim]
             + [config.n_hid] * config.n_layers
             + [env.policy_output_dim + 1]
@@ -46,7 +46,7 @@ class Policy:
 
     def __call__(self, states):
         return self.model(states)
-    
+
 
 class PPOAgent(GFlowNetAgent):
     def __init__(
@@ -107,8 +107,8 @@ class PPOAgent(GFlowNetAgent):
         if self.ckpt_period in [None, -1]:
             self.ckpt_period = np.inf
         self.opt, self.lr_scheduler = make_opt(
-                self.forward_policy.model.parameters(), optimizer
-            )
+            self.forward_policy.model.parameters(), optimizer
+        )
         self.use_context = active_learning
         self.logsoftmax = torch.nn.LogSoftmax(dim=1)
         # Training
@@ -279,40 +279,36 @@ class PPOAgent(GFlowNetAgent):
         #     print(G.mean())
         return (loss, action_loss, value_loss,), G[
             done.eq(1)
-
-        # policy_outputs = self.forward_policy(self.env.statetorch2policy(states[idxs]))
-        # logits, values = policy_outputs[:, :-1], policy_outputs[:, -1]
-        # if masks_s is not None:
-        #     logits[masks_s[idxs]] = -loginf
-        # action_indices = (
-        #     torch.tensor(
-        #         [
-        #             self.action_space.index(tuple(action.tolist()))
-        #             for action in actions[idxs]
-        #         ]
-        #     )
-        #     .to(int)
-        #     .to(self.device)
-        # )
-
-        # new_pol = Categorical(logits=logits)  # Categorical(logits: torch.Size([2, 3]))
-        # new_logprobs = new_pol.log_prob(action_indices)
-        # ratio = torch.exp(new_logprobs - logprobs)
-        # surr1 = ratio * advantages[idxs]
-        # surr2 = (
-        #     torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
-        #     * advantages[idxs]
-        # )
-        # action_loss = -torch.min(surr1, surr2).mean()
-
-        # value_loss = 0.5 * (G[idxs] - values).pow(2).mean()
-        # entropy = new_pol.entropy().mean()
-        # loss = action_loss + value_loss - entropy * self.entropy_coef
-
-        # if not it % 100:
-        #     print(G.mean())
-        # return (loss, action_loss, value_loss,), G[
-        #     done.eq(1)
+            # policy_outputs = self.forward_policy(self.env.statetorch2policy(states[idxs]))
+            # logits, values = policy_outputs[:, :-1], policy_outputs[:, -1]
+            # if masks_s is not None:
+            #     logits[masks_s[idxs]] = -loginf
+            # action_indices = (
+            #     torch.tensor(
+            #         [
+            #             self.action_space.index(tuple(action.tolist()))
+            #             for action in actions[idxs]
+            #         ]
+            #     )
+            #     .to(int)
+            #     .to(self.device)
+            # )
+            # new_pol = Categorical(logits=logits)  # Categorical(logits: torch.Size([2, 3]))
+            # new_logprobs = new_pol.log_prob(action_indices)
+            # ratio = torch.exp(new_logprobs - logprobs)
+            # surr1 = ratio * advantages[idxs]
+            # surr2 = (
+            #     torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
+            #     * advantages[idxs]
+            # )
+            # action_loss = -torch.min(surr1, surr2).mean()
+            # value_loss = 0.5 * (G[idxs] - values).pow(2).mean()
+            # entropy = new_pol.entropy().mean()
+            # loss = action_loss + value_loss - entropy * self.entropy_coef
+            # if not it % 100:
+            #     print(G.mean())
+            # return (loss, action_loss, value_loss,), G[
+            #     done.eq(1)
         ]
 
     def sample_batch(
@@ -409,9 +405,7 @@ class PPOAgent(GFlowNetAgent):
             envs, actions, valids = self.step(envs, actions, is_forward=True)
             # Add to batch
             t0_a_envs = time.time()
-            batch = _add_to_trajectory(
-                trajs, s, actions, logprobs, envs, valids, train
-            )
+            batch = _add_to_trajectory(trajs, s, actions, logprobs, envs, valids, train)
             # Filter out finished trajectories
             envs = [env for env in envs if not env.done]
             t1_a_envs = time.time()
@@ -421,7 +415,7 @@ class PPOAgent(GFlowNetAgent):
         if train is False:
             batch = sum(trajs.values(), [])
             return batch, times
-        
+
         for tau in trajs.values():
             (
                 states_in_traj,
@@ -502,7 +496,7 @@ class PPOAgent(GFlowNetAgent):
         """
         # batch = [states, actions, logprobs, masks_s, advantages, rewards, done, traj_id]
         return batch, times
-    
+
     def unpack_terminal_states(self, batch):
         """
         Unpacks the terminating states and trajectories of a batch and converts them
@@ -655,6 +649,7 @@ class PPOAgent(GFlowNetAgent):
         # Close logger
         if self.use_context == False:
             self.logger.end()
+
 
 def make_opt(params, config):
     """
