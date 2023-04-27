@@ -204,7 +204,7 @@ class PPOAgent(GFlowNetAgent):
             sampling_method,
             mask_invalid_actions,
             temperature,
-        )
+        )  # actions is list of tuples
         return actions, logprobs
 
     def loss(self, it, batch, loginf=1000):
@@ -226,8 +226,8 @@ class PPOAgent(GFlowNetAgent):
             states_sp,
             masks_sp,
             done,
-            state_id,
             traj_id,
+            state_id,
             masks_s,
             G,
             advantages,
@@ -263,6 +263,9 @@ class PPOAgent(GFlowNetAgent):
 
         new_pol = Categorical(logits=logits)  # Categorical(logits: torch.Size([2, 3]))
         new_logprobs = new_pol.log_prob(action_indices)
+        """
+        was action a tensor of tuples?
+        """
         ratio = torch.exp(new_logprobs - logprobs)
         surr1 = ratio * advantages
         surr2 = (
@@ -365,12 +368,11 @@ class PPOAgent(GFlowNetAgent):
                     # TODO: to fix sampling
                     if env.done:
                         trajs[env_sp.id].append(env_sp.state)
-            return batch
+            return trajs
 
         times = {
             "actions_envs": 0.0,
         }
-        batch = []
         trajs = defaultdict(list)
         if isinstance(envs, list):
             envs = [env.reset(idx) for idx, env in enumerate(envs)]
@@ -405,7 +407,7 @@ class PPOAgent(GFlowNetAgent):
             envs, actions, valids = self.step(envs, actions, is_forward=True)
             # Add to batch
             t0_a_envs = time.time()
-            batch = _add_to_trajectory(trajs, s, actions, logprobs, envs, valids, train)
+            trajs = _add_to_trajectory(trajs, s, actions, logprobs, envs, valids, train)
             # Filter out finished trajectories
             envs = [env for env in envs if not env.done]
             t1_a_envs = time.time()
@@ -424,8 +426,8 @@ class PPOAgent(GFlowNetAgent):
                 states_sp_in_traj,
                 masks_sp_in_traj,
                 done_in_traj,
-                traj_id,
-                state_id_in_traj,
+                traj_id,  # required for unpack_terminal_states
+                state_id_in_traj,  # required for unpack_terminal_states
             ) = [torch.cat(i, 0) for i in zip(*tau)]
             rewards_in_traj = self.env.reward_torchbatch(states_in_traj, done_in_traj)
             # state_id_in_traj = state_id_in_traj - state_id_in_traj.min() + 1
@@ -447,6 +449,7 @@ class PPOAgent(GFlowNetAgent):
                     self.env.statetorch2policy(states_sp_in_traj)
                 )[:, -1]
             adv = rewards_in_traj + v_sp * torch.logical_not(done_in_traj) - v_s
+            """rewards_in_traj should always have the last element as the reward of the terminal state"""
             for mask, i, A in zip(masks_s, tau, adv):
                 i.append(mask.unsqueeze(0))  # mask_s
                 i.append(
