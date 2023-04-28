@@ -17,7 +17,7 @@ from utils.common import get_figure_plots
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="sf_aptamers")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -310,6 +310,9 @@ def main(config):
                 picked_energies = env.call_oracle_per_fidelity(
                     picked_samples, picked_fidelity
                 )
+                # use picked_energies to update dataset
+                # env.oracle is highest fidelity
+                # eval_energies = env.oracle(picked_samples)
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
                 picked_energies = env.oracle(picked_samples)
