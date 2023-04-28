@@ -421,39 +421,45 @@ class DataHandler:
             self.train_dataset["energies"] = self.denormalize(
                 self.train_dataset["energies"], stats=self.train_stats
             )
-            self.test_dataset["energies"] = self.denormalize(
-                self.test_dataset["energies"], stats=self.test_stats
-            )
+            if self.test_dataset is not None:
+                self.test_dataset["energies"] = self.denormalize(
+                    self.test_dataset["energies"], stats=self.test_stats
+                )
 
         self.train_dataset["energies"] = torch.cat(
             (self.train_dataset["energies"], train_energies), dim=0
         )
-        self.test_dataset["energies"] = torch.cat(
-            (self.test_dataset["energies"], test_energies), dim=0
-        )
+        if self.test_dataset is not None:
+            self.test_dataset["energies"] = torch.cat(
+                (self.test_dataset["energies"], test_energies), dim=0
+            )
 
         self.train_dataset["states"] = torch.cat(
             (self.train_dataset["states"], train_states_proxy), dim=0
         )
-        self.test_dataset["states"] = torch.cat(
-            (self.test_dataset["states"], test_states_proxy), dim=0
-        )
+        if self.test_dataset is not None:
+            self.test_dataset["states"] = torch.cat(
+                (self.test_dataset["states"], test_states_proxy), dim=0
+            )
 
         self.train_stats = self.get_statistics(self.train_dataset["energies"])
-        self.test_stats = self.get_statistics(self.test_dataset["energies"])
+        if self.test_dataset is not None:
+            self.test_stats = self.get_statistics(self.test_dataset["energies"])
         if self.normalize_data:
             self.train_dataset["energies"] = self.normalize(
                 self.train_dataset["energies"], self.train_stats
             )
-            self.test_dataset["energies"] = self.normalize(
-                self.test_dataset["energies"], self.test_stats
-            )
+            if self.test_dataset is not None:
+                self.test_dataset["energies"] = self.normalize(
+                    self.test_dataset["energies"], self.test_stats
+                )
         self.train_data = Data(
             self.train_dataset["states"], self.train_dataset["energies"]
         )
-        self.test_data = Data(
-            self.test_dataset["states"], self.test_dataset["energies"]
-        )
+        if self.test_dataset is not None:
+            self.test_data = Data(
+                self.test_dataset["states"], self.test_dataset["energies"]
+            )
 
         self.logger.log_dataset_stats(self.train_stats, self.test_stats)
         if self.progress:
@@ -487,15 +493,18 @@ class DataHandler:
         train_dataset = pd.concat([train_dataset, pd.DataFrame(readable_train_dataset)])
         self.logger.save_dataset(train_dataset, "train")
 
-        test_path = self.logger.data_path.parent / Path("data_test.csv")
-        test_dataset = pd.read_csv(test_path, index_col=0)
-        test_energies = self.scale_by_target_factor(test_energies)
-        readable_test_dataset = {
-            "samples": test_samples,
-            "energies": test_energies.tolist(),
-        }
-        test_dataset = pd.concat([test_dataset, pd.DataFrame(readable_test_dataset)])
-        self.logger.save_dataset(test_dataset, "test")
+        if self.test_dataset is not None:
+            test_path = self.logger.data_path.parent / Path("data_test.csv")
+            test_dataset = pd.read_csv(test_path, index_col=0)
+            test_energies = self.scale_by_target_factor(test_energies)
+            readable_test_dataset = {
+                "samples": test_samples,
+                "energies": test_energies.tolist(),
+            }
+            test_dataset = pd.concat(
+                [test_dataset, pd.DataFrame(readable_test_dataset)]
+            )
+            self.logger.save_dataset(test_dataset, "test")
 
     def collate_batch(self, batch):
         """
