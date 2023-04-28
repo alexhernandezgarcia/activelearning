@@ -311,12 +311,15 @@ def main(config):
                 picked_energies = env.call_oracle_per_fidelity(
                     picked_samples, picked_fidelity
                 )
+                energies_for_evaluation = env.oracle(picked_samples)
+
                 # use picked_energies to update dataset
                 # env.oracle is highest fidelity
                 # eval_energies = env.oracle(picked_samples)
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
                 picked_energies = env.oracle(picked_samples)
+                energies_for_evaluation = picked_energies
                 picked_fidelity = None
 
             if isinstance(picked_samples, torch.Tensor):
@@ -326,7 +329,7 @@ def main(config):
             cumulative_sampled_states.extend(picked_states)
             cumulative_sampled_samples.extend(picked_samples)
             cumulative_sampled_energies = torch.cat(
-                (cumulative_sampled_energies, picked_energies)
+                (cumulative_sampled_energies, energies_for_evaluation)
             )
             if picked_fidelity is not None:
                 cumulative_sampled_fidelities = torch.cat(
