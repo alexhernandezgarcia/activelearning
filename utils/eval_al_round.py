@@ -48,13 +48,6 @@ def get_novelty(samples, env, logger):
         return None
     dataset_samples = train_dataset["samples"]
     dataset_states = [env.readable2state(sample) for sample in dataset_samples]
-    # if isinstance(dataset_states[0], TensorType):
-    #     dataset_states = torch.stack(dataset_states)
-    # elif isinstance(dataset_states[0], List):
-    #     dataset_states = torch.tensor(dataset_states)
-    # with open(buffer.train_pkl, "rb") as f:
-    #     dict_tr = pickle.load(f)
-    #     dataset_states = dict_tr["x"]
     dists_from_D0 = env.get_distance_from_D0(samples, dataset_states)
     dists_from_D0 = torch.sort(dists_from_D0, descending=True)[0]
     return dists_from_D0
