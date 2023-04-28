@@ -10,6 +10,7 @@ from gflownet.envs.base import Buffer
 from collections import defaultdict
 
 # from gflownet.gflownet import make_opt
+from torchtyping import TensorType
 
 # make self.forward_policy.model MLP and not self.forward_policy directly
 
@@ -232,6 +233,21 @@ class PPOAgent(GFlowNetAgent):
             G,
             advantages,
         ) = [torch.cat(i, 0) for i in zip(*[batch[i] for i in idxs])]
+        (
+            _,
+            _,
+            _,
+            _,
+            _,
+            is_terminal,
+            _,
+            _,
+            _,
+            rewards,
+            _,
+        ) = zip(*batch)
+        is_terminal = torch.cat(is_terminal, 0)
+        rewards = torch.cat(rewards, 0)[is_terminal.eq(1)]
         # zip(
         #     *batch
         # )
@@ -280,39 +296,50 @@ class PPOAgent(GFlowNetAgent):
 
         # if not it % 100:
         #     print(G.mean())
-        return (loss, action_loss, value_loss,), G[
-            done.eq(1)
-            # policy_outputs = self.forward_policy(self.env.statetorch2policy(states[idxs]))
-            # logits, values = policy_outputs[:, :-1], policy_outputs[:, -1]
-            # if masks_s is not None:
-            #     logits[masks_s[idxs]] = -loginf
-            # action_indices = (
-            #     torch.tensor(
-            #         [
-            #             self.action_space.index(tuple(action.tolist()))
-            #             for action in actions[idxs]
-            #         ]
-            #     )
-            #     .to(int)
-            #     .to(self.device)
-            # )
-            # new_pol = Categorical(logits=logits)  # Categorical(logits: torch.Size([2, 3]))
-            # new_logprobs = new_pol.log_prob(action_indices)
-            # ratio = torch.exp(new_logprobs - logprobs)
-            # surr1 = ratio * advantages[idxs]
-            # surr2 = (
-            #     torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
-            #     * advantages[idxs]
-            # )
-            # action_loss = -torch.min(surr1, surr2).mean()
-            # value_loss = 0.5 * (G[idxs] - values).pow(2).mean()
-            # entropy = new_pol.entropy().mean()
-            # loss = action_loss + value_loss - entropy * self.entropy_coef
-            # if not it % 100:
-            #     print(G.mean())
-            # return (loss, action_loss, value_loss,), G[
-            #     done.eq(1)
-        ]
+        # if len(G[done.eq(1)])==0:
+        #     # make a numpy array of nans
+        #     rewards = np.nan
+        # else:
+        #     rewards = G[done.eq(1)]
+        return (
+            loss,
+            action_loss,
+            value_loss,
+        ), rewards
+
+        # policy_outputs = self.forward_policy(self.env.statetorch2policy(states[idxs]))
+        # logits, values = policy_outputs[:, :-1], policy_outputs[:, -1]
+        # if masks_s is not None:
+        #     logits[masks_s[idxs]] = -loginf
+        # action_indices = (
+        #     torch.tensor(
+        #         [
+        #             self.action_space.index(tuple(action.tolist()))
+        #             for action in actions[idxs]
+        #         ]
+        #     )
+        #     .to(int)
+        #     .to(self.device)
+        # )
+
+        # new_pol = Categorical(logits=logits)  # Categorical(logits: torch.Size([2, 3]))
+        # new_logprobs = new_pol.log_prob(action_indices)
+        # ratio = torch.exp(new_logprobs - logprobs)
+        # surr1 = ratio * advantages[idxs]
+        # surr2 = (
+        #     torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
+        #     * advantages[idxs]
+        # )
+        # action_loss = -torch.min(surr1, surr2).mean()
+
+        # value_loss = 0.5 * (G[idxs] - values).pow(2).mean()
+        # entropy = new_pol.entropy().mean()
+        # loss = action_loss + value_loss - entropy * self.entropy_coef
+
+        # if not it % 100:
+        #     print(G.mean())
+        # return (loss, action_loss, value_loss,), G[
+        #     done.eq(1)
 
     def sample_batch(
         self, envs, n_samples=None, train=True, model=None, progress=False
@@ -366,7 +393,7 @@ class PPOAgent(GFlowNetAgent):
 
                 else:
                     # TODO: to fix sampling
-                    if env.done:
+                    if env_sp.done:
                         trajs[env_sp.id].append(env_sp.state)
             return trajs
 
@@ -577,6 +604,10 @@ class PPOAgent(GFlowNetAgent):
             # Buffer
             # t0_buffer = time.time()
             states_term, trajs_term = self.unpack_terminal_states(batch)
+            # check rewards is not NaN
+            # if isinstance(rewards, TensorType)==False:
+            #     proxy_vals = rewards
+            # else:
             proxy_vals = self.env.reward2proxy(rewards).tolist()
             rewards = rewards.tolist()
             if self.logger.do_test(it) and hasattr(self.env, "get_cost"):
@@ -612,7 +643,7 @@ class PPOAgent(GFlowNetAgent):
                 states_term=states_term,
                 costs=costs,
                 batch_size=len(data),
-                logz=0,
+                logz=None,
                 learning_rates=self.lr_scheduler.get_last_lr(),
                 step=it,
                 use_context=self.use_context,
