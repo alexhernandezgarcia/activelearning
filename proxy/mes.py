@@ -28,6 +28,7 @@ from .botorch_models import FidelityCostModel
 from abc import abstractmethod
 import matplotlib.pyplot as plt
 from regressor.dkl import DeepKernelRegressor
+from env.grid import Grid
 
 
 class SingleFidelityMES(Proxy):
@@ -90,13 +91,28 @@ class DeepKernelSingleFidelityMES(SingleFidelityMES):
         return mes
 
     def plot_acquisition_rewards(self, **kwargs):
-        if hasattr(self.env, "n_dim") == False or self.env.n_dim != 2:
+        if isinstance(self.env, Grid) and self.env.n_dim != 2:
             return None
-        if hasattr(self.env, "get_all_terminating_states") == False:
+        if hasattr(self.env, "get_all_terminating_states") == True:
+            states = torch.tensor(
+                self.env.get_all_terminating_states(), dtype=self.float
+            ).to(self.device)
+        elif hasattr(self.env, "load_test_dataset") == True:
+            states, energies = self.env.load_test_dataset(self.logger)
+            states = states.to(self.device)
+            states_input_proxy = states.clone()
+            states_proxy = self.env.statetorch2proxy(states_input_proxy)
+            scores = self(states_proxy).detach().cpu().numpy()
+            reward_distr_figure = self.env.plot_reward_distribution(
+                scores=scores, title="DKL SF MES Reward"
+            )
+            energy_vs_reward_fig = self.env.energy_vs_reward(energies, scores)
+            self.logger.log_figure(
+                "energies_vs_acq_rewards", energy_vs_reward_fig, use_context=True
+            )
+            return reward_distr_figure
+        else:
             return None
-        states = torch.tensor(
-            self.env.get_all_terminating_states(), dtype=self.float
-        ).to(self.device)
         states_input_proxy = states.clone()
         states_proxy = self.env.statetorch2proxy(states_input_proxy)
         scores = self(states_proxy).detach().cpu().numpy()
@@ -527,7 +543,7 @@ class DeepKernelMultiFidelityMES(MES):
 
         features = features.unsqueeze(-2)
         acq_values = self.acqf(features)
-        if abs(torch.mean(acq_values)-float("inf"))<1e-1:
+        if abs(torch.mean(acq_values) - float("inf")) < 1e-1:
             print("Warning: Acqf value is positive")
         return acq_values
 

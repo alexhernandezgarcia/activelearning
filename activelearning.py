@@ -14,10 +14,11 @@ import matplotlib.pyplot as plt
 from regressor.dkl import Tokenizer
 import numpy as np
 from utils.common import get_figure_plots
+from utils.eval_al_round import evaluate
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="sf_dkl")
+@hydra.main(config_path="./config", config_name="mf_rosenbrock")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -310,6 +311,9 @@ def main(config):
                 picked_energies = env.call_oracle_per_fidelity(
                     picked_samples, picked_fidelity
                 )
+                # use picked_energies to update dataset
+                # env.oracle is highest fidelity
+                # eval_energies = env.oracle(picked_samples)
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
                 picked_energies = env.oracle(picked_samples)
@@ -360,13 +364,14 @@ def main(config):
                 # )
 
             if config.env.proxy_state_format != "oracle":
-                gflownet.evaluate(
-                    cumulative_sampled_samples,
-                    cumulative_sampled_energies,
-                    oracle.maximize,
-                    modes=modes,
-                    dataset_states=data_handler.train_dataset["states"],
+                evaluate(
+                    samples=cumulative_sampled_samples,
+                    energies=cumulative_sampled_energies,
+                    maximize=oracle.maximize,
                     cumulative_cost=cumulative_cost,
+                    logger=logger,
+                    env=env,
+                    modes=modes,
                     proxy_extrema=proxy_extrema,
                     extrema=extrema,
                 )

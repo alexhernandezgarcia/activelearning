@@ -6,6 +6,7 @@ from .base import GFlowNetEnv
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from pathlib import Path
 
 
 def split_str(s):
@@ -30,7 +31,7 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
             raise ValueError(
                 "Invalid proxy_state_format: {}".format(self.proxy_state_format)
             )
-        self.tokenizer = None
+        # self.tokenizer = None
 
     def set_tokenizer(self, tokenizer):
         self.tokenizer = tokenizer
@@ -75,9 +76,9 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
         if title == None:
             title = "Rewards of Sampled States"
         if scores is None:
-            oracle_states = self.statebatch2oracle(states)
             if states is None or len(states) == 0:
                 return None
+            oracle_states = self.statebatch2oracle(states)
             scores = oracle(oracle_states)
         if isinstance(scores, TensorType):
             scores = scores.cpu().detach().numpy()
@@ -85,11 +86,25 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
         ax.set_title(title)
         ax.set_ylabel("Number of Samples")
         ax.set_xlabel("Energy")
+        if "MES" in title:
+            ax.set_xbound(-0.0, 0.01)
+            # ax.set_xticks(np.arange(start = 0.0, stop=0.1, step=1e-2))
         plt.show()
         if standalone == True:
             plt.tight_layout()
             plt.close()
         return ax
+
+    # def energy_vs_reward(self, energies, rewards):
+    #     # Plot a scatter plot of energy vs reward
+    #     fig, ax = plt.subplots()
+    #     ax.scatter(energies, rewards)
+    #     ax.set_ybound(0.0, 0.01)
+    #     ax.set_xlabel("Energy")
+    #     ax.set_ylabel("Reward")
+    #     plt.show()
+    #     plt.close()
+    #     return ax
 
     def initialize_dataset(self, config, n_samples, resume, **kwargs):
         train_scores = torch.tensor([])
@@ -141,6 +156,22 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
             return states, scores
         else:
             return train_states, train_scores, test_states, test_scores
+
+    # def load_test_dataset(self, logger):
+    #     # path = logger.data_path.parent / Path("data_test.csv")
+    #     print("Loading UNIFORM Test Dataset")
+    #     path = Path("/home/mila/n/nikita.saxena/activelearning/storage/dna/length30/test_2000_FINAL.csv")
+    #     dataset = pd.read_csv(path, index_col=0)
+    #     samples = dataset["samples"]
+    #     scores = dataset["energies"]
+    #     states = [self.readable2state(sample) for sample in samples]
+    #     states = torch.stack(states)
+    #     return states, scores
+
+    def write_samples_to_file(self, samples, path):
+        samples = [self.state2readable(state) for state in samples]
+        df = pd.DataFrame(samples, columns=["samples"])
+        df.to_csv(path)
 
     # def initialize_dataset(self, config, n_samples, resume, **kwargs):
     #     train_states = torch.tensor([])

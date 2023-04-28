@@ -81,6 +81,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self._test_traj_list = []
         self._test_traj_actions_list = []
 
+    def write_samples_to_file(self, samples, path):
+        samples = [self.state2readable(state) for state in samples]
+        df = pd.DataFrame(samples, columns=["samples"])
+        df.to_csv(path)
+
     def set_proxy(self, proxy):
         self.proxy = proxy
         if hasattr(self, "proxy_factor"):
@@ -117,7 +122,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # Specifically for Oracle MES and Oracle based MF Experiments
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
         state_oracle = self.env.statebatch2oracle(states)
-        fidelities = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
+        fidelities = torch.tensor(
+            fid_list, dtype=torch.long, device=self.device
+        ).unsqueeze(-1)
         transformed_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
@@ -181,7 +188,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         updated_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
-            updated_fidelities[idx_fid] = self.oracle[fid].fid
+            if idx_fid.numel() > 0:
+                updated_fidelities[idx_fid] = self.oracle[fid].fid
         states = torch.cat([states, updated_fidelities], dim=-1)
         return states
 
@@ -672,7 +680,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
     def statebatch2oracle(self, states: List[List]):
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
         state_oracle = self.env.statebatch2oracle(list(states))
-        fidelities = torch.Tensor(fid_list).long().to(self.device).unsqueeze(-1)
+        fidelities = torch.tensor(
+            fid_list, dtype=torch.int64, device=self.device
+        ).unsqueeze(-1)
         transformed_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
@@ -817,15 +827,24 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
 
     def get_cost(self, samples, fidelities=None):
         if fidelities is None:
-            fidelities = [sample[-1] for sample in samples]
-            fidelity_of_oracle = [self.oracle[int(fid)].fid for fid in fidelities]
-            fidelities = fidelity_of_oracle
+            fidelities = [self.oracle[int(sample[-1])].fid for sample in samples]
         if isinstance(fidelities, TensorType):
             if fidelities.ndim == 2:
                 fidelities = fidelities.squeeze(-1)
             fidelities = fidelities.tolist()
         costs = [self.fidelity_costs[fid] for fid in fidelities]
         return costs
+
+        # if fidelities is None:
+        #     fidelities = [sample[-1] for sample in samples]
+        #     fidelity_of_oracle = [self.oracle[int(fid)].fid for fid in fidelities]
+        #     fidelities = fidelity_of_oracle
+        # if isinstance(fidelities, TensorType):
+        #     if fidelities.ndim == 2:
+        #         fidelities = fidelities.squeeze(-1)
+        #     fidelities = fidelities.tolist()
+        # costs = [self.fidelity_costs[fid] for fid in fidelities]
+        # return costs
 
     def get_pairwise_distance(self, samples_set1, samples_set2=None):
         if hasattr(self.env, "get_pairwise_distance"):
