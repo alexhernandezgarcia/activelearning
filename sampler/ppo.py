@@ -577,7 +577,7 @@ class PPOAgent(GFlowNetAgent):
                 self.logger.log_plots(figs, it, self.use_context)
             t0_iter = time.time()
             data = []
-            for j in range(self.sttr):
+            for i in range(self.sttr):
                 batch, times = self.sample_batch(envs)
                 data += batch
             for j in range(self.ttsr):

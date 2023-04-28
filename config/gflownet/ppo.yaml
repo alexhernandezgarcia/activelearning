@@ -1,4 +1,4 @@
-_target_: gflownet.ppo.PPOAgent
+_target_: sampler.ppo.PPOAgent
 # Random seeds
 seed: 0
 # Optimizer
@@ -41,8 +41,8 @@ policy:
   checkpoint: null
   ckpt_period: null
 active_learning: True
-ppo_num_epochs: 16 #ttsr
-ppo_epoch_size: 32 #sttr
+ppo_num_epochs: 1 #6 #ttsr
+ppo_epoch_size: 1 #32 #sttr
 ppo_clip: 0.1
 ppo_entropy_coef: 1e-3
 sample_only: False
