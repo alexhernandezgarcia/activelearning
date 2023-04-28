@@ -81,6 +81,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         self._test_traj_list = []
         self._test_traj_actions_list = []
 
+    def write_samples_to_file(self, samples, path):
+        samples = [self.state2readable(state) for state in samples]
+        df = pd.DataFrame(samples, columns=["samples"])
+        df.to_csv(path)
+
     def set_proxy(self, proxy):
         self.proxy = proxy
         if hasattr(self, "proxy_factor"):
@@ -117,7 +122,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # Specifically for Oracle MES and Oracle based MF Experiments
         states, fid_list = zip(*[(state[:-1], state[-1]) for state in states])
         state_oracle = self.env.statebatch2oracle(states)
-        fidelities = torch.tensor(fid_list, dtype=torch.long, device=self.device).unsqueeze(-1)
+        fidelities = torch.tensor(
+            fid_list, dtype=torch.long, device=self.device
+        ).unsqueeze(-1)
         transformed_fidelities = torch.zeros_like(fidelities)
         for fid in range(self.n_fid):
             idx_fid = torch.where(fidelities == fid)[0]
