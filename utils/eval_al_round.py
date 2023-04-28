@@ -77,13 +77,8 @@ def evaluate(
     Returns:
         dictionary with topk performance, diversity and novelty scores
     """
-    do_novelty = True
     define_metrics(logger)
     energies = torch.sort(energies, descending=maximize)[0]
-
-    # if dists_from_D0 is not None:
-    #     do_novelty=True
-
     metrics_dict = {}
     for k in logger.oracle.k:
         print(f"\n Top-{k} Performance")
@@ -97,12 +92,11 @@ def evaluate(
             )
             mean_pairwise_dist_topk = torch.mean(pairwise_dist_topk)
             mean_min_dist_from_mode_topk = torch.mean(min_dist_from_mode_topk)
-            if do_novelty and k != 1:
-                dists_from_D0 = get_novelty(samples_topk, env, logger)
-                mean_dist_from_D0_topk = torch.mean(dists_from_D0)
-                metrics_dict.update(
-                    {"min_distance_from_D0_top{}".format(k): mean_dist_from_D0_topk}
-                )
+            dists_from_D0 = get_novelty(samples_topk, env, logger)
+            mean_dist_from_D0_topk = torch.mean(dists_from_D0)
+            metrics_dict.update(
+                {"min_distance_from_D0_top{}".format(k): mean_dist_from_D0_topk}
+            )
         else:
             mean_pairwise_dist_topk = 0
             mean_min_dist_from_mode_topk = 0
@@ -122,8 +116,7 @@ def evaluate(
             print(f"\t Mean Energy: {mean_energy_topk}")
             print(f"\t Mean Pairwise Distance: {mean_pairwise_dist_topk}")
             print(f"\t Mean Min Distance from Mode: {mean_min_dist_from_mode_topk}")
-            if do_novelty:
-                print(f"\t Mean Min Distance from D0: {mean_dist_from_D0_topk}")
+            print(f"\t Mean Min Distance from D0: {mean_dist_from_D0_topk}")
 
     if logger.progress:
         print(f"\n Cumulative Cost: {cumulative_cost}")
