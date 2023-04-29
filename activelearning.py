@@ -18,7 +18,7 @@ from utils.eval_al_round import evaluate
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="sf_dkl")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -311,7 +311,7 @@ def main(config):
                 picked_energies = env.call_oracle_per_fidelity(
                     picked_samples, picked_fidelity
                 )
-                energies_for_evaluation = env.oracle(picked_samples)
+                energies_for_evaluation = oracle(picked_samples)
 
                 # use picked_energies to update dataset
                 # env.oracle is highest fidelity
@@ -399,6 +399,8 @@ def main(config):
         del gflownet
         del proxy
         del regressor
+        env._test_traj_list = []
+        env._test_traj_actions_list = []
         iter += 1
 
 
