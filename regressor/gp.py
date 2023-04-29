@@ -205,7 +205,7 @@ class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
         self.model = SingleTaskMultiFidelityGP(
             train_x,
             train_y,
-            # outcome_transform=Standardize(m=1),
+            outcome_transform=Standardize(m=1),
             # fid column
             data_fidelity=fid_column,
         )
@@ -223,7 +223,7 @@ class SingleFidelitySingleTaskRegressor(SingleTaskGPRegressor):
         self.model = SingleTaskGP(
             train_x,
             train_y,
-            # outcome_transform=Standardize(m=1),
+            outcome_transform=Standardize(m=1),
         )
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
             self.model.likelihood, self.model
