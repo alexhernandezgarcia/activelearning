@@ -577,7 +577,7 @@ class PPOAgent(GFlowNetAgent):
                 self.logger.log_plots(figs, it, self.use_context)
             t0_iter = time.time()
             data = []
-            for i in range(self.sttr):
+            for j in range(self.sttr):
                 batch, times = self.sample_batch(envs)
                 data += batch
             for j in range(self.ttsr):
@@ -590,7 +590,7 @@ class PPOAgent(GFlowNetAgent):
                     if len(all_losses) > 0:
                         all_losses.append([loss for loss in all_losses[-1]])
                 else:
-                    losses[0].backward()
+                    losses[0].backward(retain_graph=True)
                     if self.clip_grad_norm > 0:
                         torch.nn.utils.clip_grad_norm_(
                             self.parameters(), self.clip_grad_norm
