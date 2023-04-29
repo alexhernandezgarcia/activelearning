@@ -6,7 +6,10 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pathlib import Path
 import numpy as np
 import pandas as pd
-
+from botorch.acquisition.fixed_feature import FixedFeatureAcquisitionFunction
+from botorch.acquisition.analytic import PosteriorMean
+from botorch.optim.optimize import optimize_acqf
+from botorch.optim.optimize import optimize_acqf_mixed
 
 class GaussianProcessKnowledgeGradient(MultiFidelity):
     def __init__(self, regressor, **kwargs):
@@ -14,6 +17,21 @@ class GaussianProcessKnowledgeGradient(MultiFidelity):
         super().__init__(**kwargs)
         cost_aware_utility = self.get_cost_utility()
         model = self.load_model()
+        dim = 3
+        curr_val_acqf = FixedFeatureAcquisitionFunction(
+            acq_function=PosteriorMean(model),
+            d=dim,
+            columns=[2],
+            values=[1],
+            )
+        bounds =  torch.tensor([[0.0] * dim, [1.0] * dim], dtype=self.float, device=self.device)
+        _, current_value = optimize_acqf(
+            acq_function=curr_val_acqf,
+            bounds=bounds[:, :-1],
+            q=1,
+            num_restarts=2,
+            raw_samples= 4,
+        )
         # We need to maximise the function
         current_value = -min(self.candidate_set)
         self.acqf = qMultiFidelityKnowledgeGradient(
