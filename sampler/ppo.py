@@ -456,9 +456,7 @@ class PPOAgent(GFlowNetAgent):
                 traj_id,  # required for unpack_terminal_states
                 state_id_in_traj,  # required for unpack_terminal_states
             ) = [torch.cat(i, 0) for i in zip(*tau)]
-            rewards_in_traj = self.env.reward_torchbatch(
-                states_sp_in_traj, done_in_traj
-            )
+            rewards_in_traj = self.env.reward_torchbatch(states_in_traj, done_in_traj)
             # state_id_in_traj = state_id_in_traj - state_id_in_traj.min() + 1
             masks_s = torch.cat([self.mask_source, masks_sp_in_traj[:-1]])
 
