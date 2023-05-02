@@ -195,8 +195,8 @@ class PPOAgent(GFlowNetAgent):
             [env.get_mask_invalid_actions_forward() for env in envs]
         )
         # Build policy outputs
-        with torch.no_grad():
-            policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
+
+        policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
         # Skip v from policy outputs
         policy_outputs = policy_outputs[:, :-1]
         # Sample actions from policy outputs
@@ -208,31 +208,9 @@ class PPOAgent(GFlowNetAgent):
         )  # actions is list of tuples
         return actions, logprobs
 
-    def loss(self, it, batch, loginf=1000):
+    def loss(self, it, batch, masks_s, G, advantages, loginf=1000):
         loginf = self._tfloat([loginf])
-        # (states,
-        #     actions,
-        #     logprobs,
-        #     masks_s,
-        #     advantages,
-        #     rewards) = zip(*batch)
-        idxs = torch.randint(low=0, high=len(batch), size=(self.batch_size,))
-        # s, a, r, sp, d, lp, G, A = [torch.cat(i, 0) for i in zip(*[batch[i] for i in idxs])]
-
-        # Concatenate lists of tensors in idx
-        (
-            states,
-            actions,
-            logprobs,
-            states_sp,
-            masks_sp,
-            done,
-            traj_id,
-            state_id,
-            masks_s,
-            G,
-            advantages,
-        ) = [torch.cat(i, 0) for i in zip(*[batch[i] for i in idxs])]
+        # NEED TO RETURN MEAN OF ALL REWARDS SO NO IDX FILTERING HERE
         (
             _,
             _,
@@ -242,12 +220,37 @@ class PPOAgent(GFlowNetAgent):
             is_terminal,
             _,
             _,
-            _,
-            rewards,
-            _,
+            # _,
+            # rewards,
+            # _,
         ) = zip(*batch)
         is_terminal = torch.cat(is_terminal, 0)
-        rewards = torch.cat(rewards, 0)[is_terminal.eq(1)]
+
+        all_rewards = torch.stack(G)
+        rewards = all_rewards[is_terminal.eq(1)]
+
+        idxs = torch.randint(low=0, high=len(batch), size=(self.batch_size,))
+
+        # Concatenate lists of tensors in idx
+        (
+            states,
+            actions,
+            logprobs,
+            states_sp,
+            masks_sp,
+            is_terminal,
+            traj_id,
+            state_id,
+            # masks_s,
+            # G,
+            # advantages,
+        ) = [torch.cat(i, 0) for i in zip(*[batch[i] for i in idxs])]
+        masks_s = torch.stack(masks_s)[idxs]
+        G = torch.stack(G)[idxs]
+        advantages = torch.stack(advantages)[idxs]
+        # G = G[idxs]
+        # advantages = advantages[idxs]
+
         # zip(
         #     *batch
         # )
@@ -294,13 +297,6 @@ class PPOAgent(GFlowNetAgent):
         entropy = new_pol.entropy().mean()
         loss = action_loss + value_loss - entropy * self.entropy_coef
 
-        # if not it % 100:
-        #     print(G.mean())
-        # if len(G[done.eq(1)])==0:
-        #     # make a numpy array of nans
-        #     rewards = np.nan
-        # else:
-        #     rewards = G[done.eq(1)]
         return (
             loss,
             action_loss,
@@ -354,10 +350,9 @@ class PPOAgent(GFlowNetAgent):
                 - [2] lp, log_prob of action
                 - [3] mask_s
                 - [4] sp, the next state
-                - [5] mask_sp
-                - [6] done [True, False]
-                - [7] traj id: identifies each trajectory
-                - [8] state id: identifies each state within a traj
+                - [5] done [True, False]
+                - [6] traj id: identifies each trajectory
+                - [7] state id: identifies each state within a traj
         else:
             Each item in the batch is a list of 1 element:
                 - [0] the states (state)
@@ -445,6 +440,46 @@ class PPOAgent(GFlowNetAgent):
             batch = sum(trajs.values(), [])
             return batch, times
 
+        batch = sum(trajs.values(), [])
+        states, _, _, states_sp, masks_sp, done, traj_id, state_id = [
+            torch.cat(i, 0) for i in zip(*batch)
+        ]
+        # Shift state_id to [1, 2, ...]
+        # for tid in traj_id.unique():
+        #     state_id[traj_id == tid] = (
+        #         state_id[traj_id == tid] - state_id[traj_id == tid].min()
+        #     ) + 1
+        masks_s = torch.cat(
+            [
+                masks_sp[torch.where((state_id == sid - 1) & (traj_id == pid))]
+                if sid > 1
+                else self.mask_source
+                for sid, pid in zip(state_id, traj_id)
+            ]
+        )
+        rewards = self.env.reward_torchbatch(states, done)
+        G = rewards.clone()
+        non_zero_indices = torch.nonzero(G).squeeze()
+        non_zero_elements = G[non_zero_indices]
+        for i in range(len(non_zero_indices)):
+            if i == 0:
+                G[0 : non_zero_indices[i]] = non_zero_elements[i]
+            else:
+                G[
+                    non_zero_indices[i - 1] + 1 : non_zero_indices[i]
+                ] = non_zero_elements[i]
+
+        # Replace zero elements with the immediately succeeding non-zero element
+        # G[torch.cat([non_zero_indices[0].unsqueeze(0), non_zero_indices[:-1] + 1])] = G[
+        #     non_zero_indices
+        # ]
+        with torch.no_grad():
+            v_s = self.forward_policy(self.env.statetorch2policy(states))[:, -1]
+            v_sp = self.forward_policy(self.env.statetorch2policy(states_sp))[:, -1]
+        adv = rewards + v_sp * torch.logical_not(done) - v_s
+        return batch, masks_s, G, adv, times
+
+        """
         for tau in trajs.values():
             (
                 states_in_traj,
@@ -453,8 +488,8 @@ class PPOAgent(GFlowNetAgent):
                 states_sp_in_traj,
                 masks_sp_in_traj,
                 done_in_traj,
-                traj_id,  # required for unpack_terminal_states
-                state_id_in_traj,  # required for unpack_terminal_states
+                traj_id, #required for unpack_terminal_states
+                state_id_in_traj, #required for unpack_terminal_states
             ) = [torch.cat(i, 0) for i in zip(*tau)]
             rewards_in_traj = self.env.reward_torchbatch(states_in_traj, done_in_traj)
             # state_id_in_traj = state_id_in_traj - state_id_in_traj.min() + 1
@@ -475,8 +510,8 @@ class PPOAgent(GFlowNetAgent):
                 v_sp = self.forward_policy(
                     self.env.statetorch2policy(states_sp_in_traj)
                 )[:, -1]
-            adv = rewards_in_traj + v_sp * torch.logical_not(done_in_traj) - v_s
-            """rewards_in_traj should always have the last element as the reward of the terminal state"""
+            adv = rewards_in_traj + v_sp * torch.logical_not(done_in_traj) - v_s 
+            # rewards_in_traj should always have the last element as the reward of the terminal state
             for mask, i, A in zip(masks_s, tau, adv):
                 i.append(mask.unsqueeze(0))  # mask_s
                 i.append(
@@ -484,6 +519,8 @@ class PPOAgent(GFlowNetAgent):
                 )  # G, The return is always just the last reward, gamma is 1
                 i.append(A.unsqueeze(0))  # A
         batch = sum(trajs.values(), [])
+        """
+
         """
         unpack batch
         states, actions, logprobs, states_sp, masks_sp, done, traj_id, state_id = [
@@ -577,12 +614,19 @@ class PPOAgent(GFlowNetAgent):
                 self.logger.log_plots(figs, it, self.use_context)
             t0_iter = time.time()
             data = []
+            data_masks_s = []
+            data_G = []
+            data_adv = []
             for j in range(self.sttr):
-                batch, times = self.sample_batch(envs)
+                batch, masks_s, G, adv, times = self.sample_batch(envs)
                 data += batch
+                data_masks_s += masks_s
+                data_G += G
+                data_adv += adv
+            data = tuple(data)
             for j in range(self.ttsr):
                 losses, rewards = self.loss(
-                    it * self.ttsr + j, data
+                    it * self.ttsr + j, data, data_masks_s, data_G, data_adv
                 )  # returns (opt loss, *metrics)
                 if not all([torch.isfinite(loss) for loss in losses]):
                     if self.logger.debug:
