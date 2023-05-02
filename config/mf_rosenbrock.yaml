@@ -9,7 +9,7 @@ defaults:
   # - oracle@_oracle_dict.1: branin1
   # - oracle@_oracle_dict.2: branin2
   # - oracle@_oracle_dict.3: branin3
-  - gflownet: trajectorybalance
+  - gflownet: ppo
   - user: nikita
   - proxy: mes_gp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
   - dataset: dataset
@@ -45,8 +45,8 @@ logger:
     period: 3000
     first_it: True
   test:
-    period: 3000
-    n: 30000
+    period: -1 #3000
+    n: 1 #30000
     first_it: True
   oracle:
     period: -1
@@ -55,7 +55,7 @@ logger:
   #     period: 1000
   do:
     times: False
-    online: True
+    online: False
   tags:
     # - r(x) = (80 + x)
     # - r(x) = 10x
@@ -97,6 +97,8 @@ env:
     
 
 gflownet:
+  ppo_num_epochs: 16
+  ppo_epoch_size: 32
   active_learning: True
   sample_only: True
   random_action_prob: 0.0
@@ -153,8 +155,8 @@ float_precision: 64
 al_n_rounds: 10 #1
 do_figure: True
 multifidelity:
-  fid_embed: 'thermometer'
-  fid_embed_dim: 100
+  fid_embed: one_hot
+  fid_embed_dim: None
   proxy: True
   rescale: 10
   candidate_set_path: null

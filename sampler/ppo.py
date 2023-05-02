@@ -195,8 +195,8 @@ class PPOAgent(GFlowNetAgent):
             [env.get_mask_invalid_actions_forward() for env in envs]
         )
         # Build policy outputs
-
-        policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
+        with torch.no_grad():
+            policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
         # Skip v from policy outputs
         policy_outputs = policy_outputs[:, :-1]
         # Sample actions from policy outputs

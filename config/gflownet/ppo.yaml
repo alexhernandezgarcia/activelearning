@@ -1,4 +1,4 @@
-_target_: sampler.ppo.PPOAgent
+_target_: gflownet.ppo.PPOAgent
 # Random seeds
 seed: 0
 # Optimizer
