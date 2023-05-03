@@ -111,6 +111,17 @@ def evaluate(
             print(f"\t Mean Min Distance from Mode: {mean_min_dist_from_mode_topk}")
             print(f"\t Mean Min Distance from D0: {mean_dist_from_D0_topk}")
 
+    if extrema is not None and proxy_extrema is not None:
+        simple_regret = abs(torch.mean(extrema - energies[0]))
+        inference_regret = abs(
+            torch.mean(proxy_extrema.to(energies.device) - energies[0])
+        )
+        metrics_dict.update({"simple_regret": simple_regret})
+        metrics_dict.update({"inference_regret": inference_regret})
+        if logger.progress:
+            print(f"\t Simple Regret: {simple_regret}")
+            print(f"\t Inference Regret: {inference_regret}")
+
     if logger.progress:
         print(f"\n Cumulative Cost: {cumulative_cost}")
     metrics_dict.update({"post_al_cum_cost": cumulative_cost})
