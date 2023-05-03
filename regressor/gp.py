@@ -192,7 +192,7 @@ class SingleTaskGPRegressor:
             figure2 = self.plot_predictions(states, y_std, env.length, env.rescale)
             fig = [figure1, figure2]
         else:
-            figure = None
+            fig = None
         return fig, rmse, nll, mode_rmse, mode_nll
 
 
