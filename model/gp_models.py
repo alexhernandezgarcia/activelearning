@@ -161,6 +161,13 @@ class BaseGPSurrogate(abc.ABC):
                 )  # MultitaskMultivariateNormal(loc: torch.Size([96]))
 
                 target_batch = self.reshape_targets(target_batch)  # torch.Size([3, 45])
+                if target_batch.ndim == 0:
+                    # target_batch = torch.tensor([target_batch.item()], dtype=self.float, device=self.device)
+                    # create a batch dimension
+                    target_batch = target_batch.unsqueeze(0)  # 1
+                    # target_batch = target_batch.unsqueeze(-1)  # N
+                else:
+                    target_batch = target_batch.squeeze(-1)
                 targets.append(
                     target_batch.to(features.device).cpu()
                 )  # targets was an empty list
@@ -1462,8 +1469,14 @@ class SingleTaskMultiFidelitySVGP(
                 )  # MultitaskMultivariateNormal(loc: torch.Size([96]))
 
                 target_batch = self.reshape_targets(target_batch)  # torch.Size([3, 45])
+                if target_batch.ndim == 0:
+                    # target_batch = torch.tensor([target_batch.item()], dtype=self.float, device=self.device)
+                    # create a batch dimension
+                    target_batch = target_batch.unsqueeze(0)  # 1
+                    # target_batch = target_batch.unsqueeze(-1)  # N
+                else:
+                    target_batch = target_batch.squeeze(-1)  # N
                 targets.append(target_batch.to(features.device).cpu())
-                target_batch = target_batch.squeeze(-1)  # N
                 if y_dist.mean.shape == target_batch.shape:  # True
                     f_std.append(f_dist.variance.sqrt().cpu())
                     y_mean.append(y_dist.mean.cpu())
