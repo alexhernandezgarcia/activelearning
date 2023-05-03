@@ -227,7 +227,7 @@ class PPOAgent(GFlowNetAgent):
         is_terminal = torch.cat(is_terminal, 0)
 
         all_rewards = torch.stack(G)
-        rewards = all_rewards[is_terminal.eq(1)]
+        ret_rewards = all_rewards[is_terminal.eq(1)]
 
         idxs = torch.randint(low=0, high=len(batch), size=(self.batch_size,))
 
@@ -301,7 +301,7 @@ class PPOAgent(GFlowNetAgent):
             loss,
             action_loss,
             value_loss,
-        ), rewards
+        ), ret_rewards
 
         # policy_outputs = self.forward_policy(self.env.statetorch2policy(states[idxs]))
         # logits, values = policy_outputs[:, :-1], policy_outputs[:, -1]
@@ -469,10 +469,6 @@ class PPOAgent(GFlowNetAgent):
                     non_zero_indices[i - 1] + 1 : non_zero_indices[i]
                 ] = non_zero_elements[i]
 
-        # Replace zero elements with the immediately succeeding non-zero element
-        # G[torch.cat([non_zero_indices[0].unsqueeze(0), non_zero_indices[:-1] + 1])] = G[
-        #     non_zero_indices
-        # ]
         with torch.no_grad():
             v_s = self.forward_policy(self.env.statetorch2policy(states))[:, -1]
             v_sp = self.forward_policy(self.env.statetorch2policy(states_sp))[:, -1]
@@ -617,14 +613,16 @@ class PPOAgent(GFlowNetAgent):
             data_masks_s = []
             data_G = []
             data_adv = []
-            for j in range(self.sttr):
+            # rollout phase
+            for j in range(self.sttr):  # ppo_epoch_size
                 batch, masks_s, G, adv, times = self.sample_batch(envs)
                 data += batch
                 data_masks_s += masks_s
                 data_G += G
                 data_adv += adv
-            data = tuple(data)
-            for j in range(self.ttsr):
+            # data = tuple(data)
+            # learning phase
+            for j in range(self.ppo_num_epochs):
                 losses, rewards = self.loss(
                     it * self.ttsr + j, data, data_masks_s, data_G, data_adv
                 )  # returns (opt loss, *metrics)
@@ -741,6 +739,7 @@ def make_opt(params, config):
             params,
             config.lr,
             betas=(config.adam_beta1, config.adam_beta2),
+            eps=config.adam_eps,
         )
     elif config.method == "msgd":
         opt = torch.optim.SGD(params, config.lr, momentum=config.momentum)
