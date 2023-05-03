@@ -18,7 +18,7 @@ from utils.eval_al_round import evaluate
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="sf_dkl")
+@hydra.main(config_path="./config", config_name="kg_test")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -136,7 +136,7 @@ def main(config):
         else:
             BUDGET = oracles[-1].cost * config.al_n_rounds * config.n_samples
 
-    if "proxy" in config and "mes" in config.proxy._target_.lower():
+    if "proxy" in config and ("mes" or "kg" in config.proxy._target_.lower()):
         is_mes = True
     else:
         is_mes = False
