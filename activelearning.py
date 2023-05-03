@@ -18,7 +18,7 @@ from utils.eval_al_round import evaluate
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_rosenbrock")
+@hydra.main(config_path="./config", config_name="ppo_test")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)

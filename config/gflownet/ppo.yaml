@@ -15,6 +15,7 @@ optimizer:
   # Optimizer: adam, sgd
   adam_beta1: 0.9
   adam_beta2: 0.999
+  adam_eps: 1e-5 #boorrowed from blogpost
   # Momentum for SGD
   sgd_momentum: 0.9
   # Mini-batch size
