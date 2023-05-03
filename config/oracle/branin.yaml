@@ -1,3 +1,3 @@
 _target_: proxy.branin.SingleFidelityBranin
 maximize: False
-cost: 100
+cost: 1
