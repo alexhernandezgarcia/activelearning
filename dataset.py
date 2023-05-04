@@ -80,6 +80,8 @@ class DataHandler:
         """
         if isinstance(data, TensorType):
             return data
+        elif isinstance(data, List) and len(data) == 0:
+            return torch.tensor(data, dtype=self.float, device=self.device)
         elif isinstance(data, List) and isinstance(data[0], TensorType):
             return torch.stack(data).to(self.device)
         elif isinstance(data, List):

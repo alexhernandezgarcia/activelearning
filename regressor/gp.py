@@ -180,6 +180,8 @@ class SingleTaskGPRegressor:
             self._mode = state_pick_fid
 
     def evaluate_model(self, env, do_figure=True):
+        if env.n_dim > 2:
+            return None, 0.0, 0.0, 0.0, 0.0
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
         y_mean, y_std = self.get_predictions(env, states)
         rmse, nll = self.get_metrics(y_mean, y_std, env, states)
