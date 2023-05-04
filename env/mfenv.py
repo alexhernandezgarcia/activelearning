@@ -891,8 +891,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # If neither were given, generate dataset
         if train_samples == [] and test_samples == []:
             # Make it generalised to generate states for any environment not just grid
-            states = self.get_uniform_terminating_states(n_samples)
-            states = torch.tensor(states, dtype=self.float)
+            train_states = self.get_uniform_terminating_states(int(n_samples * 0.9))
+            train_states = torch.tensor(train_states, dtype=self.float)
+            test_states = self.get_uniform_terminating_states(int(n_samples * 0.1))
+            test_states = torch.tensor(test_states, dtype=self.float)
+            states = torch.cat((train_states, test_states), dim=0)
         else:
             samples = train_samples + test_samples
             if config.type == "sf":
