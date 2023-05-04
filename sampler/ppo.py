@@ -421,7 +421,7 @@ class PPOAgent(GFlowNetAgent):
                         temperature=1.0,
                     )
             s = []
-            # mask_s = []
+            # get current states, s
             for env in envs:
                 s.append(env.state)
                 # mask_s.append(env.get_mask_invalid_actions_forward())
@@ -458,6 +458,7 @@ class PPOAgent(GFlowNetAgent):
             ]
         )
         rewards = self.env.reward_torchbatch(states, done)
+        # G is simply reward of the trajectory
         G = rewards.clone()
         non_zero_indices = torch.nonzero(G).squeeze()
         non_zero_elements = G[non_zero_indices]
@@ -468,7 +469,7 @@ class PPOAgent(GFlowNetAgent):
                 G[
                     non_zero_indices[i - 1] + 1 : non_zero_indices[i]
                 ] = non_zero_elements[i]
-
+        # use all s and sp to compute all adv
         with torch.no_grad():
             v_s = self.forward_policy(self.env.statetorch2policy(states))[:, -1]
             v_sp = self.forward_policy(self.env.statetorch2policy(states_sp))[:, -1]
