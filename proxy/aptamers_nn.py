@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-
+import time
 
 class MLP(nn.Module):
     def __init__(
@@ -38,9 +38,13 @@ class MLP(nn.Module):
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
+        # t1 = time.time()
         if self.transformerCall == False:
             x = self.preprocess(x)
-        return self.model(x)
+        output =  self.model(x)
+        # t2 = time.time()
+        # xx = t2 - t1
+        return output
 
     def preprocess(self, inputs):
         inp_x = F.one_hot(inputs, num_classes=self.d_numToken + 1)[:, :, :-1].to(

@@ -10,6 +10,7 @@ import itertools
 import copy
 from .grid import Grid
 import pandas as pd
+import time
 
 
 class MultiFidelityEnvWrapper(GFlowNetEnv):
@@ -272,6 +273,8 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         # assert torch.eq(
         #     xx,
         #     yy).all()
+        # state_oracle = ['TACTATTTCCCGGTGTATCAGGTTAAACTT', 'CTACTAGGCTGTGATGATGAATGGGAATAG']
+        # fidelities = torch.tensor([0, 1], device=fidelities.device, dtype=fidelities.dtype)
         scores = torch.zeros(
             (fidelities.shape[0]), dtype=self.float, device=self.device
         )
@@ -289,7 +292,11 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     itertools.compress(state_oracle, chosen_state_index.tolist())
                 )
             if len(states) > 0:
+                # t1 = time.time()
                 scores[idx_fid] = self.oracle[fid](states)
+                # t2 = time.time()
+                # t= t2-t1
+                # print("time by oracle fid {}: {}".format(fid, t))
         return scores
 
     def get_actions_space(self):
