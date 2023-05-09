@@ -116,7 +116,9 @@ def run_gfn_xtb(filepath, filename=None, gfn_version='2', opt=True, gfn_xtb_conf
     log_file_dir = os.path.join(filepath, log_file_dir)
     if not os.path.exists(log_file_dir): os.makedirs(log_file_dir)
     for xyz_file in xyz_files:
-        file_name = str(xyz_file.split('.')[0])
+        # get the file name without extension using os
+        file_name = os.path.splitext(xyz_file)[0]
+        # file_name = str(xyz_file.split('.')[0])
         cmd = "xtb --gfn {} {} {} {}".format(str(gfn_version), xyz_file, opt, str(gfn_xtb_config or ''))
         with open(file_name+'.out', 'w') as fd:
             subprocess.run(cmd, shell=True, stdout=fd, stderr=subprocess.STDOUT)
@@ -146,5 +148,5 @@ def run_gfn_xtb(filepath, filename=None, gfn_version='2', opt=True, gfn_xtb_conf
         shutil.move(file_name+'.out', log_file_dir)
         if optimized_xyz_dir:
             if not os.path.exists(optimized_xyz_dir): os.makedirs(optimized_xyz_dir)  # make directory to save xyz file
-            shutil.copy2(os.path.join(log_file_dir, os.path.basename(file_name)+'_xtb_opt.xyz'), os.path.join(optimized_xyz_dir, os.path.basename(file_name).split('.')[0] + '_xtb_opt.xyz'))
+            shutil.copy2(os.path.join(log_file_dir, os.path.basename(file_name)+'_xtb_opt.xyz'), os.path.join(optimized_xyz_dir,  os.path.splitext(os.path.basename(file_name))[0] + '_xtb_opt.xyz'))
     os.chdir(starting_dir)
