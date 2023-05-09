@@ -6,6 +6,7 @@ from gflownet.envs.sequence import Sequence as GflowNetSequence
 from utils.selfies import SELFIES_VOCAB_SMALL, SELFIES_VOCAB_LARGE
 from .base import GFlowNetEnv
 
+
 class GFlowNetMolSelfies(GflowNetSequence):
     """
     Molecular environment as a SELFIES sequence
@@ -13,13 +14,13 @@ class GFlowNetMolSelfies(GflowNetSequence):
 
     def __init__(
         self,
-        selfies_vocab = 'small',
+        selfies_vocab="small",
         **kwargs,
     ):
-        special_tokens = ["[nop]", "[CLS]", "[SEP]", "[UNK]", "[MASK]"]
-        if selfies_vocab == 'small':
+        special_tokens = ["[nop]", "[CLS]", "[SEP]", "[UNK]", "[MASK]", "[PAD]"]
+        if selfies_vocab == "small":
             selfies_vocab = SELFIES_VOCAB_SMALL
-        elif selfies_vocab == 'large':
+        elif selfies_vocab == "large":
             selfies_vocab = SELFIES_VOCAB_LARGE
         else:
             raise NotImplementedError
@@ -28,6 +29,7 @@ class GFlowNetMolSelfies(GflowNetSequence):
             **kwargs,
             special_tokens=special_tokens,
         )
+
 
 class MolSelfies(GFlowNetEnv, GFlowNetMolSelfies):
     def __init__(self, **kwargs):
