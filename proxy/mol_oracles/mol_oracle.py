@@ -39,7 +39,7 @@ Possible solution if that's the case: sample more geometry via conformer_ladder;
 '''
 
 default_config = {
-    'task': 'ip',
+    'task': 'ip', # or ea
     'oracle_config': {
         'log_dir': os.getcwd(),
         "moltocoord_config":{
@@ -59,12 +59,12 @@ default_config = {
 }
 
 class MoleculeOracle(Proxy):
-    def __init__(self, cost, task, oracle_config, **kwargs):
+    def __init__(self, cost, task, oracle_config, oracle_level=None, **kwargs):
         super().__init__(**kwargs)
 
         self.cost = cost
         self.task = task
-        self.oracle_level = None # without change, this requires highest fidelity
+        self.oracle_level = oracle_level # without change, this requires highest fidelity
         self.xtb_ipea = XTB_IPEA(task=self.task, **oracle_config)
 
     def __call__(self, mols, *args, **kwargs):

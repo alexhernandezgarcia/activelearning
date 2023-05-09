@@ -31,10 +31,10 @@ class XTB_IPEA:
         self.mol_to_coord = MolToCoord(self.moltocoord_config)
         self.remove_scratch = remove_scratch
 
-    def __call__(self, molecule, oracle_level, *args, **kwargs):
+    def __call__(self, molecule, oracle_level=None, *args, **kwargs):
         return self.get_score(molecule, oracle_level)
 
-    def get_score(self, molecule, oracle_level):
+    def get_score(self, molecule, oracle_level=None):
         os.chdir(self.log_dir)
         # run to get mmff geometry from string; will also check is molecule is valid (else return None)
         num_conf = math.floor(self.moltocoord_config['conformer_config']['num_conf'] * (oracle_level ** self.conformer_ladder))
