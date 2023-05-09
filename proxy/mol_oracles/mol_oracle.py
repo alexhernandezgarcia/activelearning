@@ -3,7 +3,7 @@ import torch
 from gflownet.proxy.base import Proxy
 from proxy.mol_oracles.ipea_xtb import XTB_IPEA
 
-'''
+"""
 To run, install xtb via conda, or via source (+ export PATH="~/xtb/bin/:$PATH")
 
 A given, closed-shell organic molecule has paired electrons. 
@@ -36,35 +36,39 @@ export OMP_STACKSIZE=4G
 
 Concern: maybe IPEA don't depend that much geometry and this only adds noise (and possibly limited noise)
 Possible solution if that's the case: sample more geometry via conformer_ladder; or use DFT (which has bias and noise)
-'''
+"""
 
 default_config = {
-    'task': 'ip',
-    'oracle_config': {
-        'log_dir': os.getcwd(),
-        "moltocoord_config":{
-            'conformer_config': {
+    "task": "ip",
+    "oracle_config": {
+        "log_dir": os.getcwd(),
+        "moltocoord_config": {
+            "conformer_config": {
                 "num_conf": 2,
                 "maxattempts": 100,
                 "randomcoords": True,
                 "prunermsthres": 1.5,
             },
         },
-        "conformer_ladder": 0, # on each oracle ladder, use ladder^x more conformers (0 -> no changes)
+        "conformer_ladder": 0,  # on each oracle ladder, use ladder^x more conformers (0 -> no changes)
         "remove_scratch": True,
-        'ff': 'mmff',
-        'semiempirical': 'xtb',
-        'mol_repr': 'selfies', # or smiles
-    }
+        "ff": "mmff",
+        "semiempirical": "xtb",
+        "mol_repr": "selfies",  # or smiles
+    },
 }
 
+
 class MoleculeOracle(Proxy):
-    def __init__(self, cost, task, oracle_config, **kwargs):
+    def __init__(self, cost, task, oracle_config, oracle_level=None, **kwargs):
         super().__init__(**kwargs)
 
         self.cost = cost
         self.task = task
-        self.oracle_level = None # without change, this requires highest fidelity
+        self.oracle_level = (
+            oracle_level  # without change, this requires highest fidelity
+        )
+        oracle_config.logdir = os.getcwd()
         self.xtb_ipea = XTB_IPEA(task=self.task, **oracle_config)
 
     def __call__(self, mols, *args, **kwargs):
