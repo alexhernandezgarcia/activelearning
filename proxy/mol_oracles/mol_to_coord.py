@@ -67,12 +67,12 @@ class MolToCoord:
                 mol = os.path.basename(mol)
                 self._gfn_xtb_wrapper(save_dir, mol, charge)
                 try:
-                    shutil.copy2(os.path.join(save_dir, mol.split('.')[0] + '_xtb_opt.xyz'),
+                    shutil.copy2(os.path.join(save_dir, os.path.splitext(mol)[0] + '_xtb_opt.xyz'),
                              os.path.join(save_dir, final_coord))
                 except shutil.SameFileError:
                     pass
                 print('semiempirical geometry conversion for {} is done'.format(mol))
-                log_file = os.path.join(save_dir, self.semiempirical_config['log_file_dir'], mol.split('.')[0]+'.out')
+                log_file = os.path.join(save_dir, self.semiempirical_config['log_file_dir'], os.path.splitext(mol)[0]+'.out')
             else:
                 raise NotImplementedError
 
