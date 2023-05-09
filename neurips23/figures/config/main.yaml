@@ -1,0 +1,26 @@
+root_logdir: "/home/alex/Dropbox/ccai/activelearning/neurips23/logs/"
+plot:
+    dpi: 150
+    n_rows: 2
+    height: 10
+    dodge: 0.6
+    scale: 0.75
+    errwidth: 1.5
+    bs_n: 1000
+    bs_seed: 17
+    plot_baseline: False
+    shade_alpha: 0.10
+    markers:
+        - "o"
+        - "s"
+        - "X"
+        - "d"
+        - "o"
+        - "o"
+    colors:
+        hue:
+            palette: mako
+        models:
+            palette: vlag
+        methods_family:
+            palette: deep
