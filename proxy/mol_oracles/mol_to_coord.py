@@ -34,7 +34,7 @@ class MolToCoord:
         if os.path.isfile(mol):
             # do optimization based on given mol file
             pass
-        elif isinstance(mol, Chem.Mol):
+        elif isinstance(mol, Chem.Mol) or mol_repr == 'mols':
             # do optimization based on Chem.Mol object
             pass
         elif mol_repr == 'smiles':
