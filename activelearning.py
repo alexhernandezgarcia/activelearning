@@ -19,7 +19,7 @@ import pickle
 from proxy.mol_oracles.mol_oracle import MoleculeOracle
 
 
-@hydra.main(config_path="./config", config_name="sf_ip")
+@hydra.main(config_path="./config", config_name="sf_ea")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -313,23 +313,21 @@ def main(config):
                     picked_samples, picked_fidelity
                 )
                 energies_for_evaluation = oracle(picked_samples)
-                # TODO check both picked_energies and energies_for_evaluation for nan
                 if isinstance(oracle, MoleculeOracle):
-                    idxNAN = torch.isnan(picked_energies)
+                    hf_idxNaN = torch.isnan(energies_for_evaluation)
+                    cf_idxNaN = torch.isnan(picked_energies)
+                    idxNaN = hf_idxNaN | cf_idxNaN
                     for i in range(len(picked_samples)):
-                        if idxNAN[i]:
+                        if idxNaN[i]:
                             continue
                         else:
                             updated_picked_samples.append(picked_samples[i])
                             updated_picked_states.append(picked_states[i])
 
                     picked_energies = picked_energies[~idxNAN]
-                    idxNAN = torch.isnan(energies_for_evaluation)
                     energies_for_evaluation = energies_for_evaluation[~idxNAN]
-
-                # use picked_energies to update dataset
-                # env.oracle is highest fidelity
-                # eval_energies = env.oracle(picked_samples)
+                    picked_samples = updated_picked_samples
+                    picked_states = updated_picked_states
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
                 picked_energies = env.oracle(picked_samples)
@@ -345,9 +343,9 @@ def main(config):
                             updated_picked_states.append(picked_states[i])
                     # picked_samples = picked_samples[picked_samples[i] for i in range(len(picked_samples)) if not idxNAN[i]]
                     picked_energies = picked_energies[~idxNAN]
+                    picked_samples = updated_picked_samples
+                    picked_states = updated_picked_states
                 energies_for_evaluation = picked_energies
-                picked_samples = updated_picked_samples
-                picked_states = updated_picked_states
                 picked_fidelity = None
 
             if isinstance(picked_samples, torch.Tensor):
