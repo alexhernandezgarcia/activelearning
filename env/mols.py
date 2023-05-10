@@ -8,6 +8,8 @@ from .base import GFlowNetEnv
 import pandas as pd
 import selfies as sf
 
+# from rdkit import Chem, AllChem, DataStructs
+
 
 class GFlowNetMolSelfies(GflowNetSequence):
     """
@@ -158,3 +160,17 @@ class MolSelfies(GFlowNetEnv, GFlowNetMolSelfies):
             return states, scores
         else:
             return train_states, train_scores, test_states, test_scores
+
+    # def get_pairwise_distance(self, samples, *kwargs):
+    #     smiles = sf.decoder(samples)
+    #     mols = [Chem.MolFromSmiles(smile) for smile in smiles]
+    #     fpgen = AllChem.GetRDKitFPGenerator()
+    #     fps = [fpgen.GetFingerprint(mol) for mol in mols]
+    #     scores = []
+    #     for i in range(len(fps)):
+    #         for j in range(i+1, len(fps)):
+    #             scores.append(DataStructs.TanimotoSimilarity(fps[i], fps[j]))
+    #     return scores
+
+    # def get_distance_from_D0(self, samples, dataset_states):
+    # return super().get_distance_from_D0(samples, dataset_states)
