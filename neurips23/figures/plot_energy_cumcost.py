@@ -2,8 +2,8 @@
 This script plots the topK energy with respective to the cumulative cost.
 """
 import sys
-import wandb
 from pathlib import Path
+
 import hydra
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -11,17 +11,51 @@ import matplotlib.transforms as transforms
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import torch
+import wandb
 import yaml
 from hydra.utils import get_original_cwd, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
-from utils import plot_setup, get_hue_palette, get_pkl
-import torch
+
+from utils import get_hue_palette, get_pkl, plot_setup
 
 
-def get_performance(
-    logdir, run_path, k, higherbetter, batch_size, is_mf=False, eps=1e-3,
-    get_diversity=False
-):
+def build_dataframe(config):
+    df = pd.DataFrame(
+        columns=["method", "seed", "energy", "cost", "diversity", "round"]
+    )
+    for method in config.io.data.methods:
+        for seed in config.io.data.methods[method]:
+            logdir = (
+                Path(config.root_logdir) / config.io.data.methods[method][seed].logdir
+            )
+            runpath = config.io.data.methods[method][seed].run_path
+            energy, cost, diversity = get_performance(
+                logdir,
+                runpath,
+                config.io.data.k,
+                config.io.data.higherbetter,
+                config.io.data.batch_size_al,
+                config.io.data.get_diversity,
+            )
+            n_rounds = len(energy)
+            df_aux = pd.DataFrame.from_dict(
+                {
+                    "method": [method for _ in range(n_rounds)],
+                    "seed": [seed for _ in range(n_rounds)],
+                    "energy": energy,
+                    "cost": cost,
+                    "diversity": diversity,
+                    "round": np.arange(len(energy)),
+                }
+            )
+            df = pd.concat([df, df_aux], axis=0, ignore_index=True)
+    if "output_csv" in config.io:
+        df.to_csv(config.io.output_csv, index_label="index")
+    return df
+
+
+def get_performance(logdir, run_path, k, higherbetter, batch_size, get_diversity=False):
     # Read data from experiment
     f_pkl = get_pkl(logdir)
     data_dict = pd.read_pickle(f_pkl)
@@ -42,7 +76,10 @@ def get_performance(
     for idx, upper_bound in enumerate(rounds):
         # Compute mean topk energy up to current round
         cumul_sampled_energies_curr_round = cumul_energies[:upper_bound].cpu().numpy()
-        idx_topk = np.argsort(cumul_sampled_energies_curr_round)[::-1][:k]
+        if higherbetter:
+            idx_topk = np.argsort(cumul_sampled_energies_curr_round)[::-1][:k]
+        else:
+            idx_topk = np.argsort(cumul_sampled_energies_curr_round)[:k]
         energies_topk = cumul_sampled_energies_curr_round[idx_topk]
         mean_energy_topk = np.mean(energies_topk)
         # Compute diversity of topk samples, if requested
@@ -55,7 +92,9 @@ def get_performance(
         cost.append(post_al_cum_cost[idx])
         if get_diversity:
             diversity.append(mean_diversity_topk.numpy())
-    return energy, cost, diversity 
+    if not get_diversity:
+        diversity = [None for _ in range(len(energy))]
+    return energy, cost, diversity
 
 
 def get_diversity(seqs):
@@ -449,8 +488,8 @@ def main(config):
     with open(output_yml, "w") as fp:
         OmegaConf.save(config=config, f=fp.name)
     # Read data and build data frames
-    logdir_sf1 = Path(config.root_logdir) / config.io.data.sf[1].logdir
-    runpath_sf1 = config.io.data.sf[1].run_path
+    logdir_sf1 = Path(config.root_logdir) / config.io.data.methods.sf[1].logdir
+    runpath_sf1 = config.io.data.methods.sf[1].run_path
     energy, cost, diversity = get_performance(
         logdir_sf1,
         runpath_sf1,
@@ -458,10 +497,10 @@ def main(config):
         config.io.data.higherbetter,
         config.io.data.batch_size_al,
     )
-    import ipdb; ipdb.set_trace()
-    # Prepare data frames for plotting
-    df = df_preprocess(df_orig, config)
-    df = get_improvement_metrics(df, config)
+    df = build_dataframe(config)
+    import ipdb
+
+    ipdb.set_trace()
     # Plot
     fig = plot(df, config)
     # Save figure
