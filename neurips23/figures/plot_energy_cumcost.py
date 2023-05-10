@@ -27,7 +27,8 @@ def build_dataframe(config):
     for method in config.io.data.methods:
         for seed in config.io.data.methods[method].seeds:
             logdir = (
-                Path(config.root_logdir) / config.io.data.methods[method].seeds[seed].logdir
+                Path(config.root_logdir)
+                / config.io.data.methods[method].seeds[seed].logdir
             )
             runpath = config.io.data.methods[method].seeds[seed].run_path
             energy, cost, diversity = get_performance(
@@ -112,148 +113,12 @@ def process_cost(df, config):
     return df
 
 
-def min_max_errorbar(a):
-    return (np.min(a), np.max(a))
-
-
-def get_baselines(config):
-    baselines = []
-    for model in config.io.data.methods:
-        if (
-            "family" in config.io.data.methods[model]
-            and config.io.data.methods[model].family == "baseline"
-        ):
-            baselines.append(model)
-    return baselines
-
-
-def get_order_models_families(config):
-    baselines = get_baselines(config)
-    order = []
-    families = []
-    for model in config.io.data.methods:
-        order.append(config.io.data.methods[model].name)
-        families.append(config.io.data.methods[model].family)
-    return order, families
-
-
-def get_methods(config, model, tr_factor):
-    if np.isnan(tr_factor):
-        method = model
-    else:
-        method = f"{model}-{int(tr_factor)}"
-    return config.io.data.methods[method].name
-
-
-def df_preprocess(df, config):
-    # Select task
-    df = df.loc[df.task == config.io.data.task].copy()
-    # Duplicate metrics to keep original
-    for metric in config.io.metrics:
-        df[f"{metric}_orig"] = df[metric]
-    # Make model name
-    methods = []
-    for model, tr_factor in zip(
-        df.model_type.values, df.train_upsampling_factor.values
-    ):
-        methods.append(get_methods(config, model, tr_factor))
-    df["methods"] = methods
-    # Baselines
-    baselines = get_baselines(config)
-    # Test upsampling factor
-    df = get_upsampling_factor_method(df)
-    df = df.loc[
-        df.test_upsampling_factor_method.isin(
-            config.io.data.test_upsampling_factor_method.keys()
-        )
-    ].copy()
-    return df
-
-
-def get_upsampling_factor_method(df):
-    upsampling_method = df.method.values
-    upsampling_factor = df.test_upsampling_factor.values
-    upsampling_factor_method = [
-        str(factor) + "_" + method
-        for factor, method in zip(upsampling_factor, upsampling_method)
-    ]
-    df["test_upsampling_factor_method"] = upsampling_factor_method
-    return df
-
-
-def get_improvement_metrics(df, config):
-    for constraint in df.apply_constraint.unique():
-        for factor in df.test_upsampling_factor.unique():
-            for metric in config.io.metrics:
-                baseline = df.loc[
-                    (df.apply_constraint == 0)
-                    & (df.test_upsampling_factor == factor)
-                    & (df.model_type == config.io.data.baseline),
-                    f"{metric}_orig",
-                ].values
-                assert len(baseline == 1)
-                baseline = baseline[0]
-                results = df.loc[
-                    (df.apply_constraint == constraint)
-                    & (df.test_upsampling_factor == factor)
-                ][f"{metric}_orig"].values
-                if config.io.metrics[metric]["higherbetter"] is None:
-                    continue
-                if config.io.metrics[metric]["higherbetter"]:
-                    if np.isclose(baseline, 0.0):
-                        raise ValueError
-                    df.loc[
-                        (df.apply_constraint == constraint)
-                        & (df.test_upsampling_factor == factor),
-                        metric,
-                    ] = (
-                        100 * (results - baseline) / baseline
-                    )
-                else:
-                    if any(np.isclose(results, 0.0)):
-                        raise ValueError
-                    df.loc[
-                        (df.apply_constraint == constraint)
-                        & (df.test_upsampling_factor == factor),
-                        metric,
-                    ] = (
-                        baseline / results
-                    )
-    return df
-
-
-def get_palette_methods_family(families, config):
-    palette_base = sns.color_palette(
-        config.plot.colors.methods_family.palette,
-        as_cmap=False,
-        n_colors=5,
-    )
-    palette_base = palette_base[:2] + [palette_base[3]] + [palette_base[2]]
-    if len(np.unique(families)) == 3:
-        palette_base = palette_base[:2] + [palette_base[3]]
-    palette_dict = {}
-    palette = []
-    idx = 0
-    for fam in families:
-        if fam not in palette_dict:
-            palette_dict.update({fam: palette_base[idx]})
-            idx += 1
-        palette.append(palette_dict[fam])
-    return palette[::-1]
-
-
-def customscale_forward(x):
-    return x ** (1 / 2)
-
-
-def customscale_inverse(x):
-    return x**2
-
-
 def plot(df, config):
     plot_setup()
 
-    fig, ax = plt.subplots(figsize=(config.plot.width, config.plot.height), dpi=config.plot.dpi)
+    fig, ax = plt.subplots(
+        figsize=(config.plot.width, config.plot.height), dpi=config.plot.dpi
+    )
 
     # Plot
     sns.lineplot(ax=ax, data=df, x="cost", y="energy", hue="method")
@@ -269,7 +134,9 @@ def plot(df, config):
 
     # Legend
     leg_handles, _ = ax.get_legend_handles_labels()
-    leg_labels = [config.io.data.methods[method].name for method in config.io.data.methods]
+    leg_labels = [
+        config.io.data.methods[method].name for method in config.io.data.methods
+    ]
     leg = ax.legend(
         handles=leg_handles,
         labels=leg_labels,
