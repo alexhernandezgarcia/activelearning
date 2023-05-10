@@ -11,7 +11,7 @@ import copy
 from .grid import Grid
 import pandas as pd
 import time
-
+from proxy.mol_oracles.mol_oracle import MoleculeOracle
 
 class MultiFidelityEnvWrapper(GFlowNetEnv):
     """
@@ -292,11 +292,7 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
                     itertools.compress(state_oracle, chosen_state_index.tolist())
                 )
             if len(states) > 0:
-                # t1 = time.time()
                 scores[idx_fid] = self.oracle[fid](states)
-                # t2 = time.time()
-                # t= t2-t1
-                # print("time by oracle fid {}: {}".format(fid, t))
         return scores
 
     def get_actions_space(self):

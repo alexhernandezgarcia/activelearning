@@ -39,11 +39,11 @@ Possible solution if that's the case: sample more geometry via conformer_ladder;
 """
 
 default_config = {
-    'task': 'ip', # or ea
-    'oracle_config': {
-        'log_dir': os.getcwd(),
-        "moltocoord_config":{
-            'conformer_config': {
+    "task": "ip",  # or ea
+    "oracle_config": {
+        "log_dir": os.getcwd(),
+        "moltocoord_config": {
+            "conformer_config": {
                 "num_conf": 2,
                 "maxattempts": 100,
                 "randomcoords": True,
@@ -73,4 +73,10 @@ class MoleculeOracle(Proxy):
 
     def __call__(self, mols, *args, **kwargs):
         scores = [self.xtb_ipea(mol, self.oracle_level) for mol in mols]
-        return torch.tensor(scores, device=self.device, dtype=self.float)
+        scores = torch.tensor(scores, device=self.device, dtype=self.float)
+        return scores
+
+    def replaceNaN(self, mols, scores):
+        # consider only those mols which have score which is not nan
+        mols = [mols[i] for i in range(len(mols)) if not torch.isnan(scores[i])]
+        return mols, scores[~torch.isnan(scores)]
