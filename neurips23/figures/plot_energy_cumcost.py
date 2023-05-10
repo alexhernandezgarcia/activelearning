@@ -18,46 +18,45 @@ from utils import plot_setup, get_hue_palette, get_pkl
 import torch
 
 
-def get_performance(logdir, run_path, k, higherbetter, batch_size, is_mf=False, eps=1e-3):
-    pkl_file = get_pkl(logdir)
-    cumul_pkl = pd.read_pickle(pkl_file)
-    cumul_samples = cumul_pkl['cumulative_sampled_samples']
-    cumul_energies = cumul_pkl['cumulative_sampled_energies']
-
-    metric_diversity = []
-    metric_energy = []
-    metric_cost = []
-    # mean_energy_from_wandb = run.history(keys=["mean_energy_top{}".format(k)])
-    # mean_energy_from_wandb = mean_energy_from_wandb["mean_energy_top{}".format(k)].values
+def get_performance(
+    logdir, run_path, k, higherbetter, batch_size, is_mf=False, eps=1e-3,
+    get_diversity=False
+):
+    # Read data from experiment
+    f_pkl = get_pkl(logdir)
+    data_dict = pd.read_pickle(f_pkl)
+    cumul_samples = data_dict["cumulative_sampled_samples"]
+    cumul_energies = data_dict["cumulative_sampled_energies"]
+    # Read data from wandb run
     api = wandb.Api()
     run = api.run(run_path)
     post_al_cum_cost = run.history(keys=["post_al_cum_cost"])
-    post_al_cum_cost = np.unique(post_al_cum_cost['post_al_cum_cost'])
+    post_al_cum_cost = np.unique(post_al_cum_cost["post_al_cum_cost"])
+    # Compute metrics from each AL round
+    rounds = np.arange(
+        start=batch_size, stop=len(cumul_samples), step=batch_size, dtype=int
+    )
+    energy = []
+    cost = []
+    diversity = []
+    for idx, upper_bound in enumerate(rounds):
+        # Compute mean topk energy up to current round
+        cumul_sampled_energies_curr_round = cumul_energies[:upper_bound].cpu().numpy()
+        idx_topk = np.argsort(cumul_sampled_energies_curr_round)[::-1][:k]
+        energies_topk = cumul_sampled_energies_curr_round[idx_topk]
+        mean_energy_topk = np.mean(energies_topk)
+        # Compute diversity of topk samples, if requested
+        if get_diversity:
+            cumul_samples_curr_round = np.array(cumul_samples[:upper_bound])
+            samples_topk = cumul_samples_curr_round[idx_topk]
+            mean_diversity_topk = get_diversity(samples_topk)
+        # Append to lists
+        energy.append(mean_energy_topk)
+        cost.append(post_al_cum_cost[idx])
+        if get_diversity:
+            diversity.append(mean_diversity_topk.numpy())
+    return energy, cost, diversity 
 
-    steps = np.arange(start = batch_size, stop = len(cumul_samples), step = batch_size, dtype=int)
-    for idx, upper_bound in enumerate(steps):
-        cumul_samples_curr_iter = cumul_samples[0:upper_bound]
-        cumul_sampled_energies_curr_iter = cumul_energies[0:upper_bound]
-
-        idx_topk = torch.argsort(cumul_sampled_energies_curr_iter, descending=higherbetter)[:k].tolist()
-        samples_topk = [cumul_samples_curr_iter[i] for i in idx_topk]
-        energies_topk = [cumul_sampled_energies_curr_iter[i] for i in idx_topk]
-        mean_energy_topk = torch.mean(torch.FloatTensor(energies_topk))
-        # diff = abs(mean_energy_topk-mean_energy_from_wandb[idx])
-        # if diff>eps:
-            # print("ERROR: energy from wandb does not match for the {}th iteration".format(idx))
-        metric_energy.append(mean_energy_topk.numpy())
-        mean_diversity_topk = get_diversity(samples_topk)
-        metric_diversity.append(mean_diversity_topk.numpy())
-        metric_cost.append(post_al_cum_cost[idx])
-
-    # PLOT METRICS
-    import ipdb; ipdb.set_trace()
-    reward = np.array(metric_energy)
-    diversity = np.array(metric_diversity)
-    cost = np.array(metric_cost)
-
-    return reward, diversity, cost
 
 def get_diversity(seqs):
     sample_states1 = torch.tensor(seqs)
@@ -203,7 +202,7 @@ def customscale_forward(x):
 
 
 def customscale_inverse(x):
-    return x ** 2
+    return x**2
 
 
 def plot(df, config):
@@ -452,8 +451,13 @@ def main(config):
     # Read data and build data frames
     logdir_sf1 = Path(config.root_logdir) / config.io.data.sf[1].logdir
     runpath_sf1 = config.io.data.sf[1].run_path
-    rew, div, cost = get_performance(logdir_sf1, runpath_sf1, config.io.data.k, config.io.data.higherbetter, config.io.data.batch_size_al)
-    df_orig = pd.read_csv(to_absolute_path(config.io.input_csv), index_col=False)
+    energy, cost, diversity = get_performance(
+        logdir_sf1,
+        runpath_sf1,
+        config.io.data.k,
+        config.io.data.higherbetter,
+        config.io.data.batch_size_al,
+    )
     import ipdb; ipdb.set_trace()
     # Prepare data frames for plotting
     df = df_preprocess(df_orig, config)
