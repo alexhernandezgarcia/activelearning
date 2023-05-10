@@ -106,6 +106,12 @@ def get_diversity(seqs):
     return dist_vector
 
 
+def process_cost(df, config):
+    if config.plot.x_axis.type == "fraction_budget":
+        df.cost = df.cost / df.cost.max()
+    return df
+
+
 def min_max_errorbar(a):
     return (np.min(a), np.max(a))
 
@@ -249,7 +255,17 @@ def plot(df, config):
 
     fig, ax = plt.subplots(figsize=(config.plot.width, config.plot.height), dpi=config.plot.dpi)
 
+    # Plot
     sns.lineplot(ax=ax, data=df, x="cost", y="energy", hue="method")
+
+    # Set X-label
+    ax.set_xlabel(config.plot.x_axis.label)
+    # Set Y-label
+    if config.io.data.higherbetter:
+        better = "higher"
+    else:
+        better = "lower"
+    ax.set_ylabel(f"Top-{config.io.data.k} energy ({better} is better)")
 
     return fig
 
@@ -272,6 +288,7 @@ def main(config):
         df = pd.read_csv(config.io.input_csv, index_col="index")
     else:
         df = build_dataframe(config)
+    df = process_cost(df, config)
     # Plot
     fig = plot(df, config)
     # Save figure

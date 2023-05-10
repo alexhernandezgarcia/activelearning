@@ -24,3 +24,6 @@ plot:
             palette: vlag
         methods_family:
             palette: deep
+    x_axis:
+        type: "fraction_budget"
+        label: "Fraction of total budget"
