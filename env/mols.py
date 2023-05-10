@@ -20,7 +20,8 @@ class GFlowNetMolSelfies(GflowNetSequence):
         **kwargs,
     ):
 
-        special_tokens = ["[nop]", "[CLS]", "[SEP]", "[UNK]", "[MASK]"]
+        special_tokens = ["[nop]", "[EOS]"]
+        # "[SEP]", "[UNK]", "[MASK]"
 
         if selfies_vocab == "small":
             selfies_vocab = SELFIES_VOCAB_SMALL
