@@ -80,7 +80,7 @@ class MolSelfies(GFlowNetEnv, GFlowNetMolSelfies):
             pad_to_len=self.max_seq_length,
             enc_type="label",
         )
-        return state
+        return torch.tensor(state, device = self.device)
 
     def statebatch2state(
         self, states: List[TensorType["1", "state_dim"]]
