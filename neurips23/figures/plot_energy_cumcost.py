@@ -2,6 +2,7 @@
 This script plots the topK energy with respective to the cumulative cost.
 """
 import sys
+import wandb
 from pathlib import Path
 import hydra
 import matplotlib.patches as mpatches
@@ -14,9 +15,10 @@ import yaml
 from hydra.utils import get_original_cwd, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
 from utils import plot_setup, get_hue_palette, get_pkl
+import torch
 
 
-def get_performance(logdir, run_path, higherbetter, is_mf=False, eps=1e-3):
+def get_performance(logdir, run_path, k, higherbetter, batch_size, is_mf=False, eps=1e-3):
     pkl_file = get_pkl(logdir)
     cumul_pkl = pd.read_pickle(pkl_file)
     cumul_samples = cumul_pkl['cumulative_sampled_samples']
@@ -27,16 +29,17 @@ def get_performance(logdir, run_path, higherbetter, is_mf=False, eps=1e-3):
     metric_cost = []
     # mean_energy_from_wandb = run.history(keys=["mean_energy_top{}".format(k)])
     # mean_energy_from_wandb = mean_energy_from_wandb["mean_energy_top{}".format(k)].values
+    api = wandb.Api()
     run = api.run(run_path)
     post_al_cum_cost = run.history(keys=["post_al_cum_cost"])
     post_al_cum_cost = np.unique(post_al_cum_cost['post_al_cum_cost'])
 
-    steps = np.arange(start = AL_BATCH_SIZE, stop = len(cumul_samples), step = AL_BATCH_SIZE, dtype=int)
+    steps = np.arange(start = batch_size, stop = len(cumul_samples), step = batch_size, dtype=int)
     for idx, upper_bound in enumerate(steps):
         cumul_samples_curr_iter = cumul_samples[0:upper_bound]
         cumul_sampled_energies_curr_iter = cumul_energies[0:upper_bound]
 
-        idx_topk = torch.argsort(cumul_sampled_energies_curr_iter, descending=oracle_maximize)[:k].tolist()
+        idx_topk = torch.argsort(cumul_sampled_energies_curr_iter, descending=higherbetter)[:k].tolist()
         samples_topk = [cumul_samples_curr_iter[i] for i in idx_topk]
         energies_topk = [cumul_sampled_energies_curr_iter[i] for i in idx_topk]
         mean_energy_topk = torch.mean(torch.FloatTensor(energies_topk))
@@ -49,11 +52,20 @@ def get_performance(logdir, run_path, higherbetter, is_mf=False, eps=1e-3):
         metric_cost.append(post_al_cum_cost[idx])
 
     # PLOT METRICS
+    import ipdb; ipdb.set_trace()
     reward = np.array(metric_energy)
     diversity = np.array(metric_diversity)
     cost = np.array(metric_cost)
 
     return reward, diversity, cost
+
+def get_diversity(seqs):
+    sample_states1 = torch.tensor(seqs)
+    sample_states2 = sample_states1.clone()
+    dist_matrix = torch.cdist(sample_states1, sample_states2, p=2)
+    dist_upper_triangle = torch.triu(dist_matrix, diagonal=1)
+    dist_vector = dist_upper_triangle[dist_upper_triangle != 0]
+    return dist_vector
 
 
 def min_max_errorbar(a):
@@ -439,8 +451,8 @@ def main(config):
         OmegaConf.save(config=config, f=fp.name)
     # Read data and build data frames
     logdir_sf1 = Path(config.root_logdir) / config.io.data.sf[1].logdir
-    runpath_sf1 = Path(config.root_logdir) / config.io.data.sf[1].run_path
-    rew, div, cost = get_performance(logdir_sf1, runpath_sf1, config.io.data.higherbetter)
+    runpath_sf1 = config.io.data.sf[1].run_path
+    rew, div, cost = get_performance(logdir_sf1, runpath_sf1, config.io.data.k, config.io.data.higherbetter, config.io.data.batch_size_al)
     df_orig = pd.read_csv(to_absolute_path(config.io.input_csv), index_col=False)
     import ipdb; ipdb.set_trace()
     # Prepare data frames for plotting
