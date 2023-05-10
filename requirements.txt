@@ -114,3 +114,8 @@ wandb==0.13.9
 wcwidth==0.2.6
 Werkzeug==2.2.2
 zipp==3.11.0
+meson==1.1.0
+cffi==1.15.1
+ninja==1.11.1
+rdkit-pypi==2022.9.5
+selfies==2.1.1

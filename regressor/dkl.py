@@ -56,7 +56,7 @@ class Tokenizer:
     def __init__(self, non_special_vocab):
         self.non_special_vocab = non_special_vocab
         # skipped UNK and 0
-        self.special_vocab = ["[EOS]", "[CLS]", "[PAD]", "[MASK]"]
+        self.special_vocab = ["[EOS]", "[CLS]", "[nop]", "[MASK]"]
         special_dict = dict.fromkeys(self.special_vocab)
         non_special_dict = dict.fromkeys(self.non_special_vocab)
         special_vocab_dict = dict.fromkeys(
@@ -67,10 +67,13 @@ class Tokenizer:
         self.full_vocab = self.non_special_vocab + self.special_vocab
         self.lookup = {a: i for (i, a) in enumerate(self.full_vocab)}
         self.inverse_lookup = {i: a for (i, a) in enumerate(self.full_vocab)}
-        padding_token = "[PAD]"
+        padding_token = "[nop]"
         masking_token = "[MASK]"
         bos_token = "[CLS]"
         eos_token = "[EOS]"
+        # if "[nop]" in self.lookup:
+            # self.padding_idx = self.lookup["[nop]"]
+        # else:
         self.padding_idx = self.lookup[padding_token]
         self.masking_idx = self.lookup[masking_token]
         self.bos_idx = self.lookup[bos_token]
