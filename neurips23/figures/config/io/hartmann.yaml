@@ -1,5 +1,6 @@
+input_csv: data/hartmann.csv
 output_dir: output
-output_csv: hartmann.csv
+output_csv: data/hartmann.csv
 output_filename: hartmann.pdf
 data:
     methods:
@@ -12,7 +13,7 @@ data:
                run_path: "alexhg/Hartmann budget data set/u3jlu0gs"
            3:
                logdir: "2023-05-04_06-27-13"
-               run_path: "nikita0209/AMP-DKL/zgoc6a5q"
+               run_path: "alexhg/Hartmann budget data set/ladvzph0"
        mf:
            1:
                logdir: "2023-05-05_10-51-53"

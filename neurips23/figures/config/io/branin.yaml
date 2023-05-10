@@ -1,5 +1,6 @@
+input_csv: data/branin.csv
 output_dir: output
-output_csv: branin.csv
+output_csv: data/branin.csv
 output_filename: branin.pdf
 data:
     methods:
