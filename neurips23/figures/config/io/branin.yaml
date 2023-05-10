@@ -5,6 +5,7 @@ output_filename: branin.pdf
 data:
     methods:
        sf:
+           name: "Single-fidelity (highest) AL"
            1:
                logdir: "2023-05-03_06-35-40"
                run_path: "alexhg/Branin budget data set/p6nu2nzx"
@@ -15,6 +16,7 @@ data:
                logdir: "2023-05-03_18-49-33"
                run_path: "alexhg/Branin budget data set/27japxej"
        mf:
+           name: "Multi-fidelity AL"
            1:
                logdir: "2023-05-04_22-24-48"
                run_path: "alexhg/Branin budget data set/cijnbh4w"

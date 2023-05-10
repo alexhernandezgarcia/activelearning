@@ -5,25 +5,29 @@ output_filename: hartmann.pdf
 data:
     methods:
        sf:
-           1:
-               logdir: "2023-05-05_01-08-33"
-               run_path: "alexhg/Hartmann budget data set/nioe5ca4"
-           2:
-               logdir: "2023-05-04_06-27-13"
-               run_path: "alexhg/Hartmann budget data set/u3jlu0gs"
-           3:
-               logdir: "2023-05-04_06-27-13"
-               run_path: "alexhg/Hartmann budget data set/ladvzph0"
+           name: "Single-fidelity (highest) AL"
+           seeds:
+               1:
+                   logdir: "2023-05-05_01-08-33"
+                   run_path: "alexhg/Hartmann budget data set/nioe5ca4"
+               2:
+                   logdir: "2023-05-04_06-27-13"
+                   run_path: "alexhg/Hartmann budget data set/u3jlu0gs"
+               3:
+                   logdir: "2023-05-04_06-27-13"
+                   run_path: "alexhg/Hartmann budget data set/ladvzph0"
        mf:
-           1:
-               logdir: "2023-05-05_10-51-53"
-               run_path: "alexhg/Hartmann budget data set/bytcboio"
-           2:
-               logdir: "2023-05-04_06-27-11"
-               run_path: "alexhg/Hartmann budget data set/n6i5yw72"
-           3:
-               logdir: "2023-05-04_06-27-12"
-               run_path: "alexhg/Hartmann budget data set/wkimrg0l"
+           name: "Multi-fidelity AL"
+           seeds:
+               1:
+                   logdir: "2023-05-05_10-51-53"
+                   run_path: "alexhg/Hartmann budget data set/bytcboio"
+               2:
+                   logdir: "2023-05-04_06-27-11"
+                   run_path: "alexhg/Hartmann budget data set/n6i5yw72"
+               3:
+                   logdir: "2023-05-04_06-27-12"
+                   run_path: "alexhg/Hartmann budget data set/wkimrg0l"
     higherbetter: True
     k: 10
     batch_size_al: 10

@@ -25,11 +25,11 @@ def build_dataframe(config):
         columns=["method", "seed", "energy", "cost", "diversity", "round"]
     )
     for method in config.io.data.methods:
-        for seed in config.io.data.methods[method]:
+        for seed in config.io.data.methods[method].seeds:
             logdir = (
-                Path(config.root_logdir) / config.io.data.methods[method][seed].logdir
+                Path(config.root_logdir) / config.io.data.methods[method].seeds[seed].logdir
             )
-            runpath = config.io.data.methods[method][seed].run_path
+            runpath = config.io.data.methods[method].seeds[seed].run_path
             energy, cost, diversity = get_performance(
                 logdir,
                 runpath,
@@ -266,6 +266,21 @@ def plot(df, config):
     else:
         better = "lower"
     ax.set_ylabel(f"Top-{config.io.data.k} energy ({better} is better)")
+
+    # Legend
+    leg_handles, _ = ax.get_legend_handles_labels()
+    leg_labels = [config.io.data.methods[method].name for method in config.io.data.methods]
+    leg = ax.legend(
+        handles=leg_handles,
+        labels=leg_labels,
+        loc="best",
+        title="",
+        framealpha=1.0,
+        frameon=True,
+    )
+
+    # Change spines
+    sns.despine(ax=ax, left=True, bottom=True)
 
     return fig
 
