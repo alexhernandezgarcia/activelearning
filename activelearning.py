@@ -322,7 +322,7 @@ def main(config):
                         else:
                             updated_picked_samples.append(picked_samples[i])
                             updated_picked_states.append(picked_states[i])
-                    
+
                     picked_energies = picked_energies[~idxNAN]
                     idxNAN = torch.isnan(energies_for_evaluation)
                     energies_for_evaluation = energies_for_evaluation[~idxNAN]

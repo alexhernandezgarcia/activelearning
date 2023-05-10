@@ -72,7 +72,7 @@ class Tokenizer:
         bos_token = "[CLS]"
         eos_token = "[EOS]"
         # if "[nop]" in self.lookup:
-            # self.padding_idx = self.lookup["[nop]"]
+        # self.padding_idx = self.lookup["[nop]"]
         # else:
         self.padding_idx = self.lookup[padding_token]
         self.masking_idx = self.lookup[masking_token]
