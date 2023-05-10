@@ -18,3 +18,5 @@ logs/
 config/experiment/
 storage/
 previous_code/
+config/*.yaml
+playground/*.py
