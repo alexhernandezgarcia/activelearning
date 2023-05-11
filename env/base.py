@@ -1,8 +1,8 @@
+from torchtyping import TensorType
 from gflownet.envs.base import GFlowNetEnv as BaseGFlowNetEnv
 import torch
 import pickle
 import time
-
 
 class GFlowNetEnv(BaseGFlowNetEnv):
     def __init__(
