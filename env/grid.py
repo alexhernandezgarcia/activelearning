@@ -8,10 +8,12 @@ import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pandas as pd
 from proxy.branin import MultiFidelityBranin, SingleFidelityBranin
+import random
 
 
 class Grid(GFlowNetEnv, GflowNetGrid):
-    def __init__(self, **kwargs):
+    def __init__(self, max_init_steps, **kwargs):
+        self.max_init_steps = max_init_steps
         super().__init__(
             **kwargs,
         )
@@ -33,6 +35,17 @@ class Grid(GFlowNetEnv, GflowNetGrid):
             raise NotImplementedError(
                 f"Proxy state format {self.proxy_state_format} not implemented"
             )
+
+    def reset(self, env_id=None):
+        self.state = self.source.copy()
+        init_steps = random.randint(0, self.max_init_steps)
+        a = random.randint(0, init_steps)
+        b = init_steps - a
+        self.state = [a, b]
+        self.n_actions = 0
+        self.done = False
+        self.id = env_id
+        return self
 
     def statetorch2readable(self, state, alphabet={}):
         """
