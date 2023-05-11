@@ -8,6 +8,7 @@ from torch.distributions import Categorical
 from tqdm import tqdm
 from gflownet.envs.base import Buffer
 from collections import defaultdict
+from torch.distributions import Categorical, Bernoulli
 
 # from gflownet.gflownet import make_opt
 from torchtyping import TensorType
@@ -27,6 +28,9 @@ class Policy:
             + [env.policy_output_dim + 1]
         )
         self.is_model = True
+        self.random_output = torch.ones(env.random_policy_output + 1).to(
+            dtype=self.float, device=self.device
+        )
         if self.is_model:
             self.model.to(self.device)
 
@@ -44,6 +48,15 @@ class Policy:
                 + tail
             )
         ).to(dtype=self.float)
+
+    def random_distribution(self, states):
+        """
+        Returns the random distribution specified by the environment.
+        Args: states: tensor
+        """
+        return torch.tile(self.random_output, (len(states), 1)).to(
+            dtype=self.float, device=self.device
+        )
 
     def __call__(self, states):
         return self.model(states)
@@ -195,8 +208,23 @@ class PPOAgent(GFlowNetAgent):
             [env.get_mask_invalid_actions_forward() for env in envs]
         )
         # Build policy outputs
-
-        policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
+        policy_outputs = model.random_distribution(states)
+        idx_norandom = (
+            Bernoulli(
+                (1 - random_action_prob) * torch.ones(len(states), device=self.device)
+            )
+            .sample()
+            .to(bool)
+        )
+        if idx_norandom.sum() > 0:
+            policy_outputs[idx_norandom, :] = model(
+                self._tfloat(
+                    self.env.statebatch2policy(
+                        [s for s, do in zip(states, idx_norandom) if do]
+                    )
+                )
+            )
+        # policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
         # Skip v from policy outputs
         policy_outputs = policy_outputs[:, :-1]
         # Sample actions from policy outputs
