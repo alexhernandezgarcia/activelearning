@@ -18,7 +18,7 @@ from utils.eval_al_round import evaluate
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="mf_hartmann")
+@hydra.main(config_path="./config", config_name="mf_dkl")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -273,6 +273,9 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
+            fid_chosen_at_random = np.random.randint(0, N_FID, (len(states),))
+            for idx, state in enumerate(states):
+                state[-1] = fid_chosen_at_random[idx]
             if isinstance(states[0], list):
                 states_tensor = torch.tensor(states)
             else:
