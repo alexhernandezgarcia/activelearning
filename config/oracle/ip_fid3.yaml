@@ -13,6 +13,6 @@ oracle_config:
   ff: mmff
   semiempirical: xtb
   mol_repr: selfies # or smiles
-cost: 10
+cost: 7
 maximize: False
 oracle_level: 3
