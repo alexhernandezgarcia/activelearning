@@ -1,0 +1,21 @@
+output_dir: output
+output_csv: dna.csv
+output_filename: dna.pdf
+data:
+    methods:
+       sf:
+           1:
+               logdir: "2023-05-05_01-08-33"
+               run_path: "alexhg/Hartmann budget data set/nioe5ca4"
+       mf_index:
+           1:
+               logdir: "2023-05-05_10-51-53"
+               run_path: "alexhg/Hartmann budget data set/bytcboio"
+       mf_linear:
+           1:
+               logdir: "2023-05-05_10-51-53"
+               run_path: "alexhg/Hartmann budget data set/bytcboio"
+    higherbetter: False
+    k: 100
+    batch_size_al: 512
+    get_diversity: True
