@@ -7,6 +7,7 @@ from utils.selfies import SELFIES_VOCAB_SMALL, SELFIES_VOCAB_LARGE
 from .base import GFlowNetEnv
 import pandas as pd
 import selfies as sf
+import matplotlib.pyplot as plt
 
 # from rdkit import Chem, AllChem, DataStructs
 
@@ -160,6 +161,35 @@ class MolSelfies(GFlowNetEnv, GFlowNetMolSelfies):
             return states, scores
         else:
             return train_states, train_scores, test_states, test_scores
+        
+    def plot_reward_distribution(
+        self, states=None, scores=None, ax=None, title=None, oracle=None, **kwargs
+    ):
+        if ax is None:
+            fig, ax = plt.subplots()
+            standalone = True
+        else:
+            standalone = False
+        if oracle is None:
+            oracle = self.oracle
+        if title == None:
+            title = "Rewards of Sampled States"
+        if scores is None:
+            if states is None or len(states) == 0:
+                return None
+            oracle_states = self.statetorch2oracle(states)
+            scores = oracle(oracle_states)
+        if isinstance(scores, TensorType):
+            scores = scores.cpu().detach().numpy()
+        ax.hist(scores)
+        ax.set_title(title)
+        ax.set_ylabel("Number of Samples")
+        ax.set_xlabel("Energy")
+        plt.show()
+        if standalone == True:
+            plt.tight_layout()
+            plt.close()
+        return ax
 
     # def get_pairwise_distance(self, samples, *kwargs):
     #     smiles = sf.decoder(samples)

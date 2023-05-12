@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def define_metrics(logger):
-    for k in [1, 10, 100]:
+    for k in [1, 10, 50, 100]:
         logger.define_metric(
             "mean_energy_top{}".format(k), step_metric="post_al_cum_cost"
         )
