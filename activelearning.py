@@ -19,7 +19,7 @@ import pickle
 from proxy.mol_oracles.mol_oracle import MoleculeOracle
 
 
-@hydra.main(config_path="./config", config_name="sf_ea")
+@hydra.main(config_path="./config", config_name="mf_ea")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -317,6 +317,8 @@ def main(config):
                     hf_idxNaN = torch.isnan(energies_for_evaluation)
                     cf_idxNaN = torch.isnan(picked_energies)
                     idxNaN = hf_idxNaN | cf_idxNaN
+                    updated_picked_samples = []
+                    updated_picked_states = []
                     for i in range(len(picked_samples)):
                         if idxNaN[i]:
                             continue
@@ -324,25 +326,25 @@ def main(config):
                             updated_picked_samples.append(picked_samples[i])
                             updated_picked_states.append(picked_states[i])
 
-                    picked_energies = picked_energies[~idxNAN]
-                    energies_for_evaluation = energies_for_evaluation[~idxNAN]
+                    picked_energies = picked_energies[~idxNaN]
+                    energies_for_evaluation = energies_for_evaluation[~idxNaN]
                     picked_samples = updated_picked_samples
                     picked_states = updated_picked_states
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
                 picked_energies = env.oracle(picked_samples)
                 if isinstance(oracle, MoleculeOracle):
-                    idxNAN = torch.isnan(picked_energies)
+                    idxNaN = torch.isnan(picked_energies)
                     updated_picked_samples = []
                     updated_picked_states = []
                     for i in range(len(picked_samples)):
-                        if idxNAN[i]:
+                        if idxNaN[i]:
                             continue
                         else:
                             updated_picked_samples.append(picked_samples[i])
                             updated_picked_states.append(picked_states[i])
-                    # picked_samples = picked_samples[picked_samples[i] for i in range(len(picked_samples)) if not idxNAN[i]]
-                    picked_energies = picked_energies[~idxNAN]
+                    # picked_samples = picked_samples[picked_samples[i] for i in range(len(picked_samples)) if not idxNaN[i]]
+                    picked_energies = picked_energies[~idxNaN]
                     picked_samples = updated_picked_samples
                     picked_states = updated_picked_states
                 energies_for_evaluation = picked_energies
