@@ -5,12 +5,12 @@ model:
   _target_: model.shared_elements.Transformer
   tokenizer: null
   max_len: ${env.max_seq_length}
-  embed_dim: 32
-  latent_dim: 32
+  embed_dim: 64
+  latent_dim: 64
   ff_dim: 256
   num_heads: 8
   num_layers: 8
-  out_dim: 32
+  out_dim: 64
   p: 0.
   max_len_delta: 0
 
