@@ -28,9 +28,9 @@ class Policy:
             + [env.policy_output_dim + 1]
         )
         self.is_model = True
-        self.random_output = torch.ones(env.random_policy_output + 1).to(
-            dtype=self.float, device=self.device
-        )
+        # self.random_output = torch.ones(env.random_policy_output + 1).to(
+        #     dtype=self.float, device=self.device
+        # )
         if self.is_model:
             self.model.to(self.device)
 
@@ -208,23 +208,23 @@ class PPOAgent(GFlowNetAgent):
             [env.get_mask_invalid_actions_forward() for env in envs]
         )
         # Build policy outputs
-        policy_outputs = model.random_distribution(states)
-        idx_norandom = (
-            Bernoulli(
-                (1 - random_action_prob) * torch.ones(len(states), device=self.device)
-            )
-            .sample()
-            .to(bool)
-        )
-        if idx_norandom.sum() > 0:
-            policy_outputs[idx_norandom, :] = model(
-                self._tfloat(
-                    self.env.statebatch2policy(
-                        [s for s, do in zip(states, idx_norandom) if do]
-                    )
-                )
-            )
-        # policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
+        # policy_outputs = model.random_distribution(states)
+        # idx_norandom = (
+        #     Bernoulli(
+        #         (1 - random_action_prob) * torch.ones(len(states), device=self.device)
+        #     )
+        #     .sample()
+        #     .to(bool)
+        # )
+        # if idx_norandom.sum() > 0:
+        # policy_outputs[idx_norandom, :] = model(
+        #     self._tfloat(
+        #         self.env.statebatch2policy(
+        #             [s for s, do in zip(states, idx_norandom) if do]
+        #         )
+        #     )
+        # )
+        policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
         # Skip v from policy outputs
         policy_outputs = policy_outputs[:, :-1]
         # Sample actions from policy outputs
@@ -451,7 +451,7 @@ class PPOAgent(GFlowNetAgent):
             s = []
             # get current states, s
             for env in envs:
-                s.append(env.state)
+                s.append(env.state.copy())
                 # mask_s.append(env.get_mask_invalid_actions_forward())
             # Update environments with sampled actions
             envs, actions, valids = self.step(envs, actions, is_forward=True)
@@ -486,6 +486,8 @@ class PPOAgent(GFlowNetAgent):
             ]
         )
         rewards = self.env.reward_torchbatch(states, done)
+        # rewards = self.env.reward_torchbatch(states_sp, done)
+
         # G is simply reward of the trajectory
         G = rewards.clone()
         non_zero_indices = torch.nonzero(G).squeeze()
