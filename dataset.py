@@ -168,8 +168,12 @@ class DataHandler:
                 train_scores = None
             if self.n_fid > 1:
                 fidelities = states[:, -1].tolist()
+                train_fidelities = train_states[:, -1].tolist()
+                test_fidelities = test_states[:, -1].tolist()
             else:
                 fidelities = None
+                train_fidelities = None
+                test_fidelities = None
 
         else:
             raise NotImplementedError(
@@ -211,26 +215,27 @@ class DataHandler:
             raise ValueError("Split type not implemented")
 
         get_figure_plots(
-            self.env,
-            train_states,
-            train_scores,
-            fidelities,
-            logger=self.logger,
-            title="Initial Train Dataset",
-            key="initial_train_dataset",
-            use_context=True,
-        )
+                self.env,
+                train_states,
+                train_scores,
+                train_fidelities,
+                logger=self.logger,
+                title="Initial Train Dataset",
+                key="initial_train_dataset",
+                use_context=True,
+            )
 
         get_figure_plots(
-            self.env,
-            test_states,
-            test_scores,
-            fidelities,
-            logger=self.logger,
-            title="Initial Test Dataset",
-            key="initial_test_dataset",
-            use_context=True,
-        )
+                self.env,
+                test_states,
+                test_scores,
+                test_fidelities,
+                logger=self.logger,
+                title="Initial Test Dataset",
+                key="initial_test_dataset",
+                use_context=True,
+            )
+    
 
         train_scores = self.scale_by_target_factor(train_scores)
         readable_train_samples = [
