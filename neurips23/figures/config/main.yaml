@@ -1,8 +1,8 @@
 root_logdir: "/home/alex/Dropbox/ccai/activelearning/neurips23/logs/"
 plot:
     dpi: 150
-    n_rows: 2
-    height: 10
+    height: 6
+    width: 10
     dodge: 0.6
     scale: 0.75
     errwidth: 1.5
@@ -24,3 +24,6 @@ plot:
             palette: vlag
         methods_family:
             palette: deep
+    x_axis:
+        type: "fraction_budget"
+        label: "Fraction of total budget"
