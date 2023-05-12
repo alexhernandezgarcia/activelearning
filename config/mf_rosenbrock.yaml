@@ -144,7 +144,7 @@ dataset:
 # Sample 5*K and choose topK
 n_samples: 30
 # Random seeds
-seed: 0
+seed: 16
 # Device
 device: cuda
 # Float precision
