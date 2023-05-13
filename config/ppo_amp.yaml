@@ -2,11 +2,12 @@
 
 defaults:
   # - _self_
-  - env: aptamers
-  # - oracle@_oracle_dict.1: branin
-  - oracle@_oracle_dict.1: aptamers_nn
-  - oracle@_oracle_dict.2: aptamers_nupack
-  # - oracle: amp
+  - env: amp
+  - true_oracle: amp
+  # last must be the best for project function to work as expected
+  - oracle@_oracle_dict.1: amp_fid1
+  - oracle@_oracle_dict.2: amp_fid2
+  - oracle@_oracle_dict.3: amp
   - gflownet: ppo
   - user: nikita
   - proxy: mf_mes_dkl  #mf_mes_gp #mes_gp
@@ -23,7 +24,7 @@ regressor:
     num_inducing_points: 64
 
 logger:
-  project_name: "PPO-DNA"
+  project_name: "PPO-AMP"
   test:
     period: -1
     n: 1
@@ -46,14 +47,14 @@ logger:
     # - backward_policy = shared
 
 env:
-  max_init_steps: 9
+  max_init_steps: 15
   corr_type: None
   proxy_state_format: state #state_fidIdx FOR DKL, state for GP
   reward_func: power #shift power
   reward_beta: 1 #1 #80
   beta_factor: 0
   reward_norm: 0.00001
-  norm_factor: 1.5
+  norm_factor: 1
 
 gflownet:
   active_learning: True
@@ -100,20 +101,13 @@ dataset:
   path:
     type: mf
     oracle_dataset:
-      fid_type: random
-      type: null
       train: 
-      # AS OG oracle dataset was different
-      # TODO: CHANGE TO NON_EXACTDKL DATASET WHEN RUNNIN EXPERIMENTS
-        # path: /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/oracle_dataset.csv
-        # path: ${user.data_path}/dna/length30/mf/data_train.csv
-        path: /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/mf/data_train.csv
-        # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-05-01_22-12-21/data/data_train.csv
+        path: ${user.data_path}/amp/mf/data_train.csv
+        # /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-03-17_12-57-25/data/data_train.csv
         get_scores: False
       test: 
-        # path: ${user.data_path}/dna/length30/mf/data_test.csv
-        path: /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/mf/data_test.csv
-        # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-05-01_22-12-21/data/data_test.csv
+        path: ${user.data_path}/amp/mf/data_test.csv
+        # /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-03-17_12-57-25/data/data_test.csv
         get_scores: False
         # /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/test_2000.csv
         # get_scores: False
@@ -122,7 +116,7 @@ dataset:
   
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
-n_samples: 512
+n_samples: 32
 # Random seeds
 seed: 0
 # Device

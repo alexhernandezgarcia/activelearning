@@ -17,17 +17,17 @@ defaults:
   - logger: wandb
 
 logger:
-  project_name: "PPO"
+  project_name: "PPO-Branin"
   test:
-    period: 1000
+    period: -1
     n: 1000
     first_it: False
   do:
     times: False
     online: True
   plot:
-    period: 2000 #1000
-    first_it: True
+    period: -1 #1000
+    first_it: False
   tags:
     - mf_branin
     # - optimize_code
@@ -75,7 +75,7 @@ gflownet:
     batch_size: 16
   ppo_num_epochs: 4
   ppo_epoch_size: 4
-  ppo_clip: 0.1
+  ppo_clip: 0.01
   ppo_entropy_coef: 1e-2
   policy:
     n_hid: 2048
@@ -107,19 +107,19 @@ dataset:
       batch_size: 256
   path:
     type: mf #mf sf
-    oracle_dataset: null
+    oracle_dataset: 
     # UNCOMMENT FOR GP
-    # # COMMENT FOR DKL BECAUSE NEED INDUCING POINTS
-      # fid_type: random
-      # train: 
-      # #   # path: ${user.data_path}/branin/sf/data_train.csv
-      #   path: /home/mila/n/nikita.saxena/activelearning/storage/branin/mf/data_train.csv
-      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/mf/ppo_sampled_data_train.csv
-      # #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
-      # #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid3_100x100.csv
-      #   get_scores: True
-      # # # train: null
-      # test: null
+    # COMMENT FOR DKL BECAUSE NEED INDUCING POINTS
+      fid_type: random
+      train: 
+      #   # path: ${user.data_path}/branin/sf/data_train.csv
+        path: /home/mila/n/nikita.saxena/activelearning/storage/branin/mf/data_train.csv
+        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/mf/ppo_sampled_data_train.csv
+      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
+      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid3_100x100.csv
+        get_scores: True
+      # # train: null
+      test: null
   
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
