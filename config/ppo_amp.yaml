@@ -66,9 +66,9 @@ gflownet:
 #     lr_z_mult: 50
     n_train_steps: 10000
     batch_size: 16
-  ppo_num_epochs: 8
-  ppo_epoch_size: 8
-  ppo_clip: 0.01
+  ppo_num_epochs: 4
+  ppo_epoch_size: 4
+  ppo_clip: 0.1
   ppo_entropy_coef: 1e-2
   policy:
     n_hid: 2048

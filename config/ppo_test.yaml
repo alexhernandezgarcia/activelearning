@@ -40,7 +40,7 @@ logger:
     # - backward_policy = shared
 
 env:
-  max_init_steps: 60
+  max_init_steps: 15
   corr_type: None
   proxy_state_format: state #state_fidIdx FOR DKL, state for GP
   reward_func: power #shift power
