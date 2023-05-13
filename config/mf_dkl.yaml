@@ -27,7 +27,7 @@ logger:
   resume: True 
   logdir: 
     # root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-05-12_19-14-32 #2023-04-18_04-11-44
-    root: network/scratch/n/nikita.saxena/logs/activelearning/2023-05-10_22-15-42"
+    root: network/scratch/n/nikita.saxena/logs/activelearning/2023-05-10_22-15-42
     overwrite: False
   run_id: 6c7twkzj #ly838evp #n8wpr8cw #fuy1i0gz  #uwjujwlg
   # run_id: n7obqliz #ly838evp
