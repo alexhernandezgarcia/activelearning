@@ -1,18 +1,17 @@
-# @package _global_
+  # @package _global_
 
 defaults:
   # - _self_
   - env: aptamers
-  # - oracle@_oracle_dict.1: branin
   - oracle@_oracle_dict.1: aptamers_nn
+  # Second is better
   - oracle@_oracle_dict.2: aptamers_nupack
-  # - oracle: amp
-  - gflownet: ppo
+  - gflownet: trajectorybalance
   - user: nikita
-  - proxy: mf_mes_dkl  #mf_mes_gp #mes_gp
+  - proxy: mf_mes_dkl #botorch_ucb #mes_svgp #mf_mes_proxy
   - dataset: dataset
-  - regressor: mf_dkl_linear
-  - model: mlm_transformer
+  - regressor: mf_dkl_linear #dropout_regressor
+  - model: mlm_transformer #mf_mlp #regressive
   - logger: wandb
 
 regressor:
@@ -23,80 +22,102 @@ regressor:
     num_inducing_points: 64
 
 logger:
-  project_name: "PPO-DNA"
-  test:
+  # resume: True 
+  # logdir: 
+  #   root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-05-10_22-18-45
+  #   overwrite: False
+  # run_id: kmlgrals
+  project_name: "Aptamers-DKL"
+  lightweight: False
+  plot:
     period: -1
-    n: 1
-    first_it: False
+    first_it: True
+  test:
+    period: 1000
+    n: 1000
+    first_it: True
+  oracle:
+    period: -1
+  # ckpts:
+  #   policy:
+  #     period: 1000
   do:
     times: False
     online: True
-  plot:
-    period: -1 #1000
-    first_it: False
   tags:
-    - mf_branin
-    # - optimize_code
-    # - (10x)^8
-    # - amp
-    # - train_frac = 0.8
-    # - tb
-    # - get_scores_realtime
-    # - botorch_ucb
+    # - r(x) = (1000x)^8
+    # - ucb
+    # - test
+    # - reward_inf
+    - skewed_fid
+    - mf
+    # - proxy_ablation
+    # - time_eval
+    # - corrected_source_in_corr
+    # - correct_padding_mlm_train
+    # - amp-mf-mes
     # - backward_policy = shared
+    # - sampling_temp=1.0
 
 env:
-  max_init_steps: 9
-  corr_type: None
-  proxy_state_format: state #state_fidIdx FOR DKL, state for GP
-  reward_func: power #shift power
-  reward_beta: 1 #1 #80
+  corr_type: from_trajectory
+  proxy_state_format: state
+  reward_func: power
+  reward_beta: 1
   beta_factor: 0
+  # length: 10
   reward_norm: 0.00001
   norm_factor: 1.5
+  buffer:
+    train:
+      path: data_train.csv
+      # /home/mila/n/nikita.saxena/activelearning/storage/amp/data_train.csv
+      n: null
+      type: all
+      seed: null
+      output_pkl: buffer_data_train.csv 
+      output_csv: null
+    test:
+      path: ${user.data_path}/dna/length30/test_2000_FINAL_mf.csv
+      type: all
+      output_pkl: buffer_data_test.csv
+      n: null
+      seed: null
+      output_csv: null
+    
 
 gflownet:
   active_learning: True
-#   device: cuda
-#   sample_only: False
-#   random_action_prob: 0.001
+  # sample_only: True
+  random_action_prob: 0.0 #0.001
   optimizer:
-#     lr: 5e-4
-#     lr_z_mult: 50
+    lr: 5e-4
+    lr_z_mult: 20
     n_train_steps: 10000
-    batch_size: 16
-  ppo_num_epochs: 4
-  ppo_epoch_size: 4
-  ppo_clip: 0.1
-  ppo_entropy_coef: 0.01
+    batch_size: 32
   policy:
-    n_hid: 2048
-    n_layers: 2
-#     backward:
-#       # type: uniform
-#       shared_weights: True
-#   pct_offline: 0.0   
-
-# model:
-#   n_hid: 2048
-#   n_layers: 2
-
-# regressor:
-#   weight_decay: 1e-4
-#   lr: 1e-3
-#   max_epochs: 3
-#   history: 1
+    forward:
+      type: mlp
+      n_hid: 2048
+      n_layers: 2
+      checkpoint: fp
+    backward:
+      type: mlp
+      shared_weights: True
+  pct_offline: 0.0
+  oracle:
+    n: 500
 
 dataset:
   normalize_data: True
-  # n_samples: 300
+  # n_samples: 30
+  split: given #random
   train_fraction: 0.8
-  split: given #random all_train
   dataloader:
     train:
-      batch_size: 256
+      batch_size: 32
     test:
-      batch_size: 256
+      batch_size: 32
   path:
     type: mf
     oracle_dataset:
@@ -119,25 +140,28 @@ dataset:
         # get_scores: False
       # train: null
       # test: null
-  
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
-n_samples: 512
+n_samples: 512 #512
 # Random seeds
 seed: 0
 # Device
 device: cuda
 # Float precision
 float_precision: 32
+#It is strongly recommended to use double precision in BoTorch, as this improves both precision and stability and can help avoid numerical errors. See https://github.com/pytorch/botorch/discussions/1444
 al_n_rounds: 10
-do_figure: True
+do_figure: False
+
 multifidelity:
+  proxy: True
+  #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
+  # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
+  # proxy_state_format: oracle
+  fixed_cost: 0
+  rescale: 1
   fid_embed: one_hot
   fid_embed_dim: None
-  fixed_cost: 0
-  proxy: True
-  rescale: 10
-  candidate_set_path: null
 
 # Hydra config
 hydra:

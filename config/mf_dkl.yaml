@@ -1,0 +1,169 @@
+# @package _global_
+
+defaults:
+  # - _self_
+  - env: amp
+  - true_oracle: amp
+  # last must be the best for project function to work as expected
+  - oracle@_oracle_dict.1: amp_fid1
+  - oracle@_oracle_dict.2: amp_fid2
+  - oracle@_oracle_dict.3: amp
+  - gflownet: trajectorybalance
+  - user: nikita
+  - proxy: mf_mes_dkl #mf_mes_proxy
+  - dataset: dataset
+  - regressor: mf_dkl_linear #dropout_regressor
+  - model: mlm_transformer #mlm_cnn #AMP: dim = 512
+  - logger: wandb
+
+regressor:
+  surrogate: 
+    num_epochs: 512
+    patience: 15
+    eval_period: 1
+  
+
+logger:
+  resume: True 
+  logdir: 
+    # root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-05-12_19-14-32 #2023-04-18_04-11-44
+    root: network/scratch/n/nikita.saxena/logs/activelearning/2023-05-10_22-15-42"
+    overwrite: False
+  run_id: 6c7twkzj #ly838evp #n8wpr8cw #fuy1i0gz  #uwjujwlg
+  # run_id: n7obqliz #ly838evp
+  project_name: "AMP-DKL"
+  lightweight: False
+  plot:
+    period: -1
+    first_it: True
+  test:
+    period: 1000
+    n: 1
+  oracle:
+    period: -1
+  # ckpts:
+  #   policy:
+  #     period: 1000
+  do:
+    times: False
+    online: True
+  tags:
+    # - r(x) = (1000x)^8
+    # - mf_mlp
+    - mf
+    - skewed_fid
+    # - continued from 
+    # - https://wandb.ai/nikita0209/AMP-DKL/runs/6h5ss9cf/overview?workspace=user-nikita0209
+    # - amp-mf-mes
+    # - backward_policy = shared
+    # - sampling_temp=1.0
+
+env:
+  corr_type: from_trajectory
+  proxy_state_format: state
+  reward_func: power
+  reward_beta: 1 #200
+  # beta_factor: 2
+  # length: 10
+  reward_norm: 1e-5
+  norm_factor: 1
+  # max_seq_length: 3
+  buffer:
+    train:
+      path: data_train.csv
+      # /home/mila/n/nikita.saxena/activelearning/storage/amp/data_train.csv
+      n: null
+      type: all
+      seed: null
+      output_csv: null 
+      output_pkl: buffer_data_train.csv
+    test:
+      # path: null
+      # type: null
+      # output_pkl: null
+      path: data_test.csv
+      type: all
+      output_pkl: buffer_data_test.csv
+      n: null
+      seed: null
+      output_csv: null
+    
+
+gflownet:
+  active_learning: True
+  sample_only: True
+  random_action_prob: 0.15 #0.001
+  optimizer:
+    lr: 5e-4
+    lr_z_mult: 20
+    n_train_steps: 10000
+    batch_size: 32
+  policy:
+    forward:
+      type: mlp
+      n_hid: 2048
+      n_layers: 2
+      checkpoint: fp
+    backward:
+      type: mlp
+      shared_weights: True
+  # code slow so decreased
+  pct_offline: 0.3
+  oracle:
+    n: 500
+
+dataset:
+  # n_samples: 30
+  split: given #random
+  train_fraction: 0.8
+  dataloader:
+    train:
+      batch_size: 32
+    test:
+      batch_size: 32
+  path:
+    type: mf
+    oracle_dataset:
+      train: 
+        path: ${user.data_path}/amp/mf/data_train.csv
+        # /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-03-17_12-57-25/data/data_train.csv
+        get_scores: False
+      test: 
+        path: ${user.data_path}/amp/mf/data_test.csv
+        # /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-03-17_12-57-25/data/data_test.csv
+        get_scores: False
+      # train: null
+      # test: null
+# Number of objects to sample at the end of training
+# Sample 5*K and choose topK
+n_samples: 32
+# Random seeds
+seed: 0
+# Device
+device: cuda
+# Float precision
+float_precision: 64
+#It is strongly recommended to use double precision in BoTorch, as this improves both precision and stability and can help avoid numerical errors. See https://github.com/pytorch/botorch/discussions/1444
+# al_n_rounds: 30
+do_figure: False
+budget: 89600
+
+multifidelity:
+  proxy: True
+  fid_embed: one_hot
+  fid_embed_dim: None
+  #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
+  # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
+  # proxy_state_format: oracle
+  fixed_cost: 0
+  rescale: 1
+
+# Hydra config
+hydra:
+  # See: https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+    chdir: True
