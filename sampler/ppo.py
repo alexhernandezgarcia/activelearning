@@ -70,7 +70,7 @@ class PPOAgent(GFlowNetAgent):
         device,
         float_precision,
         optimizer,
-        buffer,
+        # buffer,
         policy,
         ppo_num_epochs,
         ppo_epoch_size,
@@ -134,36 +134,6 @@ class PPOAgent(GFlowNetAgent):
         self.l1 = -1.0
         self.kl = -1.0
         self.jsd = -1.0
-        self.buffer = Buffer(
-            **buffer, env=self.env, make_train_test=not sample_only, logger=logger
-        )
-        # Train set statistics and reward normalization constant
-        if self.buffer.train is not None:
-            energies_stats_tr = [
-                self.buffer.min_tr,
-                self.buffer.max_tr,
-                self.buffer.mean_tr,
-                self.buffer.std_tr,
-                self.buffer.max_norm_tr,
-            ]
-            self.env.set_energies_stats(energies_stats_tr)
-            print("\nGFN Train data")
-            print(f"\tMean score: {energies_stats_tr[2]}")
-            print(f"\tStd score: {energies_stats_tr[3]}")
-            print(f"\tMin score: {energies_stats_tr[0]}")
-            print(f"\tMax score: {energies_stats_tr[1]}")
-        else:
-            energies_stats_tr = None
-        if self.env.reward_norm_std_mult > 0 and energies_stats_tr is not None:
-            self.env.reward_norm = self.env.reward_norm_std_mult * energies_stats_tr[3]
-            self.env.set_reward_norm(self.env.reward_norm)
-        # Test set statistics
-        if self.buffer.test is not None:
-            print("\nGFN Test Data")
-            print(f"\tMean score: {self.buffer.mean_tt}")
-            print(f"\tStd score: {self.buffer.std_tt}")
-            print(f"\tMin score: {self.buffer.min_tt}")
-            print(f"\tMax score: {self.buffer.max_tt}")
 
     def sample_actions(
         self,
@@ -451,7 +421,10 @@ class PPOAgent(GFlowNetAgent):
             s = []
             # get current states, s
             for env in envs:
-                s.append(env.state.copy())
+                if env.is_state_list == True:
+                    s.append(env.state.copy())
+                else:
+                    s.append(env.state.clone())
                 # mask_s.append(env.get_mask_invalid_actions_forward())
             # Update environments with sampled actions
             envs, actions, valids = self.step(envs, actions, is_forward=True)
