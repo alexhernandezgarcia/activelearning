@@ -11,7 +11,8 @@ import pandas as pd
 import random
 
 class AMP(GFlowNetEnv, GflowNetAMP):
-    def __init__(self, **kwargs):
+    def __init__(self, max_init_steps, **kwargs):
+        self.max_init_steps = max_init_steps
         super().__init__(
             **kwargs,
         )
