@@ -41,8 +41,7 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
     def reset(self, env_id=None):
         self.state = (
             self.source.clone()
-        )  # tensor([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        # 4, 4, 4, 4, 4, 4])
+        )  
         init_steps = random.randint(0, self.max_init_steps)
         random_state = torch.randint(low=0, high=4, size=(1, init_steps))
         self.state[0:init_steps] = random_state
