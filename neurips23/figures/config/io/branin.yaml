@@ -3,30 +3,34 @@ output_dir: output
 output_csv: data/branin.csv
 output_filename: branin.pdf
 data:
-    methods:
-       sf:
-           name: "Single-fidelity (highest) AL"
-           1:
-               logdir: "2023-05-03_06-35-40"
-               run_path: "alexhg/Branin budget data set/p6nu2nzx"
-           2:
-               logdir: "2023-05-03_06-32-45"
-               run_path: "alexhg/Branin budget data set/yvk5tox2"
-           3:
-               logdir: "2023-05-03_18-49-33"
-               run_path: "alexhg/Branin budget data set/27japxej"
-       mf:
-           name: "Multi-fidelity AL"
-           1:
-               logdir: "2023-05-04_22-24-48"
-               run_path: "alexhg/Branin budget data set/cijnbh4w"
-           2:
-               logdir: "2023-05-03_06-41-16"
-               run_path: "alexhg/Branin budget data set/lwzlgxvj"
-           3:
-               logdir: "2023-05-03_06-41-50"
-               run_path: "alexhg/Branin budget data set/g557nx3y"
-    higherbetter: False
-    k: 50
-    batch_size_al: 30
-    get_diversity: False
+  methods:
+   sf:
+     dirname: "branin/gfn_sf"
+     name: "Single-fidelity (highest) AL"
+     seeds:
+       1:
+         logdir: "2023-05-06_18-52-02"
+       2:
+         logdir: "2023-05-08_16-59-06"
+       3:
+         logdir: "2023-05-08_17-08-04"
+#      4:
+#        logdir: "2023-05-03_06-35-40"
+#      5:
+#        logdir: "2023-05-03_06-32-45"
+#      6:
+#        logdir: "2023-05-03_18-49-33"
+   mf:
+     dirname: "branin/gfn_mf"
+     name: "Multi-fidelity AL"
+     seeds:
+       1:
+         logdir: "2023-05-04_22-24-48"
+       2:
+         logdir: "2023-05-03_06-41-16"
+       3:
+         logdir: "2023-05-03_06-41-50"
+  higherbetter: False
+  k: 50
+  batch_size_al: 30
+  get_diversity: False

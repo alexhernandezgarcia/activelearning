@@ -1,4 +1,4 @@
-root_logdir: "/home/alex/Dropbox/ccai/activelearning/neurips23/logs/"
+root_logdir: "/network/scratch/h/hernanga/mfal"
 plot:
     dpi: 150
     height: 6

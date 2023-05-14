@@ -28,9 +28,10 @@ def build_dataframe(config):
         for seed in config.io.data.methods[method].seeds:
             logdir = (
                 Path(config.root_logdir)
+                / config.io.data.methods[method].dirname
                 / config.io.data.methods[method].seeds[seed].logdir
             )
-            runpath = config.io.data.methods[method].seeds[seed].run_path
+            runpath = get_wandb_runpath(logdir)
             energy, cost, diversity = get_performance(
                 logdir,
                 runpath,
@@ -56,7 +57,7 @@ def build_dataframe(config):
     return df
 
 
-def get_performance(logdir, run_path, k, higherbetter, batch_size, get_diversity=False):
+def get_performance(logdir, runpath, k, higherbetter, batch_size, get_diversity=False):
     # Read data from experiment
     f_pkl = get_pkl(logdir)
     data_dict = pd.read_pickle(f_pkl)
@@ -64,7 +65,7 @@ def get_performance(logdir, run_path, k, higherbetter, batch_size, get_diversity
     cumul_energies = data_dict["cumulative_sampled_energies"]
     # Read data from wandb run
     api = wandb.Api()
-    run = api.run(run_path)
+    run = api.run(runpath)
     post_al_cum_cost = run.history(keys=["post_al_cum_cost"])
     post_al_cum_cost = np.unique(post_al_cum_cost["post_al_cum_cost"])
     # Compute metrics from each AL round
@@ -111,6 +112,17 @@ def process_cost(df, config):
     if config.plot.x_axis.type == "fraction_budget":
         df.cost = df.cost / df.cost.max()
     return df
+
+
+def get_wandb_runpath(logdir):
+    with open(Path(logdir) / "wandb.url", "r") as f:
+        url = f.read()
+    entity, project, _, run_id = (
+        url.rstrip().replace("https://wandb.ai/", "").split("/")
+    )
+    runpath = entity + "/" + project + "/" + run_id
+    runpath = runpath.replace("%20", " ")
+    return runpath
 
 
 def plot(df, config):
@@ -166,7 +178,11 @@ def main(config):
     with open(output_yml, "w") as fp:
         OmegaConf.save(config=config, f=fp.name)
     # Build data frame or read CSV
-    if "input_csv" in config.io and Path(config.io.input_csv).exists():
+    if (
+        "input_csv" in config.io
+        and config.io.input_csv is not None
+        and Path(config.io.input_csv).exists()
+    ):
         df = pd.read_csv(config.io.input_csv, index_col="index")
     else:
         df = build_dataframe(config)
