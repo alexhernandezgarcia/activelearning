@@ -40,6 +40,7 @@ class XTB_IPEA:
         self.moltocoord_config = moltocoord_config
         self.moltocoord_config["log_dir"] = self.log_dir
         self.mol_to_coord = MolToCoord(self.moltocoord_config)
+        self.inital_num_conf = self.moltocoord_config.get('conformer_config', {}).get('num_conf', 2)
         self.remove_scratch = remove_scratch
 
     def __call__(self, molecule, oracle_level=None, *args, **kwargs):
@@ -49,7 +50,7 @@ class XTB_IPEA:
         os.chdir(self.log_dir)
         # run to get mmff geometry from string; will also check is molecule is valid (else return None)
         num_conf = math.floor(
-            self.moltocoord_config["conformer_config"]["num_conf"]
+            self.inital_num_conf
             * (oracle_level**self.conformer_ladder)
         )
         self.mol_to_coord.conformer_config["num_conf"] = num_conf
