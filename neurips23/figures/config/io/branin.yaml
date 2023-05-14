@@ -31,6 +31,9 @@ data:
        3:
          logdir: "2023-05-03_06-41-50"
   higherbetter: False
-  k: 50
+  k:
+    - 1
+    - 10
+    - 50
   batch_size_al: 30
   get_diversity: False

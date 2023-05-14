@@ -22,36 +22,38 @@ from utils import get_hue_palette, get_pkl, plot_setup
 
 def build_dataframe(config):
     df = pd.DataFrame(
-        columns=["method", "seed", "energy", "cost", "diversity", "round"]
+        columns=["method", "seed", "energy", "cost", "diversity", "round", "k"]
     )
     for method in config.io.data.methods:
         for seed in config.io.data.methods[method].seeds:
-            logdir = (
-                Path(config.root_logdir)
-                / config.io.data.methods[method].dirname
-                / config.io.data.methods[method].seeds[seed].logdir
-            )
-            runpath = get_wandb_runpath(logdir)
-            energy, cost, diversity = get_performance(
-                logdir,
-                runpath,
-                config.io.data.k,
-                config.io.data.higherbetter,
-                config.io.data.batch_size_al,
-                config.io.data.get_diversity,
-            )
-            n_rounds = len(energy)
-            df_aux = pd.DataFrame.from_dict(
-                {
-                    "method": [method for _ in range(n_rounds)],
-                    "seed": [seed for _ in range(n_rounds)],
-                    "energy": energy,
-                    "cost": cost,
-                    "diversity": diversity,
-                    "round": np.arange(len(energy)),
-                }
-            )
-            df = pd.concat([df, df_aux], axis=0, ignore_index=True)
+            for k in config.io.data.k:
+                logdir = (
+                    Path(config.root_logdir)
+                    / config.io.data.methods[method].dirname
+                    / config.io.data.methods[method].seeds[seed].logdir
+                )
+                runpath = get_wandb_runpath(logdir)
+                energy, cost, diversity = get_performance(
+                    logdir,
+                    runpath,
+                    k,
+                    config.io.data.higherbetter,
+                    config.io.data.batch_size_al,
+                    config.io.data.get_diversity,
+                )
+                n_rounds = len(energy)
+                df_aux = pd.DataFrame.from_dict(
+                    {
+                        "method": [method for _ in range(n_rounds)],
+                        "seed": [seed for _ in range(n_rounds)],
+                        "energy": energy,
+                        "cost": cost,
+                        "diversity": diversity,
+                        "round": np.arange(len(energy)),
+                        "k": [k for _ in range(n_rounds)],
+                    }
+                )
+                df = pd.concat([df, df_aux], axis=0, ignore_index=True)
     if "output_csv" in config.io:
         df.to_csv(config.io.output_csv, index_label="index")
     return df
@@ -133,7 +135,7 @@ def plot(df, config):
     )
 
     # Plot
-    sns.lineplot(ax=ax, data=df, x="cost", y="energy", hue="method")
+    sns.lineplot(ax=ax, data=df, x="cost", y="energy", hue="method", style="k")
 
     # Set X-label
     ax.set_xlabel(config.plot.x_axis.label)
