@@ -25,5 +25,6 @@ plot:
         methods_family:
             palette: deep
     x_axis:
+        log: True
         type: "fraction_budget"
         label: "Fraction of total budget"
