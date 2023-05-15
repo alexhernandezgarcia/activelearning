@@ -18,7 +18,7 @@ from utils.eval_al_round import evaluate
 import pickle
 
 
-@hydra.main(config_path="./config", config_name="ppo_hartmann")
+@hydra.main(config_path="./config", config_name="ppo_test")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)
@@ -194,7 +194,7 @@ def main(config):
             initial_reward_beta * env.beta_factor * (iter - 1)
         )
         env.reward_norm = initial_reward_norm / (env.norm_factor ** (iter - 1))
-        # env.max_init_steps = env.max_init_steps + 5 *(iter-1)
+        env.max_init_steps = env.max_init_steps + 5 *(iter-1)
         # env.reward_norm = initial_reward_norm - (
         #     initial_reward_norm * env.norm_factor * (iter - 1)
         # )
