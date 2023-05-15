@@ -40,14 +40,14 @@ logger:
     # - backward_policy = shared
 
 env:
-  max_init_steps: 1
+  max_init_steps: 5
   corr_type: None
   proxy_state_format: state #state_fidIdx FOR DKL, state for GP
   reward_func: power #shift power
   # reward_beta: 1 #1 #80
   length: 100
   rescale: 15
-  reward_norm: 1e-4 #1e-1 #1
+  reward_norm: 1e-1 #1e-1 #1
   buffer:
     train:
       path: null
@@ -75,7 +75,7 @@ gflownet:
     batch_size: 16
   ppo_num_epochs: 8
   ppo_epoch_size: 4
-  ppo_clip: 0.1
+  ppo_clip: 0.01
   ppo_entropy_coef: 1e-2
   policy:
     n_hid: 2048
