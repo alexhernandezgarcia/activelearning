@@ -10,6 +10,8 @@ plot:
     bs_seed: 17
     plot_baseline: False
     shade_alpha: 0.10
+    estimator: mean
+    do_markers: False
     markers:
         - "o"
         - "s"

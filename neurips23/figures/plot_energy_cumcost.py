@@ -135,14 +135,25 @@ def plot(df, config):
     )
 
     # Plot
-    sns.lineplot(ax=ax, data=df, x="cost", y="energy", hue="method", style="k")
+    sns.lineplot(
+        ax=ax,
+        data=df,
+        x="cost",
+        y="energy",
+        hue="method",
+        style="k",
+        estimator=config.plot.estimator,
+        markers=config.plot.do_markers,
+    )
 
-    # Set X-axis scale
+    # Set X-axis scale and label
     if config.plot.x_axis.log:
-        ax.set_xscale('log')
+        ax.set_xscale("log")
+        ax.set_xlabel(config.plot.x_axis.label + " (log)")
+    else:
+        ax.set_xlabel(config.plot.x_axis.label)
 
     # Set X-label
-    ax.set_xlabel(config.plot.x_axis.label)
     # Set Y-label
     if config.io.data.higherbetter:
         better = "higher"
@@ -151,19 +162,19 @@ def plot(df, config):
     ax.set_ylabel(f"Mean Top-K energy ({better} is better)")
 
     # Legend
-#     leg_handles, leg_labels = ax.get_legend_handles_labels()
-#     import ipdb; ipdb.set_trace()
-#     leg_labels = [
-#         config.io.data.methods[method].name for method in config.io.data.methods
-#     ]
-#     leg = ax.legend(
-#         handles=leg_handles,
-#         labels=leg_labels,
-#         loc="best",
-#         title="",
-#         framealpha=1.0,
-#         frameon=True,
-#     )
+    #     leg_handles, leg_labels = ax.get_legend_handles_labels()
+    #     import ipdb; ipdb.set_trace()
+    #     leg_labels = [
+    #         config.io.data.methods[method].name for method in config.io.data.methods
+    #     ]
+    #     leg = ax.legend(
+    #         handles=leg_handles,
+    #         labels=leg_labels,
+    #         loc="best",
+    #         title="",
+    #         framealpha=1.0,
+    #         frameon=True,
+    #     )
 
     # Change spines
     sns.despine(ax=ax, left=True, bottom=True)
