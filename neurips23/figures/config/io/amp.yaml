@@ -1,0 +1,37 @@
+task: amp
+input_csv: data/amp.csv
+output_dir: output
+output_csv: data/amp.csv
+output_filename: amp.pdf
+data:
+  methods:
+   sf:
+     dirname: "amp/gfn_sf"
+     name: "Single-fidelity (highest) AL"
+     seeds:
+       1:
+         logdir: "2023-05-03_11-56-45"
+   mf_random:
+     dirname: "amp/gfn_random"
+     name: "Random samples and fidelities"
+     seeds:
+       1:
+         logdir: "2023-05-12_18-41-42"
+       2:
+         logdir: "2023-05-12_19-14-30"
+       3:
+         logdir: "2023-05-12_19-14-32"
+   mf_index:
+     dirname: "amp/gfn_index_kernel"
+     name: "MF GFlowNet (GP Index)"
+     seeds:
+       1:
+         logdir: "2023-05-01_23-18-47"
+  higherbetter: True
+  k:
+    - 1
+    - 10
+    - 50
+  batch_size_al: 32
+  do_diversity: True
+

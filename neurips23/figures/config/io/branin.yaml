@@ -1,3 +1,4 @@
+task: branin
 input_csv: data/branin.csv
 output_dir: output
 output_csv: data/branin.csv
@@ -36,4 +37,4 @@ data:
     - 10
     - 50
   batch_size_al: 30
-  get_diversity: False
+  do_diversity: False

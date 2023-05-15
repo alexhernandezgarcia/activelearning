@@ -1,9 +1,12 @@
 """
 This script plots the topK energy with respective to the cumulative cost.
 """
+import itertools
 import sys
 from pathlib import Path
 
+import biotite.sequence as biotite_seq
+import biotite.sequence.align as align
 import hydra
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -21,6 +24,12 @@ from utils import get_hue_palette, get_pkl, plot_setup
 
 
 def build_dataframe(config):
+    if config.io.task == "dna":
+        substitution_matrix = align.SubstitutionMatrix.std_nucleotide_matrix()
+    elif config.io.task == "amp":
+        substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
+    else:
+        substitution_matrix = None
     df = pd.DataFrame(
         columns=["method", "seed", "energy", "cost", "diversity", "round", "k"]
     )
@@ -39,7 +48,9 @@ def build_dataframe(config):
                     k,
                     config.io.data.higherbetter,
                     config.io.data.batch_size_al,
-                    config.io.data.get_diversity,
+                    config.io.data.do_diversity,
+                    config.io.task,
+                    substitution_matrix,
                 )
                 n_rounds = len(energy)
                 df_aux = pd.DataFrame.from_dict(
@@ -59,7 +70,16 @@ def build_dataframe(config):
     return df
 
 
-def get_performance(logdir, runpath, k, higherbetter, batch_size, get_diversity=False):
+def get_performance(
+    logdir,
+    runpath,
+    k,
+    higherbetter,
+    batch_size,
+    do_diversity=False,
+    task=None,
+    substitution_matrix=None,
+):
     # Read data from experiment
     f_pkl = get_pkl(logdir)
     data_dict = pd.read_pickle(f_pkl)
@@ -87,27 +107,45 @@ def get_performance(logdir, runpath, k, higherbetter, batch_size, get_diversity=
         energies_topk = cumul_sampled_energies_curr_round[idx_topk]
         mean_energy_topk = np.mean(energies_topk)
         # Compute diversity of topk samples, if requested
-        if get_diversity:
+        if do_diversity and k > 1:
             cumul_samples_curr_round = np.array(cumul_samples[:upper_bound])
             samples_topk = cumul_samples_curr_round[idx_topk]
-            mean_diversity_topk = get_diversity(samples_topk)
+            mean_diversity_topk = get_diversity(samples_topk, task, substitution_matrix)
         # Append to lists
         energy.append(mean_energy_topk)
         cost.append(post_al_cum_cost[idx])
-        if get_diversity:
-            diversity.append(mean_diversity_topk.numpy())
-    if not get_diversity:
+        if do_diversity and k > 1:
+            diversity.append(mean_diversity_topk)
+    if not do_diversity or k == 1:
         diversity = [None for _ in range(len(energy))]
     return energy, cost, diversity
 
 
-def get_diversity(seqs):
-    sample_states1 = torch.tensor(seqs)
-    sample_states2 = sample_states1.clone()
-    dist_matrix = torch.cdist(sample_states1, sample_states2, p=2)
-    dist_upper_triangle = torch.triu(dist_matrix, diagonal=1)
-    dist_vector = dist_upper_triangle[dist_upper_triangle != 0]
-    return dist_vector
+def get_diversity(seqs, task=None, substitution_matrix=None):
+    if task == "dna":
+        seqs = [biotite_seq.NucleotideSequence(seq) for seq in seqs]
+        distances = []
+        for pair in itertools.combinations(seqs, 2):
+            alignment = align.align_optimal(
+                pair[0], pair[1], substitution_matrix, local=False, max_number=1
+            )[0]
+            distances.append(align.get_sequence_identity(alignment))
+    elif task == "amp":
+        seqs = [biotite_seq.ProteinSequence(seq) for seq in seqs]
+        distances = []
+        for pair in itertools.combinations(seqs, 2):
+            alignment = align.align_optimal(
+                pair[0], pair[1], substitution_matrix, local=False, max_number=1
+            )[0]
+            distances.append(align.get_sequence_identity(alignment))
+    else:
+        sample_states1 = torch.tensor(seqs)
+        sample_states2 = sample_states1.clone()
+        dist_matrix = torch.cdist(sample_states1, sample_states2, p=2)
+        dist_upper_triangle = torch.triu(dist_matrix, diagonal=1)
+        distances = dist_upper_triangle[dist_upper_triangle != 0]
+        distances = distances.numpy()
+    return np.mean(distances)
 
 
 def process_cost(df, config):

@@ -1,3 +1,4 @@
+task: hartmann
 input_csv: data/hartmann.csv
 output_dir: output
 output_csv: data/hartmann.csv
@@ -29,4 +30,4 @@ data:
     - 1
     - 10
   batch_size_al: 10
-  get_diversity: False
+  do_diversity: False
