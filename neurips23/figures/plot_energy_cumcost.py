@@ -162,50 +162,10 @@ def filter_novel_seqs(seqs, dataset_seqs, dist_func, novelty_thresh, substitutio
             novel_seqs.append(seq)
     return novel_seqs
 
-def get_diversity(seqs, task=None, thresh=None):
-    if task in ("amp", "dna"):
-        if thresh is None:
-            thresh = 0.7
+def get_diversity(seqs, novelty=False, dataset_seqs=None, task=None, novelty_thresh=None, cluster_thresh=None, dataset_format='smiles'):
+    if novelty:
+        assert dataset_seqs is not None
 
-        # process seqs
-        if task in "dna":
-            substitution_matrix = align.SubstitutionMatrix.std_nucleotide_matrix()
-            seqs = [biotite_seq.NucleotideSequence(seq) for seq in seqs]
-        else: # amp
-            substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
-            seqs = [biotite_seq.ProteinSequence(seq) for seq in seqs]
-
-        # get distance matrix
-        random.shuffle(seqs)
-        dist_mtx = get_biolseq_bulk_similarity(seqs, substitution_matrix, ret_square_mtx=True)
-
-        # get clusters
-        cluster_model = LeaderClustering(
-            max_radius=thresh,
-            sparse_dist=False,
-            precomputed_dist=True
-        )
-
-        cluster_labels = cluster_model.fit_predict(dist_mtx)
-        num_modes = len(np.unique(cluster_labels))
-
-    elif task == "molecules":
-        if thresh is None:
-            thresh = 0.65
-        smiles = [sf.decoder(seq) for seq in seqs]
-        mols = [Chem.MolFromSmiles(smi) for smi in smiles]
-        lp = rdSimDivPickers.LeaderPicker()
-        fps = [rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in mols]
-        picks = lp.LazyBitVectorPick(fps,
-                                     len(fps),
-                                     thresh)
-        num_modes = len(picks)
-    else: raise NotImplementedError
-
-    return num_modes
-
-
-def get_novelty(seqs, dataset_seqs, task=None, novelty_thresh=None, cluster_thresh=None, dataset_format='smiles'):
     if task in ("amp", "dna"):
         if cluster_thresh is None:
             cluster_thresh = 0.7
@@ -216,22 +176,25 @@ def get_novelty(seqs, dataset_seqs, task=None, novelty_thresh=None, cluster_thre
         if task in "dna":
             substitution_matrix = align.SubstitutionMatrix.std_nucleotide_matrix()
             seqs = [biotite_seq.NucleotideSequence(seq) for seq in seqs]
-            dataset_seqs = [biotite_seq.NucleotideSequence(seq) for seq in dataset_seqs]
+            if novelty:
+                dataset_seqs = [biotite_seq.NucleotideSequence(seq) for seq in dataset_seqs]
         else: # amp
             substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
             seqs = [biotite_seq.ProteinSequence(seq) for seq in seqs]
-            dataset_seqs = [biotite_seq.ProteinSequence(seq) for seq in dataset_seqs]
+            if novelty:
+                dataset_seqs = [biotite_seq.ProteinSequence(seq) for seq in dataset_seqs]
 
         # find novel seqs
-        novel_seqs = filter_novel_seqs(seqs,
-                                       dataset_seqs,
-                                       get_biolseq_pairwise_similarity,
-                                       novelty_thresh,
-                                       substitution_matrix)
+        if novelty:
+            seqs = filter_novel_seqs(seqs,
+                                           dataset_seqs,
+                                           get_biolseq_pairwise_similarity,
+                                           novelty_thresh,
+                                           substitution_matrix)
 
         # cluster the novel seqs
-        random.shuffle(novel_seqs)
-        dist_mtx = get_biolseq_bulk_similarity(novel_seqs, substitution_matrix)
+        random.shuffle(seqs)
+        dist_mtx = get_biolseq_bulk_similarity(seqs, substitution_matrix)
         cluster_model = LeaderClustering(
             max_radius=cluster_thresh,
             sparse_dist=False,
@@ -252,21 +215,22 @@ def get_novelty(seqs, dataset_seqs, task=None, novelty_thresh=None, cluster_thre
         mols = [Chem.MolFromSmiles(smi) for smi in smiles]
         fps = [rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in mols]
 
-        # process dataset mols
-        if dataset_format in 'smiles':
-            dataset_smiles = dataset_seqs
-        else:
-            dataset_smiles = [sf.decoder(seq) for seq in dataset_seqs]
-        dataset_mols = [Chem.MolFromSmiles(smi) for smi in dataset_smiles]
-        dataset_fps = [rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in dataset_mols]
+        if novelty:
+            # process dataset mols
+            if dataset_format in 'smiles':
+                dataset_smiles = dataset_seqs
+            else:
+                dataset_smiles = [sf.decoder(seq) for seq in dataset_seqs]
+            dataset_mols = [Chem.MolFromSmiles(smi) for smi in dataset_smiles]
+            dataset_fps = [rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in dataset_mols]
 
-        # find novel mols
-        novel_fps = filter_novel_seqs(fps, dataset_fps, DataStructs.TanimotoSimilarity, novelty_thresh)
+            # find novel mols
+            fps = filter_novel_seqs(fps, dataset_fps, DataStructs.TanimotoSimilarity, novelty_thresh)
 
         # do clustering
         lp = rdSimDivPickers.LeaderPicker()
-        picks = lp.LazyBitVectorPick(novel_fps,
-                                     len(novel_fps),
+        picks = lp.LazyBitVectorPick(fps,
+                                     len(fps),
                                      cluster_thresh)
         num_modes = len(picks)
     else: raise NotImplementedError
