@@ -24,6 +24,11 @@ regressor:
     num_inducing_points: 64
 
 logger:
+  resume: True 
+  logdir: 
+    root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-05-13_17-49-20
+    overwrite: False
+  run_id: jl95tmd1  
   project_name: "PPO-AMP"
   test:
     period: -1
@@ -68,8 +73,8 @@ gflownet:
     batch_size: 16
   ppo_num_epochs: 4
   ppo_epoch_size: 4
-  ppo_clip: 0.1
-  ppo_entropy_coef: 0.01
+  ppo_clip: 0.01
+  ppo_entropy_coef: 0.1
   policy:
     n_hid: 2048
     n_layers: 2
