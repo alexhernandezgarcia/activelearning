@@ -28,6 +28,8 @@ data:
      seeds:
        1:
          logdir: "2023-05-12_00-02-07"
+       2:
+         logdir: "2023-05-12_20-05-48"
    ppo:
      highlight: False
      dirname: "dna/ppo"

@@ -16,6 +16,33 @@ data:
          logdir: "2023-05-04_06-27-13"
        3:
          logdir: "2023-05-04_06-27-13"
+   mf_random:
+     highlight: False
+     dirname: "hartmann/gfn_random"
+     name: "Random samples and fidelities"
+     seeds:
+       1:
+         logdir: "2023-05-12_18-53-21"
+       2:
+         logdir: "2023-05-12_18-53-26"
+   mf_random_fid:
+     highlight: False
+     dirname: "hartmann/gfn_random_fid"
+     name: "GFlowNet random fidelities"
+     seeds:
+       1:
+         logdir: "2023-05-10_22-12-28"
+       2:
+         logdir: "2023-05-12_00-30-34"
+       3:
+         logdir: "2023-05-12_00-31-01"
+   ppo:
+     highlight: False
+     dirname: "hartmann/ppo"
+     name: "PPO"
+     seeds:
+       1:
+         logdir: "2023-05-13_18-46-10"
    mf:
      highlight: True
      dirname: "hartmann/gfn_mf"
