@@ -11,7 +11,7 @@ def plot_setup():
     sns.reset_orig()
 #     sns.set(style="whitegrid")
     plt.rcParams.update({"font.family": "serif"})
-    plt.rcParams.update({"font.size": "large"})
+    plt.rcParams.update({"font.size": 12})
     plt.rcParams.update(
         {
             "font.serif": [
