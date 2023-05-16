@@ -1,0 +1,43 @@
+task: molecules_ip
+input_csv: data/molecules_ip.csv
+output_dir: output
+output_csv: data/molecules_ip.csv
+output_filename: molecules_ip.pdf
+data:
+  methods:
+   sf:
+     highlight: False
+     dirname: "molecules_ip/gfn_sf"
+     name: "Single-fidelity (highest) AL"
+     seeds:
+       1:
+         logdir: "2023-05-11_20-52-32"
+   mf_random:
+     highlight: False
+     dirname: "molecules_ip/gfn_random"
+     name: "Random samples and fidelities"
+     seeds:
+       1:
+         logdir: "2023-05-12_19-41-52"
+       2:
+         logdir: "2023-05-12_19-59-50"
+       3:
+         logdir: "2023-05-12_19-59-53"
+   mf:
+     highlight: True
+     dirname: "molecules_ip/gfn_mf"
+     name: "MFAL GFlowNet"
+     seeds:
+       1:
+         logdir: "2023-05-12_06-42-28"
+  higherbetter: True
+  k:
+    - 1
+    - 50
+    - 100
+  batch_size_al: 128
+  do_diversity: False
+plot:
+    x_axis:
+        log: False
+
