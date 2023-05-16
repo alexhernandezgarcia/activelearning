@@ -95,6 +95,8 @@ def get_performance(
     rounds = np.arange(
         start=batch_size, stop=len(cumul_samples), step=batch_size, dtype=int
     )
+    # Catch cases where post_al_cum_cost has fewer values than number of rounds
+    rounds = rounds[:len(post_al_cum_cost)]
     energy = []
     cost = []
     diversity = []
