@@ -2,30 +2,30 @@
 This script plots the topK energy with respective to the cumulative cost.
 """
 import itertools
+import random
 import sys
 from pathlib import Path
-import random
-from diameter_clustering import LeaderClustering
-import selfies as sf
-from rdkit import Chem
-from rdkit.SimDivFilters import rdSimDivPickers
-from rdkit.Chem import rdMolDescriptors
-from rdkit import DataStructs
+
 import biotite.sequence as biotite_seq
 import biotite.sequence.align as align
 import hydra
+import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
-import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import selfies as sf
 import torch
 import wandb
 import yaml
+from diameter_clustering import LeaderClustering
 from hydra.utils import get_original_cwd, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
+from rdkit import Chem, DataStructs
+from rdkit.Chem import rdMolDescriptors
+from rdkit.SimDivFilters import rdSimDivPickers
 
 from utils import get_hue_palette, get_pkl, plot_setup
 
@@ -38,9 +38,30 @@ def build_dataframe(config):
     else:
         substitution_matrix = None
     df = pd.DataFrame(
-        columns=["method", "seed", "energy", "cost", "diversity", "round", "k"]
+        columns=[
+            "method",
+            "seed",
+            "energy",
+            "cost",
+            "diversity",
+            "n_modes",
+            "round",
+            "k",
+        ]
     )
     for method in config.io.data.methods:
+        if method == "sfgfn":
+            datadir = "sf"
+        else:
+            datadir = "mf"
+        train_data_f = (
+            Path(config.root_logdir)
+            / config.io.data.methods[method].dirname.split("/")[0]
+            / "dataset"
+            / datadir
+            / "data_train.csv"
+        )
+        df_tr = pd.read_csv(train_data_f)
         for seed in config.io.data.methods[method].seeds:
             for k in config.io.data.k:
                 logdir = (
@@ -49,12 +70,13 @@ def build_dataframe(config):
                     / config.io.data.methods[method].seeds[seed].logdir
                 )
                 runpath = get_wandb_runpath(logdir)
-                energy, cost, diversity = get_performance(
+                energy, cost, diversity, n_modes = get_performance(
                     logdir,
                     runpath,
                     k,
                     config.io.data.higherbetter,
                     config.io.data.batch_size_al,
+                    df_tr,
                     config.io.data.do_diversity,
                     config.io.task,
                     substitution_matrix,
@@ -67,6 +89,7 @@ def build_dataframe(config):
                         "energy": energy,
                         "cost": cost,
                         "diversity": diversity,
+                        "n_modes": n_modes,
                         "round": np.arange(len(energy)),
                         "k": [k for _ in range(n_rounds)],
                     }
@@ -83,6 +106,7 @@ def get_performance(
     k,
     higherbetter,
     batch_size,
+    train_data,
     do_diversity=False,
     task=None,
     substitution_matrix=None,
@@ -102,10 +126,11 @@ def get_performance(
         start=batch_size, stop=len(cumul_samples), step=batch_size, dtype=int
     )
     # Catch cases where post_al_cum_cost has fewer values than number of rounds
-    rounds = rounds[:len(post_al_cum_cost)]
+    rounds = rounds[: len(post_al_cum_cost)]
     energy = []
     cost = []
     diversity = []
+    n_modes = []
     for idx, upper_bound in enumerate(rounds):
         # Compute mean topk energy up to current round
         cumul_sampled_energies_curr_round = cumul_energies[:upper_bound].cpu().numpy()
@@ -120,26 +145,42 @@ def get_performance(
             cumul_samples_curr_round = np.array(cumul_samples[:upper_bound])
             samples_topk = cumul_samples_curr_round[idx_topk]
             mean_diversity_topk = get_diversity(samples_topk, task, substitution_matrix)
+            try:
+                n_modes_topk = get_n_modes(
+                    samples_topk,
+                    task,
+                    substitution_matrix,
+                    novelty=True,
+                    dataset_seqs=train_data.samples.values,
+                )
+            except:
+                n_modes_topk = None
         # Append to lists
         energy.append(mean_energy_topk)
         cost.append(post_al_cum_cost[idx])
         if do_diversity and k > 1:
             diversity.append(mean_diversity_topk)
+            n_modes.append(n_modes_topk)
     if not do_diversity or k == 1:
         diversity = [None for _ in range(len(energy))]
-    return energy, cost, diversity
+        n_modes = [None for _ in range(len(energy))]
+    return energy, cost, diversity, n_modes
 
 
 def get_biolseq_pairwise_similarity(seq_i, seq_j, substitution_matrix):
-    alignment = align.align_optimal(seq_i, seq_j, substitution_matrix, local=False, max_number=1)[0]
+    alignment = align.align_optimal(
+        seq_i, seq_j, substitution_matrix, local=False, max_number=1
+    )[0]
     return align.get_sequence_identity(alignment)
 
 
 def get_biolseq_bulk_similarity(seqs, substitution_matrix, ret_square_mtx=True):
     distances = [] if not ret_square_mtx else np.empty((len(seqs), len(seqs)))
     for i in range(len(seqs)):
-        for j in range(i+1, len(seqs)):
-            dist = get_biolseq_pairwise_similarity(seqs[i], seqs[j], substitution_matrix)
+        for j in range(i + 1, len(seqs)):
+            dist = get_biolseq_pairwise_similarity(
+                seqs[i], seqs[j], substitution_matrix
+            )
             if ret_square_mtx:
                 distances[i, j] = dist
                 distances[j, i] = dist
@@ -148,7 +189,9 @@ def get_biolseq_bulk_similarity(seqs, substitution_matrix, ret_square_mtx=True):
     return distances
 
 
-def filter_novel_seqs(seqs, dataset_seqs, dist_func, novelty_thresh, substitution_matrix=None):
+def filter_novel_seqs(
+    seqs, dataset_seqs, dist_func, novelty_thresh, substitution_matrix=None
+):
     novel_seqs = []
     for seq in seqs:
         dists = []
@@ -162,7 +205,17 @@ def filter_novel_seqs(seqs, dataset_seqs, dist_func, novelty_thresh, substitutio
             novel_seqs.append(seq)
     return novel_seqs
 
-def get_diversity(seqs, novelty=False, dataset_seqs=None, task=None, novelty_thresh=None, cluster_thresh=None, dataset_format='smiles'):
+
+def get_n_modes(
+    seqs,
+    task=None,
+    substitution_matrix=None,
+    novelty=False,
+    dataset_seqs=None,
+    novelty_thresh=None,
+    cluster_thresh=None,
+    dataset_format="smiles",
+):
     if novelty:
         assert dataset_seqs is not None
 
@@ -170,74 +223,86 @@ def get_diversity(seqs, novelty=False, dataset_seqs=None, task=None, novelty_thr
         if cluster_thresh is None:
             cluster_thresh = 0.7
         if novelty_thresh is None:
-            novelty_thresh = 1-cluster_thresh
+            novelty_thresh = 1 - cluster_thresh
 
         # process generated seqs and dataset seqs
         if task in "dna":
-            substitution_matrix = align.SubstitutionMatrix.std_nucleotide_matrix()
             seqs = [biotite_seq.NucleotideSequence(seq) for seq in seqs]
             if novelty:
-                dataset_seqs = [biotite_seq.NucleotideSequence(seq) for seq in dataset_seqs]
-        else: # amp
-            substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
+                dataset_seqs = [
+                    biotite_seq.NucleotideSequence(seq) for seq in dataset_seqs
+                ]
+        else:  # amp
             seqs = [biotite_seq.ProteinSequence(seq) for seq in seqs]
             if novelty:
-                dataset_seqs = [biotite_seq.ProteinSequence(seq) for seq in dataset_seqs]
+                dataset_seqs = [
+                    biotite_seq.ProteinSequence(seq) for seq in dataset_seqs
+                ]
 
         # find novel seqs
         if novelty:
-            seqs = filter_novel_seqs(seqs,
-                                           dataset_seqs,
-                                           get_biolseq_pairwise_similarity,
-                                           novelty_thresh,
-                                           substitution_matrix)
+            seqs = filter_novel_seqs(
+                seqs,
+                dataset_seqs,
+                get_biolseq_pairwise_similarity,
+                novelty_thresh,
+                substitution_matrix,
+            )
 
         # cluster the novel seqs
-        random.shuffle(seqs)
-        dist_mtx = get_biolseq_bulk_similarity(seqs, substitution_matrix)
-        cluster_model = LeaderClustering(
-            max_radius=cluster_thresh,
-            sparse_dist=False,
-            precomputed_dist=True
-        )
+        if len(seqs) > 0:
+            random.shuffle(seqs)
+            dist_mtx = get_biolseq_bulk_similarity(seqs, substitution_matrix)
+            cluster_model = LeaderClustering(
+                max_radius=cluster_thresh, sparse_dist=False, precomputed_dist=True
+            )
 
-        cluster_labels = cluster_model.fit_predict(dist_mtx)
-        num_modes = len(np.unique(cluster_labels))
+            cluster_labels = cluster_model.fit_predict(dist_mtx)
+            num_modes = len(np.unique(cluster_labels))
+        else:
+            num_modes = 0
 
     elif task == "molecules":
         if cluster_thresh is None:
             cluster_thresh = 0.65
         if novelty_thresh is None:
-            novelty_thresh = 1-cluster_thresh
+            novelty_thresh = 1 - cluster_thresh
 
         # process generated mols
         smiles = [sf.decoder(seq) for seq in seqs]
         mols = [Chem.MolFromSmiles(smi) for smi in smiles]
-        fps = [rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in mols]
+        fps = [
+            rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in mols
+        ]
 
         if novelty:
             # process dataset mols
-            if dataset_format in 'smiles':
+            if dataset_format in "smiles":
                 dataset_smiles = dataset_seqs
             else:
                 dataset_smiles = [sf.decoder(seq) for seq in dataset_seqs]
             dataset_mols = [Chem.MolFromSmiles(smi) for smi in dataset_smiles]
-            dataset_fps = [rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in dataset_mols]
+            dataset_fps = [
+                rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048)
+                for mol in dataset_mols
+            ]
 
             # find novel mols
-            fps = filter_novel_seqs(fps, dataset_fps, DataStructs.TanimotoSimilarity, novelty_thresh)
+            fps = filter_novel_seqs(
+                fps, dataset_fps, DataStructs.TanimotoSimilarity, novelty_thresh
+            )
 
         # do clustering
         lp = rdSimDivPickers.LeaderPicker()
-        picks = lp.LazyBitVectorPick(fps,
-                                     len(fps),
-                                     cluster_thresh)
+        picks = lp.LazyBitVectorPick(fps, len(fps), cluster_thresh)
         num_modes = len(picks)
-    else: raise NotImplementedError
+    else:
+        raise NotImplementedError
 
     return num_modes
 
-def prev_get_diversity(seqs, task=None, substitution_matrix=None):
+
+def get_diversity(seqs, task=None, substitution_matrix=None):
     if task == "dna":
         seqs = [biotite_seq.NucleotideSequence(seq) for seq in seqs]
         distances = []
@@ -312,7 +377,7 @@ def process_highlights(df, config):
 def process_diversity(df, config):
     min_diversity = df.diversity.min()
     max_diversity = df.diversity.max()
-    df.diversity = 1.0 / df.diversity 
+    df.diversity = 1.0 / df.diversity
     return df
 
 
@@ -396,20 +461,20 @@ def plot(df, config):
             x="cost",
             y="energy",
             hue="diversity",
-#             sizes=(10.0, 100.0),
+            #             sizes=(10.0, 100.0),
             palette="gist_gray",
             zorder=10,
         )
-#         sns.scatterplot(
-#             ax=ax,
-#             data=df_means.loc[df_means.k == k_plot],
-#             x="cost",
-#             y="energy",
-#             hue="method",
-#             size="diversity",
-#             sizes=(10.0, 100.0),
-#             palette=palette,
-#         )
+    #         sns.scatterplot(
+    #             ax=ax,
+    #             data=df_means.loc[df_means.k == k_plot],
+    #             x="cost",
+    #             y="energy",
+    #             hue="method",
+    #             size="diversity",
+    #             sizes=(10.0, 100.0),
+    #             palette=palette,
+    #         )
     #         sns.lineplot(
     #             ax=ax,
     #             data=df.loc[df.k == k_plot],
@@ -516,7 +581,7 @@ def main(config):
         df = build_dataframe(config)
     df = process_cost(df, config)
     df = process_highlights(df, config)
-#     df = process_diversity(df, config)
+    #     df = process_diversity(df, config)
     # Plot
     fig = plot(df, config)
     # Save figure
