@@ -24,36 +24,50 @@ plot:
             palette: colorblind
             palette_idx: 0
             name: "MF-GFlowNet"
+            dash: solid
+            linewidth: 3
         mfgfn_linear:
             palette: colorblind
             palette_idx: 0
             name: "MF-GFlowNet (GP Linear)"
+            dash: solid
+            linewidth: 3
         mfgfn_index:
             palette: colorblind
             palette_idx: 9
             name: "MF-GFlowNet (GP Index)"
+            dash: solid
+            linewidth: 3
         mf_random:
             palette: colorblind
-            palette_idx: 3
+            palette_idx: 4
             name: "Random"
+            dash: loosely dashed
+            linewidth: 2
         random_fid_gfn:
             palette: colorblind
-            palette_idx: 1
-            name: "Random fidelities GFlowNet"
+            palette_idx: 5
+            name: "Random fid. GFlowNet"
+            dash: dashed
+            linewidth: 2
         sfgfn:
             palette: colorblind
             palette_idx: 2
             name: "SF-GFlowNet"
+            dash: dotted
+            linewidth: 2
         mfppo:
             palette: colorblind
-            palette_idx: 4
+            palette_idx: 3
             name: "MF-PPO"
+            dash: loosely dotted
+            linewidth: 2
     x_axis:
         log: True
         type: "fraction_budget"
         label: "Fraction of total budget"
     do_all_k: False
-    do_line_top1: True
+    do_line_top1: False
     linewidth:
-        highlight: 3
-        other: 2
+        highlight: 2
+        other: 1

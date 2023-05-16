@@ -9,9 +9,9 @@ from omegaconf.listconfig import ListConfig
 
 def plot_setup():
     sns.reset_orig()
-#     sns.set(style="whitegrid")
+    #     sns.set(style="whitegrid")
     plt.rcParams.update({"font.family": "serif"})
-    plt.rcParams.update({"font.size": 12})
+    plt.rcParams.update({"font.size": 16})
     plt.rcParams.update(
         {
             "font.serif": [
@@ -32,6 +32,17 @@ def plot_setup():
     )
 
 
+def get_dash(code):
+    linestyle_tuple = {
+        "solid": (1, 0),
+        "dotted": (1, 1),
+        "dashed": (2, 1),
+        "loosely dotted": (1, 2),
+        "loosely dashed": (2, 2),
+    }
+    return linestyle_tuple[code]
+
+
 def get_hue_palette(palette, n_hues):
     if isinstance(palette, list) or isinstance(palette, ListConfig):
         palettes = [
@@ -43,9 +54,10 @@ def get_hue_palette(palette, n_hues):
     else:
         return sns.color_palette(palette, as_cmap=False, n_colors=n_hue)
 
+
 def get_pkl(directory):
     for root, dirs, files in os.walk(directory):
         for file in files:
-            if file.endswith('.pkl'):
+            if file.endswith(".pkl"):
                 return os.path.join(root, file)
     return None

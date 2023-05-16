@@ -21,7 +21,7 @@ import yaml
 from hydra.utils import get_original_cwd, to_absolute_path
 from omegaconf import DictConfig, OmegaConf
 
-from utils import get_hue_palette, get_pkl, plot_setup
+from utils import get_hue_palette, get_pkl, plot_setup, get_dash
 
 
 def build_dataframe(config):
@@ -150,6 +150,8 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
         distances = distances.numpy()
     return np.mean(distances)
 
+def process_methods(df, config):
+    return df.loc[df.method.isin(config.io.do_methods)]
 
 def process_cost(df, config):
     for method in df.method.unique():
@@ -181,7 +183,10 @@ def process_cost(df, config):
                         (df.method == method) & (df.k == k) & (df.seed == seed), "cost"
                     ] = costs_dict[seed]
     if config.plot.x_axis.type == "fraction_budget":
-        df.cost = df.cost / df.cost.max()
+        if "sfgfn" in df.method.unique():
+            df.cost = df.cost / df.loc[df.method == "sfgfn"].cost.max()
+        else:
+            df.cost = df.cost / df.cost.max()
     return df
 
 
@@ -226,6 +231,18 @@ def make_palette(config):
         )
     return palette
 
+def make_dashes(config):
+    dashes = {}
+    for method in config.plot.methods:
+        dashes.update({method: get_dash(config.plot.methods[method].dash)})
+    return dashes
+
+def make_linewidths(config):
+    linewidths = {}
+    for method in config.plot.methods:
+        linewidths.update({method: config.plot.methods[method].linewidth})
+    return linewidths
+
 
 def plot(df, config):
     if config.io.data.higherbetter:
@@ -242,6 +259,8 @@ def plot(df, config):
     )
 
     palette = make_palette(config)
+    dashes = make_dashes(config)
+    linewidths = make_linewidths(config)
 
     # Plot
     if config.plot.do_all_k:
@@ -266,10 +285,14 @@ def plot(df, config):
             x="cost",
             y="energy",
             hue="method",
-            size="linewidth",
+            style="method",
+            size="method",
             estimator=config.plot.estimator,
             markers=config.plot.do_markers,
+            dashes=dashes,
+            sizes=linewidths,
             palette=palette,
+            zorder=9,
         )
         leg_handles_def, leg_labels_def = ax.get_legend_handles_labels()
         # Scatter plot of diversity
@@ -401,6 +424,7 @@ def main(config):
         df = pd.read_csv(config.io.input_csv, index_col="index")
     else:
         df = build_dataframe(config)
+    df = process_methods(df, config)
     df = process_cost(df, config)
     df = process_highlights(df, config)
 #     df = process_diversity(df, config)

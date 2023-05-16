@@ -3,6 +3,12 @@ input_csv: data/dna.csv
 output_dir: output
 output_csv: data/dna.csv
 output_filename: dna.pdf
+do_methods:
+    - sfgfn
+    - mf_random
+    - random_fid_gfn
+    - mfppo
+    - mfgfn
 data:
   methods:
    sfgfn:

@@ -3,6 +3,11 @@ input_csv: data/hartmann.csv
 output_dir: output
 output_csv: data/hartmann.csv
 output_filename: hartmann.pdf
+do_methods:
+    - sfgfn
+    - random_fid_gfn
+    - mfppo
+    - mfgfn
 data:
   methods:
    sfgfn:

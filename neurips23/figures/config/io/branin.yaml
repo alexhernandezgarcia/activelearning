@@ -3,6 +3,10 @@ input_csv: data/branin.csv
 output_dir: output
 output_csv: data/branin.csv
 output_filename: branin.pdf
+do_methods:
+    - sfgfn
+    - random_fid_gfn
+    - mfgfn
 data:
   methods:
    sfgfn:
