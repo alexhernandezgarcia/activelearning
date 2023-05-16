@@ -6,6 +6,7 @@ output_filename: hartmann.pdf
 data:
   methods:
    sf:
+     highlight: False
      dirname: "hartmann/gfn_sf"
      name: "Single-fidelity (highest) AL"
      seeds:
@@ -16,6 +17,7 @@ data:
        3:
          logdir: "2023-05-04_06-27-13"
    mf:
+     highlight: True
      dirname: "hartmann/gfn_mf"
      name: "Multi-fidelity AL"
      seeds:

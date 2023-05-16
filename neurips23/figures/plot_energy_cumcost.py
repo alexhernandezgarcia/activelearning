@@ -11,6 +11,7 @@ import hydra
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
+import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -149,8 +150,54 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
 
 
 def process_cost(df, config):
+    for method in df.method.unique():
+        for k in df.k.unique():
+            df_aux = df.loc[(df.method == method) & (df.k == k)]
+            if len(df_aux.seed.unique()) > 1:
+                costs_dict = {}
+                for seed in df_aux.seed.unique():
+                    costs_dict.update(
+                        {seed: df_aux.loc[df_aux.seed == seed, "cost"].values}
+                    )
+                max_lengths = np.sort([len(c) for c in costs_dict.values()])
+                idx_from = 0
+                for idx_to in max_lengths:
+                    costs_lists = [
+                        c[idx_from:idx_to]
+                        for c in costs_dict.values()
+                        if len(c) > idx_from
+                    ]
+                    if len(costs_lists) <= 1:
+                        break
+                    costs_mean = np.mean(np.stack(costs_lists, axis=1), axis=1)
+                    for seed, vec in costs_dict.items():
+                        if len(vec) > idx_from:
+                            costs_dict[seed][idx_from:idx_to] = costs_mean
+                    idx_from = idx_to
+                for seed in df_aux.seed.unique():
+                    df.loc[
+                        (df.method == method) & (df.k == k) & (df.seed == seed), "cost"
+                    ] = costs_dict[seed]
     if config.plot.x_axis.type == "fraction_budget":
         df.cost = df.cost / df.cost.max()
+    return df
+
+
+def process_highlights(df, config):
+    df["linewidth"] = np.ones(len(df))
+    for method in config.io.data.methods:
+        if config.io.data.methods[method].highlight:
+            linewidth = config.plot.linewidth.highlight
+        else:
+            linewidth = config.plot.linewidth.other
+        df.loc[df.method == method, "linewidth"] = linewidth
+    return df
+
+
+def process_diversity(df, config):
+    min_diversity = df.diversity.min()
+    max_diversity = df.diversity.max()
+    df.diversity = 1.0 / df.diversity 
     return df
 
 
@@ -165,57 +212,167 @@ def get_wandb_runpath(logdir):
     return runpath
 
 
+def make_palette(config):
+    palette = {}
+    for method in config.plot.colors:
+        palette.update(
+            {
+                method: sns.color_palette(
+                    config.plot.colors[method].palette, as_cmap=False, n_colors=9
+                )[config.plot.colors[method].index]
+            }
+        )
+    return palette
+
+
 def plot(df, config):
+    if config.io.data.higherbetter:
+        opt = "Max."
+        better = "higher"
+    else:
+        opt = "Min."
+        better = "lower"
+
     plot_setup()
 
     fig, ax = plt.subplots(
         figsize=(config.plot.width, config.plot.height), dpi=config.plot.dpi
     )
 
+    palette = make_palette(config)
+
     # Plot
-    sns.lineplot(
-        ax=ax,
-        data=df,
-        x="cost",
-        y="energy",
-        hue="method",
-        style="k",
-        estimator=config.plot.estimator,
-        markers=config.plot.do_markers,
-    )
+    if config.plot.do_all_k:
+        k_plot = "K"
+        sns.lineplot(
+            ax=ax,
+            data=df,
+            x="cost",
+            y="energy",
+            hue="method",
+            style="k",
+            estimator=config.plot.estimator,
+            markers=config.plot.do_markers,
+            palette=palette,
+        )
+        leg_handles_def, leg_labels_def = ax.get_legend_handles_labels()
+    else:
+        k_plot = df.k.max()
+        sns.lineplot(
+            ax=ax,
+            data=df.loc[df.k == k_plot],
+            x="cost",
+            y="energy",
+            hue="method",
+            size="linewidth",
+            estimator=config.plot.estimator,
+            markers=config.plot.do_markers,
+            palette=palette,
+        )
+        leg_handles_def, leg_labels_def = ax.get_legend_handles_labels()
+        # Scatter plot of diversity
+        df_means = df.groupby(
+            ["round", "method", "k"], group_keys=False, as_index=False
+        ).mean()
+        gray_palette = mcolors.Colormap("Grays")
+        sns.scatterplot(
+            ax=ax,
+            data=df_means.loc[df_means.k == k_plot],
+            x="cost",
+            y="energy",
+            hue="diversity",
+#             sizes=(10.0, 100.0),
+            palette="gist_gray",
+            zorder=10,
+        )
+#         sns.scatterplot(
+#             ax=ax,
+#             data=df_means.loc[df_means.k == k_plot],
+#             x="cost",
+#             y="energy",
+#             hue="method",
+#             size="diversity",
+#             sizes=(10.0, 100.0),
+#             palette=palette,
+#         )
+    #         sns.lineplot(
+    #             ax=ax,
+    #             data=df.loc[df.k == k_plot],
+    #             x="cost",
+    #             y="energy",
+    #             hue="method",
+    #             style="method",
+    #             estimator=config.plot.estimator,
+    #             markers=True,
+    #         )
+    #         sns.lineplot(
+    #             ax=ax,
+    #             data=df.loc[df.k == 1],
+    #             x="cost",
+    #             y="energy",
+    #             hue="method",
+    #             size=0.0,
+    #             markers=config.plot.do_markers,
+    #             err_style="bars"
+    #         )
+
+    # Change spines
+    # sns.despine(ax=ax, left=True, bottom=True)
+    ax.spines[["right", "top", "bottom"]].set_visible(False)
 
     # Set X-axis scale and label
+    min_x = df.cost.min()
     if config.plot.x_axis.log:
         ax.set_xscale("log")
         ax.set_xlabel(config.plot.x_axis.label + " (log)")
+        ax.set_xlim([min_x, 1.0])
     else:
         ax.set_xlabel(config.plot.x_axis.label)
+        ax.set_xlim([min_x, 1.0])
 
-    # Set X-label
+    # Draw line at H0
+    if config.plot.do_line_top1:
+        step = 0.1
+        x = np.arange(ax.get_xlim()[0], ax.get_xlim()[1] + step, step)
+        if config.io.data.higherbetter:
+            y = df.loc[df.k == 1, "energy"].max() * np.ones(x.shape[0])
+        else:
+            y = df.loc[df.k == 1, "energy"].min() * np.ones(x.shape[0])
+        ax.plot(x, y, linestyle=":", linewidth=2.0, color="black", zorder=1)
+        ax.annotate(
+            f" {opt} energy reached",
+            xy=(ax.get_xlim()[0], y[0]),
+            xytext=(ax.get_xlim()[0], y[0]),
+            horizontalalignment="left",
+            verticalalignment="bottom",
+            fontsize="small",
+        )
+
     # Set Y-label
-    if config.io.data.higherbetter:
-        better = "higher"
-    else:
-        better = "lower"
-    ax.set_ylabel(f"Mean Top-K energy ({better} is better)")
+    ax.set_ylabel(f"Mean Top-{k_plot} energy ({better} is better)")
+
+    # Remove ticks
+    ax.tick_params(axis="both", which="both", length=0)
+
+    # Grid
+    ax.grid(which="both")
 
     # Legend
-    #     leg_handles, leg_labels = ax.get_legend_handles_labels()
-    #     import ipdb; ipdb.set_trace()
-    #     leg_labels = [
-    #         config.io.data.methods[method].name for method in config.io.data.methods
-    #     ]
-    #     leg = ax.legend(
-    #         handles=leg_handles,
-    #         labels=leg_labels,
-    #         loc="best",
-    #         title="",
-    #         framealpha=1.0,
-    #         frameon=True,
-    #     )
+    if not config.plot.do_all_k:
+        leg_handles, leg_labels = [], []
+        for handle, label in zip(leg_handles_def, leg_labels_def):
+            if label in config.io.data.methods:
+                leg_handles.append(handle)
+                leg_labels.append(config.io.data.methods[label].name)
 
-    # Change spines
-    sns.despine(ax=ax, left=True, bottom=True)
+        leg = ax.legend(
+            handles=leg_handles,
+            labels=leg_labels,
+            loc="best",
+            title="",
+            framealpha=1.0,
+            frameon=True,
+        )
 
     return fig
 
@@ -243,6 +400,8 @@ def main(config):
     else:
         df = build_dataframe(config)
     df = process_cost(df, config)
+    df = process_highlights(df, config)
+#     df = process_diversity(df, config)
     # Plot
     fig = plot(df, config)
     # Save figure

@@ -9,7 +9,7 @@ from omegaconf.listconfig import ListConfig
 
 def plot_setup():
     sns.reset_orig()
-    sns.set(style="whitegrid")
+#     sns.set(style="whitegrid")
     plt.rcParams.update({"font.family": "serif"})
     plt.rcParams.update(
         {

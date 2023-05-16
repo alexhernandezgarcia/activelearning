@@ -6,6 +6,7 @@ output_filename: branin.pdf
 data:
   methods:
    sf:
+     highlight: False
      dirname: "branin/gfn_sf"
      name: "Single-fidelity (highest) AL"
      seeds:
@@ -22,6 +23,7 @@ data:
 #      6:
 #        logdir: "2023-05-03_18-49-33"
    mf:
+     highlight: True
      dirname: "branin/gfn_mf"
      name: "Multi-fidelity AL"
      seeds:

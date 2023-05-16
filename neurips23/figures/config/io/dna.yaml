@@ -6,12 +6,14 @@ output_filename: dna.pdf
 data:
   methods:
    sf:
+     highlight: False
      dirname: "dna/gfn_sf"
      name: "Single-fidelity (highest) AL"
      seeds:
        1:
          logdir: "2023-05-06_11-38-43"
    mf_random:
+     highlight: False
      dirname: "dna/gfn_random"
      name: "Random samples and fidelities"
      seeds:
@@ -20,24 +22,28 @@ data:
        2:
          logdir: "2023-05-12_19-23-46"
    mf_random_fid:
+     highlight: False
      dirname: "dna/gfn_random_fid"
      name: "GFlowNet random fidelities"
      seeds:
        1:
          logdir: "2023-05-12_00-02-07"
    ppo:
+     highlight: False
      dirname: "dna/ppo"
      name: "PPO"
      seeds:
        1:
          logdir: "2023-05-13_15-42-49"
    mf_linear:
+     highlight: True
      dirname: "dna/gfn_linear_kernel"
      name: "MF GFlowNet (GP Linear)"
      seeds:
        1:
          logdir: "2023-05-06_04-35-33"
    mf_index:
+     highlight: True
      dirname: "dna/gfn_index_kernel"
      name: "MF GFlowNet (GP Index)"
      seeds:
@@ -50,4 +56,7 @@ data:
     - 100
   batch_size_al: 512
   do_diversity: True
+plot:
+    x_axis:
+        log: False
 

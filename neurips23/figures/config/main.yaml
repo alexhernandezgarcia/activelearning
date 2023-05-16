@@ -20,13 +20,33 @@ plot:
         - "o"
         - "o"
     colors:
-        hue:
-            palette: mako
-        models:
-            palette: vlag
-        methods_family:
-            palette: deep
+        mf:
+            palette: colorblind
+            index: 0
+        mf_index:
+            palette: colorblind
+            index: 0
+        mf_linear:
+            palette: colorblind
+            index: 1
+        mf_random:
+            palette: colorblind
+            index: 2
+        mf_random_fid:
+            palette: colorblind
+            index: 3
+        sf:
+            palette: colorblind
+            index: 4
+        ppo:
+            palette: colorblind
+            index: 5
     x_axis:
         log: True
         type: "fraction_budget"
         label: "Fraction of total budget"
+    do_all_k: False
+    do_line_top1: True
+    linewidth:
+        highlight: 3
+        other: 2

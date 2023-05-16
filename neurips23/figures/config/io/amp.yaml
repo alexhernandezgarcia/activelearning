@@ -6,12 +6,14 @@ output_filename: amp.pdf
 data:
   methods:
    sf:
+     highlight: False
      dirname: "amp/gfn_sf"
      name: "Single-fidelity (highest) AL"
      seeds:
        1:
          logdir: "2023-05-03_11-56-45"
    mf_random:
+     highlight: False
      dirname: "amp/gfn_random"
      name: "Random samples and fidelities"
      seeds:
@@ -22,6 +24,7 @@ data:
        3:
          logdir: "2023-05-12_19-14-32"
    mf_index:
+     highlight: True
      dirname: "amp/gfn_index_kernel"
      name: "MF GFlowNet (GP Index)"
      seeds:
@@ -34,4 +37,7 @@ data:
     - 50
   batch_size_al: 32
   do_diversity: True
+plot:
+    x_axis:
+        log: False
 
