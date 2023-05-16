@@ -5,17 +5,15 @@ output_csv: data/molecules_ip.csv
 output_filename: molecules_ip.pdf
 data:
   methods:
-   sf:
+   sfgfn:
      highlight: False
      dirname: "molecules_ip/gfn_sf"
-     name: "Single-fidelity (highest) AL"
      seeds:
        1:
          logdir: "2023-05-11_20-52-32"
    mf_random:
      highlight: False
      dirname: "molecules_ip/gfn_random"
-     name: "Random samples and fidelities"
      seeds:
        1:
          logdir: "2023-05-12_19-41-52"
@@ -23,14 +21,13 @@ data:
          logdir: "2023-05-12_19-59-50"
        3:
          logdir: "2023-05-12_19-59-53"
-   mf:
+   mfgfn:
      highlight: True
      dirname: "molecules_ip/gfn_mf"
-     name: "MFAL GFlowNet"
      seeds:
        1:
          logdir: "2023-05-12_06-42-28"
-  higherbetter: True
+  higherbetter: False
   k:
     - 1
     - 50

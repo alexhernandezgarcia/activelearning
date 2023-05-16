@@ -5,10 +5,9 @@ output_csv: data/branin.csv
 output_filename: branin.pdf
 data:
   methods:
-   sf:
+   sfgfn:
      highlight: False
      dirname: "branin/gfn_sf"
-     name: "Single-fidelity (highest) AL"
      seeds:
        1:
          logdir: "2023-05-06_18-52-02"
@@ -25,7 +24,6 @@ data:
    mf_random:
      highlight: False
      dirname: "branin/gfn_random"
-     name: "Random samples and fidelities"
      seeds:
        1:
          logdir: "2023-05-12_18-59-13"
@@ -33,10 +31,9 @@ data:
          logdir: "2023-05-12_18-59-22"
        3:
          logdir: "2023-05-12_18-59-27"
-   mf_random_fid:
+   random_fid_gfn:
      highlight: False
      dirname: "branin/gfn_random_fid"
-     name: "GFlowNet random fidelities"
      seeds:
        1:
          logdir: "2023-05-10_22-09-29"
@@ -44,10 +41,9 @@ data:
          logdir: "2023-05-12_00-34-40"
        3:
          logdir: "2023-05-12_00-37-03"
-   mf:
+   mfgfn:
      highlight: True
      dirname: "branin/gfn_mf"
-     name: "Multi-fidelity AL"
      seeds:
        1:
          logdir: "2023-05-04_22-24-48"

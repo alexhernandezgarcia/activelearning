@@ -5,52 +5,53 @@ output_csv: data/dna.csv
 output_filename: dna.pdf
 data:
   methods:
-   sf:
+   sfgfn:
      highlight: False
      dirname: "dna/gfn_sf"
-     name: "Single-fidelity (highest) AL"
      seeds:
        1:
          logdir: "2023-05-06_11-38-43"
    mf_random:
      highlight: False
      dirname: "dna/gfn_random"
-     name: "Random samples and fidelities"
      seeds:
        1:
          logdir: "2023-05-12_19-17-41"
        2:
          logdir: "2023-05-12_19-23-46"
-   mf_random_fid:
+   random_fid_gfn:
      highlight: False
      dirname: "dna/gfn_random_fid"
-     name: "GFlowNet random fidelities"
      seeds:
        1:
          logdir: "2023-05-12_00-02-07"
        2:
          logdir: "2023-05-12_20-05-48"
-   ppo:
+   mfppo:
      highlight: False
      dirname: "dna/ppo"
-     name: "PPO"
      seeds:
        1:
          logdir: "2023-05-13_15-42-49"
-   mf_linear:
+   mfgfn:
      highlight: True
      dirname: "dna/gfn_linear_kernel"
-     name: "MF GFlowNet (GP Linear)"
+     name: "MF-GFlowNet"
      seeds:
        1:
          logdir: "2023-05-06_04-35-33"
-   mf_index:
-     highlight: True
-     dirname: "dna/gfn_index_kernel"
-     name: "MF GFlowNet (GP Index)"
-     seeds:
-       1:
-         logdir: "2023-05-05_14-26-31"
+#    mf_linear:
+#      highlight: True
+#      dirname: "dna/gfn_linear_kernel"
+#      seeds:
+#        1:
+#          logdir: "2023-05-06_04-35-33"
+#    mf_index:
+#      highlight: True
+#      dirname: "dna/gfn_index_kernel"
+#      seeds:
+#        1:
+#          logdir: "2023-05-05_14-26-31"
   higherbetter: False
   k:
     - 1

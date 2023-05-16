@@ -216,12 +216,12 @@ def get_wandb_runpath(logdir):
 
 def make_palette(config):
     palette = {}
-    for method in config.plot.colors:
+    for method in config.plot.methods:
         palette.update(
             {
                 method: sns.color_palette(
-                    config.plot.colors[method].palette, as_cmap=False, n_colors=9
-                )[config.plot.colors[method].index]
+                    config.plot.methods[method].palette, as_cmap=False, n_colors=10
+                )[config.plot.methods[method].palette_idx]
             }
         )
     return palette
@@ -365,7 +365,7 @@ def plot(df, config):
         for handle, label in zip(leg_handles_def, leg_labels_def):
             if label in config.io.data.methods:
                 leg_handles.append(handle)
-                leg_labels.append(config.io.data.methods[label].name)
+                leg_labels.append(config.plot.methods[label].name)
 
         leg = ax.legend(
             handles=leg_handles,
