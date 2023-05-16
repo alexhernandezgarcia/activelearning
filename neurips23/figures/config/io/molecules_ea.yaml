@@ -21,6 +21,25 @@ data:
          logdir: "2023-05-12_18-28-50"
        3:
          logdir: "2023-05-13_05-36-10"
+   random_fid_gfn:
+     highlight: False
+     dirname: "molecules_ea/gfn_random_fid"
+     seeds:
+       1:
+         logdir: "2023-05-12_20-17-51"
+   mfppo:
+     highlight: False
+     dirname: "molecules_ea/ppo"
+     seeds:
+       1:
+         logdir: "2023-05-14_15-56-25"
+   mfgfn:
+     highlight: True
+     dirname: "molecules_ea/gfn_mf"
+     name: "MF-GFlowNet"
+     seeds:
+       1:
+         logdir: "2023-05-12_01-42-34"
   higherbetter: True
   k:
     - 1

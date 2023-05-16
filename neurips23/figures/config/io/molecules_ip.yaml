@@ -21,12 +21,24 @@ data:
          logdir: "2023-05-12_19-59-50"
        3:
          logdir: "2023-05-12_19-59-53"
+   random_fid_gfn:
+     highlight: False
+     dirname: "molecules_ip/gfn_random_fid"
+     seeds:
+       1:
+         logdir: "2023-05-13_19-58-14"
+   mfppo:
+     highlight: False
+     dirname: "molecules_ip/ppo"
+     seeds:
+       1:
+         logdir: "2023-05-14_15-55-42"
    mfgfn:
      highlight: True
      dirname: "molecules_ip/gfn_mf"
      seeds:
        1:
-         logdir: "2023-05-12_06-42-28"
+         logdir: "2023-05-12_07-18-46"
   higherbetter: False
   k:
     - 1

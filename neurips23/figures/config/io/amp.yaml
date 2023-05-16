@@ -21,6 +21,26 @@ data:
          logdir: "2023-05-12_19-14-30"
        3:
          logdir: "2023-05-12_19-14-32"
+   random_fid_gfn:
+     highlight: False
+     dirname: "amp/gfn_random_fid"
+     seeds:
+       1:
+         logdir: "2023-05-10_22-15-42"
+       2:
+         logdir: "2023-05-12_20-08-56"
+   mfppo:
+     highlight: False
+     dirname: "amp/ppo"
+     seeds:
+       1:
+         logdir: "2023-05-12_07-18-46"
+   mfgfn_linear:
+     highlight: True
+     dirname: "amp/gfn_linear_kernel"
+     seeds:
+       1:
+         logdir: "2023-05-06_14-31-20"
    mfgfn_index:
      highlight: True
      dirname: "amp/gfn_index_kernel"
