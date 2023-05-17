@@ -6,6 +6,7 @@ output_filename: branin.pdf
 do_methods:
     - sfgfn
     - random_fid_gfn
+    - mfbo
     - mfgfn
 data:
   methods:
@@ -45,6 +46,12 @@ data:
          logdir: "2023-05-12_00-34-40"
        3:
          logdir: "2023-05-12_00-37-03"
+   mfbo:
+     highlight: False
+     dirname: "branin/mfbo"
+     seeds:
+       1:
+         logdir: ""
    mfgfn:
      highlight: True
      dirname: "branin/gfn_mf"

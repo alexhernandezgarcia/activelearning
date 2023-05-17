@@ -13,7 +13,6 @@ import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
-from matplotlib.colors import Normalize
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -23,19 +22,20 @@ import wandb
 import yaml
 from diameter_clustering import LeaderClustering
 from hydra.utils import get_original_cwd, to_absolute_path
+from matplotlib.colors import Normalize
 from omegaconf import DictConfig, OmegaConf
 from rdkit import Chem, DataStructs
 from rdkit.Chem import rdMolDescriptors
 from rdkit.SimDivFilters import rdSimDivPickers
 
 from utils import (
+    get_dash,
+    get_diversity,
     get_hue_palette,
+    get_n_modes,
+    get_performance,
     get_pkl,
     plot_setup,
-    get_dash,
-    get_performance,
-    get_diversity,
-    get_n_modes,
 )
 
 
@@ -78,7 +78,12 @@ def build_dataframe(config):
                     / config.io.data.methods[method].dirname
                     / config.io.data.methods[method].seeds[seed].logdir
                 )
-                runpath = get_wandb_runpath(logdir)
+                if method == "mfbo":
+                    data_dict = pd.read_pickle(logdir / "cumulative_stats.pkl")
+                    runpath = None
+                else:
+                    runpath = get_wandb_runpath(logdir)
+                    data_dict = None
                 energy, cost, diversity, n_modes = get_performance(
                     logdir,
                     runpath,
@@ -89,6 +94,7 @@ def build_dataframe(config):
                     config.io.data.do_diversity,
                     config.io.task,
                     substitution_matrix,
+                    data_dict=data_dict,
                 )
                 n_rounds = len(energy)
                 df_aux = pd.DataFrame.from_dict(

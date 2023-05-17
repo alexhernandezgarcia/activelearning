@@ -7,6 +7,7 @@ do_methods:
     - sfgfn
     - random_fid_gfn
     - mfppo
+    - mfbo
     - mfgfn
 data:
   methods:
@@ -44,6 +45,12 @@ data:
      seeds:
        1:
          logdir: "2023-05-13_18-46-10"
+   mfbo:
+     highlight: False
+     dirname: "hartmann/mfbo"
+     seeds:
+       1:
+         logdir: ""
    mfgfn:
      highlight: True
      dirname: "hartmann/gfn_mf"

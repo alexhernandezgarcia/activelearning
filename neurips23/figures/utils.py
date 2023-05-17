@@ -96,17 +96,24 @@ def get_performance(
     do_diversity=False,
     task=None,
     substitution_matrix=None,
+    data_dict=None,
 ):
-    # Read data from experiment
-    f_pkl = get_pkl(logdir)
-    data_dict = pd.read_pickle(f_pkl)
-    cumul_samples = data_dict["cumulative_sampled_samples"]
-    cumul_energies = data_dict["cumulative_sampled_energies"]
-    # Read data from wandb run
-    api = wandb.Api()
-    run = api.run(runpath)
-    post_al_cum_cost = run.history(keys=["post_al_cum_cost"])
-    post_al_cum_cost = np.unique(post_al_cum_cost["post_al_cum_cost"])
+    if data_dict is None:
+        # Read data from experiment
+        f_pkl = get_pkl(logdir)
+        data_dict = pd.read_pickle(f_pkl)
+        cumul_samples = data_dict["cumulative_sampled_samples"]
+        cumul_energies = data_dict["cumulative_sampled_energies"]
+        # Read data from wandb run
+        api = wandb.Api()
+        run = api.run(runpath)
+        post_al_cum_cost = run.history(keys=["post_al_cum_cost"])
+        post_al_cum_cost = np.unique(post_al_cum_cost["post_al_cum_cost"])
+    else:
+        cumul_samples = data_dict["cumulative_sampled_samples"]
+        cumul_samples = [el for sublist in cumul_samples for el in sublist]
+        cumul_energies = data_dict["cumulative_sampled_energies"]
+        post_al_cum_cost = data_dict["cumulative_cost"]
     # Compute metrics from each AL round
     rounds = np.arange(
         start=batch_size, stop=len(cumul_samples), step=batch_size, dtype=int
