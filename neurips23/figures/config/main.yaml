@@ -47,7 +47,7 @@ plot:
         random_fid_gfn:
             palette: colorblind
             palette_idx: 5
-            name: "Random fid. GFlowNet"
+            name: "Rand. fid. GFN"
             dash: dashed
             linewidth: 2
         sfgfn:

@@ -507,6 +507,7 @@ def plot(df, config):
             #             sizes=(10.0, 100.0),
             palette="gist_gray",
             zorder=10,
+            edgecolors="none",
         )
     #         sns.scatterplot(
     #             ax=ax,
@@ -588,6 +589,10 @@ def plot(df, config):
                 leg_handles.append(handle)
                 leg_labels.append(config.plot.methods[label].name)
 
+        if len(config.io.do_methods) > 4:
+            n_cols = 2
+        else:
+            n_cols = 1
         leg = ax.legend(
             handles=leg_handles,
             labels=leg_labels,
@@ -595,6 +600,8 @@ def plot(df, config):
             title="",
             framealpha=1.0,
             frameon=True,
+            ncols=n_cols,
+            columnspacing=1.0
         )
 
     return fig

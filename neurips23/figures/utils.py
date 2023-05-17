@@ -11,7 +11,8 @@ def plot_setup():
     sns.reset_orig()
     #     sns.set(style="whitegrid")
     plt.rcParams.update({"font.family": "serif"})
-    plt.rcParams.update({"font.size": 16})
+    plt.rcParams.update({"font.size": 18})
+    plt.rcParams.update({"scatter.edgecolors": "k"})
     plt.rcParams.update(
         {
             "font.serif": [
