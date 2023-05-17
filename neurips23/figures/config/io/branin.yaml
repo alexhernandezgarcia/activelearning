@@ -46,6 +46,12 @@ data:
          logdir: "2023-05-12_00-34-40"
        3:
          logdir: "2023-05-12_00-37-03"
+   mfppo:
+     highlight: False
+     dirname: "branin/ppo"
+     seeds:
+       1:
+         logdir: "2023-05-15_12-25-33"
    mfbo:
      highlight: False
      dirname: "branin/mfbo"
