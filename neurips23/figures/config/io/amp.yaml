@@ -41,18 +41,24 @@ data:
      seeds:
        1:
          logdir: "2023-05-13_17-49-20"
-   mfgfn_linear:
+   mfgfn:
      highlight: True
      dirname: "amp/gfn_linear_kernel"
      seeds:
        1:
          logdir: "2023-05-06_14-31-20"
-   mfgfn_index:
-     highlight: True
-     dirname: "amp/gfn_index_kernel"
-     seeds:
-       1:
-         logdir: "2023-05-01_23-18-47"
+#    mfgfn_linear:
+#      highlight: True
+#      dirname: "amp/gfn_linear_kernel"
+#      seeds:
+#        1:
+#          logdir: "2023-05-06_14-31-20"
+#    mfgfn_index:
+#      highlight: True
+#      dirname: "amp/gfn_index_kernel"
+#      seeds:
+#        1:
+#          logdir: "2023-05-01_23-18-47"
   higherbetter: True
   k:
     - 1
