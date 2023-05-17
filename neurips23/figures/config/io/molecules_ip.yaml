@@ -1,4 +1,4 @@
-task: molecules_ip
+task: molecules
 input_csv: data/molecules_ip.csv
 output_dir: output
 output_csv: data/molecules_ip.csv
@@ -45,7 +45,7 @@ data:
     - 50
     - 100
   batch_size_al: 128
-  do_diversity: False
+  do_diversity: True
 plot:
     x_axis:
         log: False
