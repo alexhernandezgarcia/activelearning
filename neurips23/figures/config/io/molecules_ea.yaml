@@ -1,4 +1,4 @@
-task: molecules_ea
+task: molecules
 input_csv: data/molecules_ea.csv
 output_dir: output
 output_csv: data/molecules_ea.csv
@@ -52,7 +52,7 @@ data:
     - 10
     - 100
   batch_size_al: 128
-  do_diversity: False
+  do_diversity: True
 plot:
     x_axis:
         log: False
