@@ -31,12 +31,6 @@ from utils import get_hue_palette, get_pkl, plot_setup, get_dash
 
 
 def build_dataframe(config):
-    if config.io.task == "dna":
-        substitution_matrix = align.SubstitutionMatrix.std_nucleotide_matrix()
-    elif config.io.task == "amp":
-        substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
-    else:
-        substitution_matrix = None
     df = pd.DataFrame(
         columns=[
             "task",
@@ -47,46 +41,52 @@ def build_dataframe(config):
             "k",
         ]
     )
-    for task in ["branin", "hartmann", "dna", "amp", "molecules_ea", "molecules_ip"]
-        with open(Path(config.root_logdir) / f"{task}.yaml", 'r') as f
+    for task in ["branin", "hartmann", "dna", "amp", "molecules_ea", "molecules_ip"]:
+        if task == "dna":
+            substitution_matrix = align.SubstitutionMatrix.std_nucleotide_matrix()
+        elif task == "amp":
+            substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
+        else:
+            substitution_matrix = None
+        with open(Path(f"config/io/{task}.yaml"), 'r') as f:
             config_task = yaml.safe_load(f)
         for al_type in ["sf", "mf"]:
-            for k in config_task.data.k:
-            train_data_f = (
-                Path(config.root_logdir)
-                / task
-                / "dataset"
-                / al_type
-                / "data_train.csv"
-            )
-            df_tr = pd.read_csv(train_data_f)
-            if len(df_tr) < k:
-                continue
-            if "energies" not in in df_tr:
-                continue
-            if config_task.data.higherbetter:
-                idx_topk = np.argsort(df.energies.values)[::-1][:k]
-            else:
-                idx_topk = np.argsort(df.energies.values)[:k]
-            samples_topk = df.samples.values[idx_topk]
-            energy_topk = np.mean(df.energies.values[idx_topk])
-            diversity_topk = get_diversity(samples_topk, task, substitution_matrix)
-            n_modes_topk = get_n_modes(
-                samples_topk,
-                task,
-                substitution_matrix,
-            )
-            df_aux = pd.DataFrame.from_dict(
-                {
-                    "task": task,
-                    "al_type": al_type,
-                    "energy": energy_topk,
-                    "diversity": diversity_topk,
-                    "n_modes": n_modes_topk,
-                    "k": k,
-                }
-            )
-            df = pd.concat([df, df_aux], axis=0, ignore_index=True)
+            for k in config_task["data"]["k"]:
+                train_data_f = (
+                    Path(config.root_logdir)
+                    / task
+                    / "dataset"
+                    / al_type
+                    / "data_train.csv"
+                )
+                df_tr = pd.read_csv(train_data_f)
+                if len(df_tr) < k:
+                    continue
+                if "energies" not in df_tr:
+                    continue
+                if config_task["data"]["higherbetter"]:
+                    idx_topk = np.argsort(df.energies.values)[::-1][:k]
+                else:
+                    idx_topk = np.argsort(df.energies.values)[:k]
+                samples_topk = df.samples.values[idx_topk]
+                energy_topk = np.mean(df.energies.values[idx_topk])
+                diversity_topk = get_diversity(samples_topk, task, substitution_matrix)
+                n_modes_topk = get_n_modes(
+                    samples_topk,
+                    task,
+                    substitution_matrix,
+                )
+                df_aux = pd.DataFrame.from_dict(
+                    {
+                        "task": task,
+                        "al_type": al_type,
+                        "energy": energy_topk,
+                        "diversity": diversity_topk,
+                        "n_modes": n_modes_topk,
+                        "k": k,
+                    }
+                )
+                df = pd.concat([df, df_aux], axis=0, ignore_index=True)
         if "output_csv" in config.io:
             df.to_csv("data/train_stats.csv", index_label="index")
         return df
@@ -267,14 +267,6 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
 
 @hydra.main(config_path="./config", config_name="main", version_base=None)
 def main(config):
-    # Determine output dir
-    if config.io.output_dir.upper() == "SLURM_TMPDIR":
-        output_dir = Path(os.environ["SLURM_TMPDIR"])
-    else:
-        output_dir = Path(to_absolute_path(config.io.output_dir))
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True, exist_ok=False)
-    # Build data frame or read CSV
     df = build_dataframe(config)
 
 
