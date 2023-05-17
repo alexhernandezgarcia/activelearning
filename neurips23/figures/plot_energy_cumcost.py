@@ -145,16 +145,13 @@ def get_performance(
             cumul_samples_curr_round = np.array(cumul_samples[:upper_bound])
             samples_topk = cumul_samples_curr_round[idx_topk]
             mean_diversity_topk = get_diversity(samples_topk, task, substitution_matrix)
-            try:
-                n_modes_topk = get_n_modes(
-                    samples_topk,
-                    task,
-                    substitution_matrix,
-                    novelty=True,
-                    dataset_seqs=train_data.samples.values,
-                )
-            except:
-                n_modes_topk = None
+            n_modes_topk = get_n_modes(
+                samples_topk,
+                task,
+                substitution_matrix,
+                novelty=True,
+                dataset_seqs=train_data.samples.values,
+            )
         # Append to lists
         energy.append(mean_energy_topk)
         cost.append(post_al_cum_cost[idx])
@@ -214,7 +211,7 @@ def get_n_modes(
     dataset_seqs=None,
     novelty_thresh=None,
     cluster_thresh=None,
-    dataset_format="smiles",
+    dataset_format="selfies",
 ):
     if novelty:
         assert dataset_seqs is not None
@@ -224,6 +221,10 @@ def get_n_modes(
             cluster_thresh = 0.7
         if novelty_thresh is None:
             novelty_thresh = 1 - cluster_thresh
+
+        # Remove fidelity chars
+        seqs = [seq.split(";")[0] for seq in seqs]
+        dataset_seqs = [seq.split(";")[0] for seq in dataset_seqs]
 
         # process generated seqs and dataset seqs
         if task in "dna":
@@ -268,6 +269,10 @@ def get_n_modes(
         if novelty_thresh is None:
             novelty_thresh = 1 - cluster_thresh
 
+        # Remove fidelity chars
+        seqs = [seq.split(";")[0] for seq in seqs]
+        dataset_seqs = [seq.split(";")[0] for seq in dataset_seqs]
+
         # process generated mols
         smiles = [sf.decoder(seq) for seq in seqs]
         mols = [Chem.MolFromSmiles(smi) for smi in smiles]
@@ -280,7 +285,10 @@ def get_n_modes(
             if dataset_format in "smiles":
                 dataset_smiles = dataset_seqs
             else:
-                dataset_smiles = [sf.decoder(seq) for seq in dataset_seqs]
+                try:
+                    dataset_smiles = [sf.decoder(seq) for seq in dataset_seqs]
+                except:
+                    import ipdb; ipdb.set_trace()
             dataset_mols = [Chem.MolFromSmiles(smi) for smi in dataset_smiles]
             dataset_fps = [
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048)
