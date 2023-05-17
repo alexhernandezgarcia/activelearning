@@ -319,6 +319,16 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
                 pair[0], pair[1], substitution_matrix, local=False, max_number=1
             )[0]
             distances.append(align.get_sequence_identity(alignment))
+    elif task == "molecules":
+        smiles = [sf.decoder(seq) for seq in seqs]
+        mols = [Chem.MolFromSmiles(smi) for smi in smiles]
+        fps = [
+            rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in mols
+        ]
+        distances = []
+        for pair in itertools.combinations(fps, 2):
+            tanimotosimilarity = DataStructs.TanimotoSimilarity(pair[0], pair[1])
+            distances.append(align.get_sequence_identity(tanimotosimilarity))
     else:
         sample_states1 = torch.tensor(seqs)
         sample_states2 = sample_states1.clone()
