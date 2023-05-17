@@ -338,8 +338,10 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
         distances = distances.numpy()
     return np.mean(distances)
 
+
 def process_methods(df, config):
     return df.loc[df.method.isin(config.io.do_methods)]
+
 
 def process_cost(df, config):
     for method in df.method.unique():
@@ -396,6 +398,12 @@ def process_diversity(df, config):
     return df
 
 
+def make_maximimization(df, config):
+    if not config.io.data.higherbetter:
+        df.energy = -1 * df.energy
+    return df
+
+
 def get_wandb_runpath(logdir):
     with open(Path(logdir) / "wandb.url", "r") as f:
         url = f.read()
@@ -419,11 +427,13 @@ def make_palette(config):
         )
     return palette
 
+
 def make_dashes(config):
     dashes = {}
     for method in config.plot.methods:
         dashes.update({method: get_dash(config.plot.methods[method].dash)})
     return dashes
+
 
 def make_linewidths(config):
     linewidths = {}
@@ -562,7 +572,7 @@ def plot(df, config):
         )
 
     # Set Y-label
-    ax.set_ylabel(f"Mean Top-{k_plot} energy ({better} is better)")
+    ax.set_ylabel(f"Mean Top-{k_plot} energy")
 
     # Remove ticks
     ax.tick_params(axis="both", which="both", length=0)
@@ -615,6 +625,7 @@ def main(config):
     df = process_methods(df, config)
     df = process_cost(df, config)
     df = process_highlights(df, config)
+    df = make_maximimization(df, config)
     #     df = process_diversity(df, config)
     # Plot
     fig = plot(df, config)
