@@ -62,6 +62,12 @@ plot:
             name: "MF-PPO"
             dash: loosely dotted
             linewidth: 2
+        mfbo:
+            palette: tab10
+            palette_idx: 3
+            name: "MF-BO"
+            dash: loosely dotted
+            linewidth: 2
     x_axis:
         log: True
         type: "fraction_budget"
