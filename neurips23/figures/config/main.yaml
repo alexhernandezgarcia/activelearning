@@ -23,19 +23,19 @@ plot:
         mfgfn:
             palette: colorblind
             palette_idx: 0
-            name: "MF-GFlowNet"
+            name: "MF-GFN"
             dash: solid
             linewidth: 3
         mfgfn_linear:
             palette: colorblind
             palette_idx: 0
-            name: "MF-GFlowNet (GP Linear)"
+            name: "MF-GFN (GP Linear)"
             dash: solid
             linewidth: 3
         mfgfn_index:
             palette: colorblind
             palette_idx: 9
-            name: "MF-GFlowNet (GP Index)"
+            name: "MF-GFN (GP Index)"
             dash: solid
             linewidth: 3
         mf_random:
@@ -53,7 +53,7 @@ plot:
         sfgfn:
             palette: colorblind
             palette_idx: 2
-            name: "SF-GFlowNet"
+            name: "SF-GFN"
             dash: dotted
             linewidth: 2
         mfppo:
