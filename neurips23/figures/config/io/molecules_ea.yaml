@@ -3,6 +3,12 @@ input_csv: data/molecules_ea.csv
 output_dir: output
 output_csv: data/molecules_ea.csv
 output_filename: molecules_ea.pdf
+do_methods:
+    - sfgfn
+    - mf_random
+    - random_fid_gfn
+    - mfppo
+    - mfgfn
 data:
   methods:
    sfgfn:
