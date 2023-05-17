@@ -13,6 +13,7 @@ import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
+from matplotlib.colors import Normalize
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -27,7 +28,15 @@ from rdkit import Chem, DataStructs
 from rdkit.Chem import rdMolDescriptors
 from rdkit.SimDivFilters import rdSimDivPickers
 
-from utils import get_hue_palette, get_pkl, plot_setup, get_dash, get_performance, get_diversity, get_n_modes
+from utils import (
+    get_hue_palette,
+    get_pkl,
+    plot_setup,
+    get_dash,
+    get_performance,
+    get_diversity,
+    get_n_modes,
+)
 
 
 def build_dataframe(config):
@@ -213,9 +222,14 @@ def plot(df, config):
 
     plot_setup()
 
-    fig, ax = plt.subplots(
-        figsize=(config.plot.width, config.plot.height), dpi=config.plot.dpi
-    )
+    if config.io.data.do_diversity:
+        fig, ax = plt.subplots(
+            figsize=(config.plot.width, 1.1 * config.plot.height), dpi=config.plot.dpi
+        )
+    else:
+        fig, ax = plt.subplots(
+            figsize=(config.plot.width, config.plot.height), dpi=config.plot.dpi
+        )
 
     palette = make_palette(config)
     dashes = make_dashes(config)
@@ -254,52 +268,37 @@ def plot(df, config):
             zorder=9,
         )
         leg_handles_def, leg_labels_def = ax.get_legend_handles_labels()
+
         # Scatter plot of diversity
-        df_means = df.groupby(
-            ["round", "method", "k"], group_keys=False, as_index=False
-        ).mean()
-        gray_palette = mcolors.Colormap("Grays")
-        sns.scatterplot(
-            ax=ax,
-            data=df_means.loc[df_means.k == k_plot],
-            x="cost",
-            y="energy",
-            hue="diversity",
-            #             sizes=(10.0, 100.0),
-            palette="gist_gray",
-            zorder=10,
-            edgecolors="none",
-        )
-    #         sns.scatterplot(
-    #             ax=ax,
-    #             data=df_means.loc[df_means.k == k_plot],
-    #             x="cost",
-    #             y="energy",
-    #             hue="method",
-    #             size="diversity",
-    #             sizes=(10.0, 100.0),
-    #             palette=palette,
-    #         )
-    #         sns.lineplot(
-    #             ax=ax,
-    #             data=df.loc[df.k == k_plot],
-    #             x="cost",
-    #             y="energy",
-    #             hue="method",
-    #             style="method",
-    #             estimator=config.plot.estimator,
-    #             markers=True,
-    #         )
-    #         sns.lineplot(
-    #             ax=ax,
-    #             data=df.loc[df.k == 1],
-    #             x="cost",
-    #             y="energy",
-    #             hue="method",
-    #             size=0.0,
-    #             markers=config.plot.do_markers,
-    #             err_style="bars"
-    #         )
+        if config.io.data.do_diversity:
+            df_means = df.groupby(
+                ["round", "method", "k"], group_keys=False, as_index=False
+            ).mean()
+            gray_palette = mcolors.Colormap("Grays")
+            sns.scatterplot(
+                ax=ax,
+                data=df_means.loc[df_means.k == k_plot],
+                x="cost",
+                y="energy",
+                hue="diversity",
+                #             sizes=(10.0, 100.0),
+                palette="cividis",
+                #                 palette="gist_gray",
+                zorder=10,
+                edgecolors="none",
+                s=100,
+            )
+            # Colorbar
+            vmin = df_means.diversity.min()
+            vmax = df_means.diversity.max()
+            div_norm = Normalize(vmin=vmin, vmax=vmax)
+            #             div_cmap = 'gist_gray_r'
+            div_cmap = "cividis_r"
+            sm = plt.cm.ScalarMappable(cmap=div_cmap, norm=div_norm)
+            cbar = fig.colorbar(sm, ax=ax, location="top")
+            cbar.ax.set_xlabel("(-) Diversity (+)")
+            cbar.ax.tick_params(axis="both", which="both", length=0)
+            cbar.ax.set_xticklabels([])
 
     # Change spines
     # sns.despine(ax=ax, left=True, bottom=True)
@@ -334,7 +333,12 @@ def plot(df, config):
         )
 
     # Set Y-label
-    ax.set_ylabel(f"Mean Top-{k_plot} energy")
+    if config.io.task == "molecules":
+        ax.set_ylabel(f"Mean Top-{k_plot} energy [eV]")
+    elif config.io.task in ("branin", "hartmann"):
+        ax.set_ylabel(f"Mean Top-{k_plot} score")
+    else:
+        ax.set_ylabel(f"Mean Top-{k_plot} energy")
 
     # Remove ticks
     ax.tick_params(axis="both", which="both", length=0)
@@ -362,8 +366,10 @@ def plot(df, config):
             framealpha=1.0,
             frameon=True,
             ncols=n_cols,
-            columnspacing=1.0
+            columnspacing=1.0,
         )
+        if config.io.task in ("amp"):
+            ax.get_legend().remove()
 
     return fig
 

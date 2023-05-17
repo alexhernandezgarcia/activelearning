@@ -46,7 +46,7 @@ plot:
             linewidth: 2
         random_fid_gfn:
             palette: colorblind
-            palette_idx: 5
+            palette_idx: 1
             name: "Rand. fid. GFN"
             dash: dashed
             linewidth: 2
@@ -57,15 +57,15 @@ plot:
             dash: dotted
             linewidth: 2
         mfppo:
-            palette: colorblind
-            palette_idx: 3
+            palette: tab10
+            palette_idx: 5
             name: "MF-PPO"
             dash: loosely dotted
             linewidth: 2
     x_axis:
         log: True
         type: "fraction_budget"
-        label: "Fraction of total budget"
+        label: "Fraction of total ${plot.methods.sfgfn.name} budget"
     do_all_k: False
     do_line_top1: False
     linewidth:
