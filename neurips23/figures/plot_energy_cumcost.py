@@ -328,7 +328,7 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
         distances = []
         for pair in itertools.combinations(fps, 2):
             tanimotosimilarity = DataStructs.TanimotoSimilarity(pair[0], pair[1])
-            distances.append(align.get_sequence_identity(tanimotosimilarity))
+            distances.append(tanimotosimilarity)
     else:
         sample_states1 = torch.tensor(seqs)
         sample_states2 = sample_states1.clone()
