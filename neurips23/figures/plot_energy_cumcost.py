@@ -198,6 +198,8 @@ def filter_novel_seqs(
             else:
                 dist = dist_func(seq, dataset_seq)
             dists.append(dist)
+            if dist > novelty_thresh:
+                break
         if max(dists) <= novelty_thresh:
             novel_seqs.append(seq)
     return novel_seqs
@@ -217,10 +219,6 @@ def get_n_modes(
         assert dataset_seqs is not None
 
     if task in ("amp", "dna"):
-        if cluster_thresh is None:
-            cluster_thresh = 0.7
-        if novelty_thresh is None:
-            novelty_thresh = 1 - cluster_thresh
 
         # Remove fidelity chars
         seqs = [seq.split(";")[0] for seq in seqs]
@@ -228,18 +226,23 @@ def get_n_modes(
 
         # process generated seqs and dataset seqs
         if task in "dna":
+            if cluster_thresh is None:
+                cluster_thresh = 0.45
             seqs = [biotite_seq.NucleotideSequence(seq) for seq in seqs]
             if novelty:
                 dataset_seqs = [
                     biotite_seq.NucleotideSequence(seq) for seq in dataset_seqs
                 ]
         else:  # amp
+            if cluster_thresh is None:
+                cluster_thresh = 0.65
             seqs = [biotite_seq.ProteinSequence(seq) for seq in seqs]
             if novelty:
                 dataset_seqs = [
                     biotite_seq.ProteinSequence(seq) for seq in dataset_seqs
                 ]
-
+        if novelty_thresh is None:
+            novelty_thresh = 1 - cluster_thresh
         # find novel seqs
         if novelty:
             seqs = filter_novel_seqs(
