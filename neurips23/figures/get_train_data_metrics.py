@@ -62,34 +62,38 @@ def build_dataframe(config):
                 df_tr = pd.read_csv(train_data_f)
                 if len(df_tr) < k:
                     continue
-                if "energies" not in df_tr:
-                    continue
-                if config_task["data"]["higherbetter"]:
-                    idx_topk = np.argsort(df.energies.values)[::-1][:k]
+                if "energies" in df_tr:
+                    if config_task["data"]["higherbetter"]:
+                        idx_topk = np.argsort(df_tr.energies.values)[::-1][:k]
+                    else:
+                        idx_topk = np.argsort(df_tr.energies.values)[:k]
+                    samples_topk = df_tr.samples.values[idx_topk]
+                    energy_topk = np.mean(df_tr.energies.values[idx_topk])
                 else:
-                    idx_topk = np.argsort(df.energies.values)[:k]
-                samples_topk = df.samples.values[idx_topk]
-                energy_topk = np.mean(df.energies.values[idx_topk])
-                diversity_topk = get_diversity(samples_topk, task, substitution_matrix)
-                n_modes_topk = get_n_modes(
-                    samples_topk,
-                    task,
-                    substitution_matrix,
-                )
+                    energy_topk = None
+                if config_task["data"]["do_diversity"]:
+                    diversity_topk = get_diversity(samples_topk, task, substitution_matrix)
+                    n_modes_topk = get_n_modes(
+                        samples_topk,
+                        task,
+                        substitution_matrix,
+                    )
+                else:
+                    diversity_topk = None
+                    n_modes_topk = None
                 df_aux = pd.DataFrame.from_dict(
                     {
-                        "task": task,
-                        "al_type": al_type,
-                        "energy": energy_topk,
-                        "diversity": diversity_topk,
-                        "n_modes": n_modes_topk,
-                        "k": k,
+                        "task": [task],
+                        "al_type": [al_type],
+                        "energy": [energy_topk],
+                        "diversity": [diversity_topk],
+                        "n_modes": [n_modes_topk],
+                        "k": [k],
                     }
                 )
                 df = pd.concat([df, df_aux], axis=0, ignore_index=True)
-        if "output_csv" in config.io:
-            df.to_csv("data/train_stats.csv", index_label="index")
-        return df
+        df.to_csv("data/train_stats.csv", index_label="index")
+    return df
 
 
 def get_biolseq_pairwise_similarity(seq_i, seq_j, substitution_matrix):
