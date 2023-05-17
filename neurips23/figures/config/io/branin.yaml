@@ -6,7 +6,8 @@ output_filename: branin.pdf
 do_methods:
     - sfgfn
     - random_fid_gfn
-    - mfbo
+#     - mfbo
+#     - mfppo
     - mfgfn
 data:
   methods:

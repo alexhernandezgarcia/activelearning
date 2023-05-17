@@ -7,7 +7,7 @@ do_methods:
     - sfgfn
     - random_fid_gfn
     - mfppo
-    - mfbo
+#     - mfbo
     - mfgfn
 data:
   methods:
