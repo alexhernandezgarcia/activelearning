@@ -354,3 +354,97 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
         distances = distances.numpy()
     return np.mean(distances)
 
+
+def _compute_top_k_diverse(seqs, scores, dist_func, k, diversity_thresh, substitution_matrix=None, sort_reverse=True):
+    # Sort the dataset by scores in descending order
+    dataset = list(zip(seqs, scores))
+    sorted_dataset = sorted(dataset, key=lambda x: x[1], reverse=sort_reverse) # True for top-K highest; False for top-K lowest
+
+    top_sequences = []
+    top_scores = []
+    for i in range(len(sorted_dataset)):
+        seq1 = sorted_dataset[i][0]
+        score1 = sorted_dataset[i][1]
+        if substitution_matrix is not None:
+            is_far_enough = all(dist_func(seq1, seq2, substitution_matrix) <= diversity_thresh for seq2 in top_sequences) #fixme
+        else:
+            is_far_enough = all(dist_func(seq1, seq2) <= diversity_thresh for seq2 in top_sequences)
+        if is_far_enough:
+            top_sequences.append(seq1)
+            top_scores.append(score1)
+
+        if len(top_sequences) == k:
+            break
+
+    return top_scores, top_sequences
+
+def get_top_k_diverse(
+        seqs,
+        scores,
+        k,
+        task=None,
+        substitution_matrix=None,
+        diversity_thresh=None,
+        maximization=True,
+):
+    seqs = [seq.split(";")[0] for seq in seqs]
+    if task in ("amp"):
+        if diversity_thresh is None:
+            diversity_thresh = 0.35 # at most 0.35 similar to each other
+        seqs = [biotite_seq.ProteinSequence(seq) for seq in seqs]
+        if substitution_matrix is None:
+            substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
+        dist_func = get_biolseq_pairwise_similarity
+        top_k_diverse, top_k_diverse_seqs = _compute_top_k_diverse(
+            seqs=seqs,
+            scores=scores,
+            k=k,
+            dist_func=dist_func,
+            diversity_thresh=diversity_thresh,
+            substitution_matrix=substitution_matrix,
+            sort_reverse=maximization)
+
+    elif task in ("dna"):
+        if diversity_thresh is None:
+            diversity_thresh = 0.35  # at most 0.35 similar to each other
+        seqs = [biotite_seq.NucleotideSequence(seq) for seq in seqs]
+        if substitution_matrix is None:
+            substitution_matrix = align.SubstitutionMatrix.std_nucleotide_matrix()
+        dist_func = get_biolseq_pairwise_similarity
+        top_k_diverse, top_k_diverse_seqs = _compute_top_k_diverse(
+            seqs=seqs,
+            scores=scores,
+            k=k,
+            dist_func=dist_func,
+            diversity_thresh=diversity_thresh,
+            substitution_matrix=substitution_matrix,
+            sort_reverse=maximization)
+
+    elif task in ("molecules"):
+        if diversity_thresh is None:
+            diversity_thresh = 0.35  # at most 0.35 similar to each other
+        smiles = [sf.decoder(seq) for seq in seqs]
+        mols = [Chem.MolFromSmiles(smi) for smi in smiles]
+        fps = [
+            rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048) for mol in mols
+        ]
+        dist_func = DataStructs.TanimotoSimilarity
+        top_k_diverse, top_k_diverse_seqs = _compute_top_k_diverse(
+            seqs=fps,
+            scores=scores,
+            k=k,
+            dist_func=dist_func,
+            diversity_thresh=diversity_thresh,
+            sort_reverse=maximization)
+    else:
+        def euclidean_distance(x, y):
+            return np.linalg.norm(x-y)
+
+        top_k_diverse, top_k_diverse_seqs = _compute_top_k_diverse(
+            seqs=seqs,
+            scores=scores,
+            k=k,
+            dist_func=euclidean_distance,
+            diversity_thresh=diversity_thresh)
+    return sum(top_k_diverse)/k
+
