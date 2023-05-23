@@ -26,6 +26,30 @@ plot:
             name: "MF-GFN"
             dash: solid
             linewidth: 3
+        mfgfn_a:
+            palette: flare
+            palette_idx: 0
+            name: "MF-GFN-A"
+            dash: solid
+            linewidth: 3
+        mfgfn_b:
+            palette: flare
+            palette_idx: 0
+            name: "MF-GFN (0.01, 1)"
+            dash: solid
+            linewidth: 3
+        mfgfn_c:
+            palette: flare
+            palette_idx: 4
+            name: "MF-GFN (0.05, 1)"
+            dash: solid
+            linewidth: 3
+        mfgfn_d:
+            palette: flare
+            palette_idx: 8
+            name: "MF-GFN (0.5, 1)"
+            dash: solid
+            linewidth: 3
         mfgfn_linear:
             palette: colorblind
             palette_idx: 0
@@ -77,3 +101,5 @@ plot:
     linewidth:
         highlight: 2
         other: 1
+    legend:
+        no_cols: False

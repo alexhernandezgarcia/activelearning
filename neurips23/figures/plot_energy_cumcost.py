@@ -360,7 +360,7 @@ def plot(df, config):
                 leg_handles.append(handle)
                 leg_labels.append(config.plot.methods[label].name)
 
-        if len(config.io.do_methods) > 4:
+        if len(config.io.do_methods) > 4 and config.plot.legend.no_cols is False:
             n_cols = 2
         else:
             n_cols = 1
