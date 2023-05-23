@@ -66,6 +66,7 @@ data:
     - 50
   batch_size_al: 32
   do_diversity: True
+  do_topk_diverse: True
 plot:
     x_axis:
         log: False

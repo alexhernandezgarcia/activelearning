@@ -1,13 +1,7 @@
-import os
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import seaborn as sns
-from matplotlib.colors import hsv_to_rgb
-from omegaconf.listconfig import ListConfig
-
 import itertools
+import os
 import random
+
 import biotite.sequence as biotite_seq
 import biotite.sequence.align as align
 import hydra
@@ -24,7 +18,9 @@ import wandb
 import yaml
 from diameter_clustering import LeaderClustering
 from hydra.utils import get_original_cwd, to_absolute_path
+from matplotlib.colors import hsv_to_rgb
 from omegaconf import DictConfig, OmegaConf
+from omegaconf.listconfig import ListConfig
 from rdkit import Chem, DataStructs
 from rdkit.Chem import rdMolDescriptors
 from rdkit.SimDivFilters import rdSimDivPickers
@@ -86,6 +82,7 @@ def get_pkl(directory):
                 return os.path.join(root, file)
     return None
 
+
 def get_performance(
     logdir,
     runpath,
@@ -94,6 +91,7 @@ def get_performance(
     batch_size,
     train_data,
     do_diversity=False,
+    do_topk_diverse=False,
     task=None,
     substitution_matrix=None,
     data_dict=None,
@@ -121,6 +119,7 @@ def get_performance(
     # Catch cases where post_al_cum_cost has fewer values than number of rounds
     rounds = rounds[: len(post_al_cum_cost)]
     energy = []
+    energy_diverse = []
     cost = []
     diversity = []
     n_modes = []
@@ -145,16 +144,30 @@ def get_performance(
                 novelty=True,
                 dataset_seqs=train_data.samples.values,
             )
+        if do_topk_diverse and k > 1:
+            energy_topk_diverse = get_top_k_diverse(
+                cumul_samples_curr_round,
+                cumul_sampled_energies_curr_round,
+                k,
+                task=task,
+                substitution_matrix=substitution_matrix,
+                diversity_thresh=None,
+                maximization=higherbetter,
+            )
         # Append to lists
         energy.append(mean_energy_topk)
         cost.append(post_al_cum_cost[idx])
         if do_diversity and k > 1:
             diversity.append(mean_diversity_topk)
             n_modes.append(n_modes_topk)
+        if do_topk_diverse and k > 1:
+            energy_diverse.append(energy_topk_diverse)
     if not do_diversity or k == 1:
         diversity = [None for _ in range(len(energy))]
         n_modes = [None for _ in range(len(energy))]
-    return energy, cost, diversity, n_modes
+    if not do_topk_diverse or k == 1:
+        energy_diverse = [None for _ in range(len(energy))]
+    return energy, energy_diverse, cost, diversity, n_modes
 
 
 def get_biolseq_pairwise_similarity(seq_i, seq_j, substitution_matrix):
@@ -212,7 +225,6 @@ def get_n_modes(
         assert dataset_seqs is not None
 
     if task in ("amp", "dna"):
-
         # Remove fidelity chars
         seqs = [seq.split(";")[0] for seq in seqs]
         if dataset_seqs is not None:
@@ -286,7 +298,9 @@ def get_n_modes(
                 try:
                     dataset_smiles = [sf.decoder(seq) for seq in dataset_seqs]
                 except:
-                    import ipdb; ipdb.set_trace()
+                    import ipdb
+
+                    ipdb.set_trace()
             dataset_mols = [Chem.MolFromSmiles(smi) for smi in dataset_smiles]
             dataset_fps = [
                 rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, 2048)
@@ -345,7 +359,9 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
             tanimotosimilarity = DataStructs.TanimotoSimilarity(pair[0], pair[1])
             distances.append(tanimotosimilarity)
     else:
-        import ipdb; ipdb.set_trace()
+        import ipdb
+
+        ipdb.set_trace()
         sample_states1 = torch.tensor(seqs)
         sample_states2 = sample_states1.clone()
         dist_matrix = torch.cdist(sample_states1, sample_states2, p=2)
@@ -355,10 +371,20 @@ def get_diversity(seqs, task=None, substitution_matrix=None):
     return np.mean(distances)
 
 
-def _compute_top_k_diverse(seqs, scores, dist_func, k, diversity_thresh, substitution_matrix=None, sort_reverse=True):
+def _compute_top_k_diverse(
+    seqs,
+    scores,
+    dist_func,
+    k,
+    diversity_thresh,
+    substitution_matrix=None,
+    sort_reverse=True,
+):
     # Sort the dataset by scores in descending order
     dataset = list(zip(seqs, scores))
-    sorted_dataset = sorted(dataset, key=lambda x: x[1], reverse=sort_reverse) # True for top-K highest; False for top-K lowest
+    sorted_dataset = sorted(
+        dataset, key=lambda x: x[1], reverse=sort_reverse
+    )  # True for top-K highest; False for top-K lowest
 
     top_sequences = []
     top_scores = []
@@ -366,9 +392,14 @@ def _compute_top_k_diverse(seqs, scores, dist_func, k, diversity_thresh, substit
         seq1 = sorted_dataset[i][0]
         score1 = sorted_dataset[i][1]
         if substitution_matrix is not None:
-            is_far_enough = all(dist_func(seq1, seq2, substitution_matrix) <= diversity_thresh for seq2 in top_sequences) #fixme
+            is_far_enough = all(
+                dist_func(seq1, seq2, substitution_matrix) <= diversity_thresh
+                for seq2 in top_sequences
+            )  # fixme
         else:
-            is_far_enough = all(dist_func(seq1, seq2) <= diversity_thresh for seq2 in top_sequences)
+            is_far_enough = all(
+                dist_func(seq1, seq2) <= diversity_thresh for seq2 in top_sequences
+            )
         if is_far_enough:
             top_sequences.append(seq1)
             top_scores.append(score1)
@@ -378,19 +409,20 @@ def _compute_top_k_diverse(seqs, scores, dist_func, k, diversity_thresh, substit
 
     return top_scores, top_sequences
 
+
 def get_top_k_diverse(
-        seqs,
-        scores,
-        k,
-        task=None,
-        substitution_matrix=None,
-        diversity_thresh=None,
-        maximization=True,
+    seqs,
+    scores,
+    k,
+    task=None,
+    substitution_matrix=None,
+    diversity_thresh=None,
+    maximization=True,
 ):
     seqs = [seq.split(";")[0] for seq in seqs]
     if task in ("amp"):
         if diversity_thresh is None:
-            diversity_thresh = 0.35 # at most 0.35 similar to each other
+            diversity_thresh = 0.35  # at most 0.35 similar to each other
         seqs = [biotite_seq.ProteinSequence(seq) for seq in seqs]
         if substitution_matrix is None:
             substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
@@ -402,7 +434,8 @@ def get_top_k_diverse(
             dist_func=dist_func,
             diversity_thresh=diversity_thresh,
             substitution_matrix=substitution_matrix,
-            sort_reverse=maximization)
+            sort_reverse=maximization,
+        )
 
     elif task in ("dna"):
         if diversity_thresh is None:
@@ -418,7 +451,8 @@ def get_top_k_diverse(
             dist_func=dist_func,
             diversity_thresh=diversity_thresh,
             substitution_matrix=substitution_matrix,
-            sort_reverse=maximization)
+            sort_reverse=maximization,
+        )
 
     elif task in ("molecules"):
         if diversity_thresh is None:
@@ -435,16 +469,18 @@ def get_top_k_diverse(
             k=k,
             dist_func=dist_func,
             diversity_thresh=diversity_thresh,
-            sort_reverse=maximization)
+            sort_reverse=maximization,
+        )
     else:
+
         def euclidean_distance(x, y):
-            return np.linalg.norm(x-y)
+            return np.linalg.norm(x - y)
 
         top_k_diverse, top_k_diverse_seqs = _compute_top_k_diverse(
             seqs=seqs,
             scores=scores,
             k=k,
             dist_func=euclidean_distance,
-            diversity_thresh=diversity_thresh)
-    return sum(top_k_diverse)/k
-
+            diversity_thresh=diversity_thresh,
+        )
+    return sum(top_k_diverse) / k
