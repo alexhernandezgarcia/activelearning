@@ -51,6 +51,7 @@ def build_dataframe(config):
             "method",
             "seed",
             "energy",
+            "energy_diverse",
             "cost",
             "diversity",
             "n_modes",
@@ -84,7 +85,7 @@ def build_dataframe(config):
                 else:
                     runpath = get_wandb_runpath(logdir)
                     data_dict = None
-                energy, cost, diversity, n_modes = get_performance(
+                energy, energy_diverse, cost, diversity, n_modes = get_performance(
                     logdir,
                     runpath,
                     k,
@@ -92,6 +93,7 @@ def build_dataframe(config):
                     config.io.data.batch_size_al,
                     df_tr,
                     config.io.data.do_diversity,
+                    config.io.data.do_topk_diverse,
                     config.io.task,
                     substitution_matrix,
                     data_dict=data_dict,
@@ -102,6 +104,7 @@ def build_dataframe(config):
                         "method": [method for _ in range(n_rounds)],
                         "seed": [seed for _ in range(n_rounds)],
                         "energy": energy,
+                        "energy_diverse": energy_diverse,
                         "cost": cost,
                         "diversity": diversity,
                         "n_modes": n_modes,
