@@ -12,8 +12,7 @@ import random
 
 
 class Grid(GFlowNetEnv, GflowNetGrid):
-    def __init__(self, max_init_steps, **kwargs):
-        self.max_init_steps = max_init_steps
+    def __init__(self, **kwargs):
         super().__init__(
             **kwargs,
         )

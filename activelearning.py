@@ -19,7 +19,7 @@ import pickle
 from proxy.mol_oracles.mol_oracle import MoleculeOracle
 
 
-@hydra.main(config_path="./config", config_name="mf_dkl")
+@hydra.main(config_path="./config", config_name="default")
 def main(config):
     if config.logger.logdir.root != "./logs":
         os.chdir(config.logger.logdir.root)

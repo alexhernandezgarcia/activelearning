@@ -166,10 +166,16 @@ class DataHandler:
                 scores = state_score_tuple[1]
                 test_scores = None
                 train_scores = None
+                test_states = None
+                train_states = None
             if self.n_fid > 1:
                 fidelities = states[:, -1].tolist()
-                train_fidelities = train_states[:, -1].tolist()
-                test_fidelities = test_states[:, -1].tolist()
+                if train_states is not None:
+                    train_fidelities = train_states[:, -1].tolist()
+                    test_fidelities = test_states[:, -1].tolist()
+                else:
+                    train_fidelities = fidelities
+                    test_fidelities = None
             else:
                 fidelities = None
                 train_fidelities = None
