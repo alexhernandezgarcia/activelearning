@@ -38,18 +38,6 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
     def set_tokenizer(self, tokenizer):
         self.tokenizer = tokenizer
 
-    def reset(self, env_id=None):
-        self.state = (
-            self.source.clone()
-        )  
-        init_steps = random.randint(0, self.max_init_steps)
-        random_state = torch.randint(low=0, high=4, size=(1, init_steps))
-        self.state[0:init_steps] = random_state
-        self.n_actions = 0
-        self.done = False
-        self.id = env_id
-        return self
-
     def unpad_function(self, states_term):
         states_tensor = torch.tensor(states_term)
         state_XX = []

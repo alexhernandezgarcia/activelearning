@@ -36,22 +36,6 @@ class Grid(GFlowNetEnv, GflowNetGrid):
                 f"Proxy state format {self.proxy_state_format} not implemented"
             )
 
-    def reset(self, env_id=None):
-        self.state = self.source.copy()
-        # init_loc = np.random.randint(0, self.max_init_steps, size=6)
-        # self.state = list(init_loc)
-        init_steps = random.randint(0, self.max_init_steps)
-        # generate a random numpy array of length 6 such that sum of elments is less than init_steps
-        
-        xx = np.random.randint(0, init_steps + 1, size=2)
-        a = random.randint(0, init_steps)
-        b = init_steps - a
-        self.state = [a, b]
-        self.n_actions = 0
-        self.done = False
-        self.id = env_id
-        return self
-
     def statetorch2readable(self, state, alphabet={}):
         """
         Dataset Handler in activelearning deals only in tensors. This function converts the tesnor to readble format to save the train dataset

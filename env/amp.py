@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import random
 
+
 class AMP(GFlowNetEnv, GflowNetAMP):
     def __init__(self, max_init_steps, **kwargs):
         self.max_init_steps = max_init_steps
@@ -44,18 +45,6 @@ class AMP(GFlowNetEnv, GflowNetAMP):
             )
             state_XX.append(state)
         return state_XX
-    
-    def reset(self, env_id=None):
-        self.state = (
-            self.source.clone()
-        )  
-        init_steps = random.randint(0, self.max_init_steps)
-        random_state = torch.randint(low=0, high=4, size=(1, init_steps))
-        self.state[0:init_steps] = random_state
-        self.n_actions = 0
-        self.done = False
-        self.id = env_id
-        return self
 
     def statebatch2state(
         self, states: List[TensorType["1", "state_dim"]]
