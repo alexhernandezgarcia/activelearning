@@ -190,17 +190,3 @@ class MolSelfies(GFlowNetEnv, GFlowNetMolSelfies):
             plt.tight_layout()
             plt.close()
         return ax
-
-    # def get_pairwise_distance(self, samples, *kwargs):
-    #     smiles = sf.decoder(samples)
-    #     mols = [Chem.MolFromSmiles(smile) for smile in smiles]
-    #     fpgen = AllChem.GetRDKitFPGenerator()
-    #     fps = [fpgen.GetFingerprint(mol) for mol in mols]
-    #     scores = []
-    #     for i in range(len(fps)):
-    #         for j in range(i+1, len(fps)):
-    #             scores.append(DataStructs.TanimotoSimilarity(fps[i], fps[j]))
-    #     return scores
-
-    # def get_distance_from_D0(self, samples, dataset_states):
-    # return super().get_distance_from_D0(samples, dataset_states)
