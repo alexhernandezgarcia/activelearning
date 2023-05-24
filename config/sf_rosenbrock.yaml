@@ -9,45 +9,33 @@ defaults:
   # - oracle@_oracle_dict.1: branin1
   # - oracle@_oracle_dict.2: branin2
   # - oracle@_oracle_dict.3: branin3
-  - gflownet: ppo
+  - gflownet: trajectorybalance
   - user: nikita
-  - proxy: mes_gp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
+  - proxy: mes_svgp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
   - dataset: dataset
-  - regressor: sf_gp #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
-  # - model: mlp #regressive
+  - regressor: sf_dkl #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
+  - model: mlp #regressive
   - logger: wandb
 
-# proxy:
-#   cost_type: user
+proxy:
+  cost_type: user
 
-# model:
-#   beta1: 0.9
-#   beta2: 0.99
-
-# regressor:
-#   optim: adam
-#   surrogate:
-#     eval_period: 1
-#     num_epochs: 2048
-#     patience: 100
-#     num_inducing_points: 64
-#   encoder_obj: mlm
-#   lr_sched_type: plateau #step
+regressor:
+  surrogate:
+    eval_period: 1
+    num_epochs: 2048
+    patience: 15
+    num_inducing_points: 64
 
 logger:
-  # resume: True 
-  # logdir: 
-  #   root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-04-06_18-31-55
-  # run_id: 694bvn10
-  project_name: "Scratch"
+  project_name: "MF-Grid"
   lightweight: False
   plot:
-    period: 3000
-    first_it: True
+    period: -1
+    # first_it: True
   test:
-    period: -1 #3000
-    n: 1 #30000
-    first_it: True
+    period: 100
+    n: 1
   oracle:
     period: -1
   # ckpts:
@@ -55,14 +43,11 @@ logger:
   #     period: 1000
   do:
     times: False
-    online: False
+    online: True
   tags:
     # - r(x) = (80 + x)
     # - r(x) = 10x
     - branin
-    - gp
-    - correct_data
-    - fid_embed
     # - test svgp_dkl
     # - single_fidelity
     # - mf-mes
@@ -71,14 +56,13 @@ logger:
     # - 100x100
 
 env:
-  min_reward: 1e-15
   corr_type: None
   proxy_state_format: state #state_fidIdx FOR DKL, state for GP
   reward_func: power #shift power
   reward_beta: 1 #1 #80
   length: 100
   rescale: 10
-  reward_norm: 1 #1e-1 #1
+  reward_norm: 1e-3 #1e-1 #1
   buffer:
     train:
       path: null
@@ -97,16 +81,14 @@ env:
     
 
 gflownet:
-  ppo_num_epochs: 16
-  ppo_epoch_size: 32
   active_learning: True
   sample_only: True
-  random_action_prob: 0.0
+  random_action_prob: 0.001
   optimizer:
     lr: 5e-4
     lr_z_mult: 20
-    n_train_steps: 10000
-    batch_size: 16
+    n_train_steps: 5000
+    batch_size: 32
   policy:
     forward:
       type: mlp
@@ -122,26 +104,30 @@ gflownet:
 
 dataset:
   normalize_data: True
+# TODO can we get rid of "do"
+  fidelity: 
+    do: False #add dependance on N_FID
+    mixed: True
   n_samples: 300
   train_fraction: 0.8
-  split: all_train #random all_train
+  split: random #random all_train
   dataloader:
     train:
       batch_size: 256
     test:
       batch_size: 256
   path:
-    type: sf #mf sf
-    oracle_dataset: 
+    type: mf #mf sf
+    oracle_dataset: null
     # UNCOMMENT FOR GP
     # COMMENT FOR DKL BECAUSE NEED INDUCING POINTS
-      fid_type: random
-      train: 
-        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
-        path: /home/mila/n/nikita.saxena/activelearning/storage/branin/sf/data_train.csv
-        get_scores: True
-      # train: null
-      test: null
+      # fid_type: random
+      # train: 
+      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
+      #   # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid3_100x100.csv
+      #   get_scores: True
+      # # train: null
+      # test: null
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
 n_samples: 30
@@ -152,15 +138,12 @@ device: cuda
 # Float precision
 float_precision: 64
 #It is strongly recommended to use double precision in BoTorch, as this improves both precision and stability and can help avoid numerical errors. See https://github.com/pytorch/botorch/discussions/1444
-al_n_rounds: 10 #1
+al_n_rounds: 15
 do_figure: True
 multifidelity:
-  fid_embed: one_hot
-  fid_embed_dim: None
   proxy: True
   rescale: 10
   candidate_set_path: null
-budget: 450
   # /home/mila/n/nikita.saxena/activelearning/storage/branin/mf_train50.csv
   #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
   # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv

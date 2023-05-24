@@ -5,15 +5,15 @@ defaults:
   - env: grid
   # Required so that it can be set up in the environment and used for scoring
   # - true_oracle: branin
-  - oracle@_oracle_dict.1: branin
-  # - oracle@_oracle_dict.1: branin1
-  # - oracle@_oracle_dict.2: branin2
-  # - oracle@_oracle_dict.3: branin3
-  - gflownet: ppo
+  # - oracle@_oracle_dict.1: branin
+  - oracle@_oracle_dict.1: branin1
+  - oracle@_oracle_dict.2: branin2
+  - oracle@_oracle_dict.3: branin3
+  - gflownet: trajectorybalance
   - user: nikita
-  - proxy: mes_gp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
+  - proxy: mf_kg_gp # mes_gp #mf_mes_svgp #mes_gp  #mf_mes_gp #gp_ucb #mf_mes_dkl mes_gp
   - dataset: dataset
-  - regressor: sf_gp #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
+  - regressor: mf_gp #mf_dkl_linear #mf_svgp #mf_dkl #sf_svgp #sf_dkl #mf_gp #mf_dkl #sf_gp
   # - model: mlp #regressive
   - logger: wandb
 
@@ -39,14 +39,14 @@ logger:
   # logdir: 
   #   root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-04-06_18-31-55
   # run_id: 694bvn10
-  project_name: "Scratch"
+  project_name: "KG"
   lightweight: False
   plot:
     period: 3000
     first_it: True
   test:
-    period: -1 #3000
-    n: 1 #30000
+    period: 3000
+    n: 30000
     first_it: True
   oracle:
     period: -1
@@ -55,7 +55,7 @@ logger:
   #     period: 1000
   do:
     times: False
-    online: False
+    online: True
   tags:
     # - r(x) = (80 + x)
     # - r(x) = 10x
@@ -71,13 +71,12 @@ logger:
     # - 100x100
 
 env:
-  min_reward: 1e-15
   corr_type: None
   proxy_state_format: state #state_fidIdx FOR DKL, state for GP
   reward_func: power #shift power
   reward_beta: 1 #1 #80
   length: 100
-  rescale: 10
+  rescale: 15 
   reward_norm: 1 #1e-1 #1
   buffer:
     train:
@@ -97,8 +96,6 @@ env:
     
 
 gflownet:
-  ppo_num_epochs: 16
-  ppo_epoch_size: 32
   active_learning: True
   sample_only: True
   random_action_prob: 0.0
@@ -131,14 +128,14 @@ dataset:
     test:
       batch_size: 256
   path:
-    type: sf #mf sf
+    type: mf #mf sf
     oracle_dataset: 
     # UNCOMMENT FOR GP
     # COMMENT FOR DKL BECAUSE NEED INDUCING POINTS
       fid_type: random
       train: 
-        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
-        path: /home/mila/n/nikita.saxena/activelearning/storage/branin/sf/data_train.csv
+        path: /home/mila/n/nikita.saxena/activelearning/storage/branin/mf_300.csv
+        # path: /home/mila/n/nikita.saxena/activelearning/storage/branin/lower_quad_nfid3_100x100.csv
         get_scores: True
       # train: null
       test: null

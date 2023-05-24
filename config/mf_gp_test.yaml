@@ -1,0 +1,276 @@
+# @package _global_
+
+defaults:
+  # - _self_
+  - env: grid
+  # Required so that it can be set up in the environment and used for scoring
+  - true_oracle: corners
+  - oracle@_oracle_dict.1: corners_fid3 #rosenbrock1
+  - oracle@_oracle_dict.2: corners_fid2 #rosenbrock2
+  - oracle@_oracle_dict.3: corners_fid1 #rosenbrock3
+  - gflownet: trajectorybalance
+  - user: nikita
+  - proxy: mf_mes_gp #mf_mes_proxy
+  - dataset: dataset
+  - regressor: mf_gp #dropout_regressor
+  - model: gp #regressive
+  - logger: wandb
+
+proxy:
+  cost_type: user
+  # gibbon: False
+
+logger:
+  project_name: "Scratch"
+  lightweight: False
+  plot:
+    period: -1
+    first_it: True
+  test:
+    period: 500
+    n: 1
+  oracle:
+    period: -1
+  # ckpts:
+  #   policy:
+  #     period: 1000
+  do:
+    times: False
+    online: True
+  tags:
+    # - r(x) = (1000x)^8
+    # - full_regressive_mf_mlp
+    # - rosenbrock
+    - tb
+    - gp-mf-mes
+    # - good_oracle_sanity
+    - exact_mes
+    - sanity
+    - backward_policy = shared
+    - sampling_temp=1.0
+
+env:
+  proxy_state_format: oracle #raw
+  reward_func: power
+  reward_beta: 1 #8
+  length: 10
+  reward_norm: 1e-2 #1e-3
+  buffer:
+    train:
+      path: null
+      # /home/mila/n/nikita.saxena/activelearning/storage/amp/data_train.csv
+      n: null
+      type: null
+      seed: null
+      output_csv: null 
+    test:
+      path: null #data_test.csv
+      type: all
+      output_pkl: buffer_data_test.csv
+      n: null
+      seed: null
+      output_csv: null 
+    
+
+gflownet:
+  active_learning: True
+  sample_only: True
+  random_action_prob: 0.001 #0.001
+  optimizer:
+    lr: 5e-4
+    lr_z_mult: 20
+    n_train_steps: 5
+    batch_size: 32
+  policy:
+    forward:
+      type: mlp
+      n_hid: 2048
+      n_layers: 2
+      checkpoint: fp
+    backward:
+      type: mlp
+      shared_weights: True
+  pct_offline: 0.0
+  oracle:
+    n: 500
+
+dataset:
+  n_samples: 30
+  split: all_train #random
+  dataloader:
+    train:
+      batch_size: 256
+    test:
+      batch_size: 256
+  path:
+    oracle_dataset: null
+      # train: /home/mila/n/nikita.saxena/activelearning/storage/amp/data_train.csv
+      # test: /home/mila/n/nikita.saxena/activelearning/storage/amp/data_test.csv
+      # train: null
+      # test: null
+# Number of objects to sample at the end of training
+# Sample 5*K and choose topK
+n_samples: 64
+# Random seeds
+seed: 0
+# Device
+device: cuda
+# Float precision
+float_precision: 64
+#It is strongly recommended to use double precision in BoTorch, as this improves both precision and stability and can help avoid numerical errors. See https://github.com/pytorch/botorch/discussions/1444
+al_n_rounds: 15
+
+multifidelity:
+  proxy: True
+  candidate_set_path: null
+  rescale: 1
+  #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
+  # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
+  fixed_cost: 1e-6
+
+# Hydra config
+hydra:
+  # See: https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+    chdir: True
+
+# # @package _global_
+
+# defaults:
+#   # - _self_
+#   - env: grid
+#   - oracle: corners
+#   - noise@_noise_dict.1: normal_mu0_sigma0.3
+#   - noise@_noise_dict.2: normal_mu0_sigma0.2
+#   - noise@_noise_dict.3: normal_mu0_sigma0.1
+#   - gflownet: trajectorybalance
+#   - user: nikita
+#   - proxy: mf_mes_gp
+#   - dataset: dataset
+#   - regressor: mf_gp
+#   - model: gp
+#   - logger: wandb
+
+# proxy:
+#   cost_type: user
+
+# logger:
+#   project_name: "MF-Grid"
+#   lightweight: False
+#   plot:
+#     period: 1000
+#     first_it: True
+#   test:
+#     period: 100
+#     n: 1000
+#   oracle:
+#     period: 1000
+#   # ckpts:
+#   #   policy:
+#   #     period: 1000
+#   do:
+#     times: False
+#     online: True
+#   tags:
+#     - r(x) = 100x
+#     - 20x20
+#     - tb
+#     - gp-mf-mes
+#     - backward_policy = shared
+#     - sampling_temp=1.0
+#     - gp_grid_al
+#     - more_uncertain_oracles
+
+# env:
+#   proxy_state_format: oracle
+#   reward_func: power
+#   reward_beta: 1
+#   length: 10
+#   reward_norm: 1e-1
+#   buffer:
+#     train:
+#       path: null
+#       # /home/mila/n/nikita.saxena/activelearning/storage/amp/data_train.csv
+#       n: null
+#       seed: null
+#       output_csv: null 
+#     test:
+#       path: null
+#     # TODO: change path to a larger initial dataset
+#       type: all
+#       output_pkl: data_test.csv
+#       n: null
+#       seed: null
+#       output_csv: null 
+    
+
+# gflownet:
+#   al: True
+#   sample_only: True
+#   random_action_prob: 0.075
+#   optimizer:
+#     lr: 5e-4
+#     lr_z_mult: 20
+#     n_train_steps: 7000
+#     batch_size: 32
+#   policy:
+#     forward:
+#       type: mlp
+#       n_hid: 2048
+#       n_layers: 2
+#       checkpoint: fp
+#     backward:
+#       type: mlp
+#       shared_weights: True
+#   pct_batch_empirical: 0.0
+#   oracle:
+#     n: 500
+
+# dataset:
+#   mixed_fidelity: True
+#   n_samples: 30
+#   split: all_train
+#   dataloader:
+#     train:
+#       batch_size: 256
+#     test:
+#       batch_size: 256
+#   path:
+#     oracle_dataset: null
+#       # train: null
+#       # test: null
+# # Number of objects to sample at the end of training
+# # Sample 5*K and choose topK
+# n_samples: 32
+# # Random seeds
+# seed: 0
+# # Device
+# device: cuda
+# # Float precision
+# float_precision: 64
+# #It is strongly recommended to use double precision in BoTorch, as this improves both precision and stability and can help avoid numerical errors. See https://github.com/pytorch/botorch/discussions/1444
+# al_n_rounds: 10
+
+# multifidelity:
+#   toy: True
+#   n_fid: 3
+#   proxy: True
+#   candidate_set_path: null
+#   #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
+#   # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
+#   is_oracle_proxy: True
+#   fixed_cost: 1e-6
+
+# # Hydra config
+# hydra:
+#   # See: https://hydra.cc/docs/configure_hydra/workdir/
+#   run:
+#     dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+#   job:
+#     # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+#     # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+#     chdir: True

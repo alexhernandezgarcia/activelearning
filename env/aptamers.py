@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from pathlib import Path
+import random
 
 
 def split_str(s):
@@ -14,7 +15,8 @@ def split_str(s):
 
 
 class Aptamers(GFlowNetEnv, GflowNetAptamers):
-    def __init__(self, **kwargs):
+    def __init__(self, max_init_steps, **kwargs):
+        self.max_init_steps = max_init_steps
         super().__init__(
             **kwargs,
         )

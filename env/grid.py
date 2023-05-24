@@ -8,10 +8,12 @@ import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pandas as pd
 from proxy.branin import MultiFidelityBranin, SingleFidelityBranin
+import random
 
 
 class Grid(GFlowNetEnv, GflowNetGrid):
-    def __init__(self, **kwargs):
+    def __init__(self, max_init_steps, **kwargs):
+        self.max_init_steps = max_init_steps
         super().__init__(
             **kwargs,
         )

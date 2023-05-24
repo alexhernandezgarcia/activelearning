@@ -1,0 +1,149 @@
+# @package _global_
+
+defaults:
+  # - _self_
+  - env: amp
+  - true_oracle: amp
+  # last must be the best for project function to work as expected
+  - oracle@_oracle_dict.1: amp_fid1
+  - oracle@_oracle_dict.2: amp_fid2
+  - oracle@_oracle_dict.3: amp
+  - gflownet: ppo
+  - user: nikita
+  - proxy: mf_mes_dkl  #mf_mes_gp #mes_gp
+  - dataset: dataset
+  - regressor: mf_dkl_linear
+  - model: mlm_transformer
+  - logger: wandb
+
+regressor:
+  surrogate: 
+    num_epochs: 512
+    patience: 15
+    eval_period: 1
+    num_inducing_points: 64
+
+logger:
+  resume: True 
+  logdir: 
+    root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-05-13_17-49-20
+    overwrite: False
+  run_id: jl95tmd1  
+  project_name: "PPO-AMP"
+  test:
+    period: -1
+    n: 1
+    first_it: False
+  do:
+    times: False
+    online: True
+  plot:
+    period: -1 #1000
+    first_it: False
+  tags:
+    - mf_branin
+    # - optimize_code
+    # - (10x)^8
+    # - amp
+    # - train_frac = 0.8
+    # - tb
+    # - get_scores_realtime
+    # - botorch_ucb
+    # - backward_policy = shared
+
+env:
+  max_init_steps: 15
+  corr_type: None
+  proxy_state_format: state #state_fidIdx FOR DKL, state for GP
+  reward_func: power #shift power
+  reward_beta: 1 #1 #80
+  beta_factor: 0
+  reward_norm: 0.00001
+  norm_factor: 1
+
+gflownet:
+  active_learning: True
+#   device: cuda
+#   sample_only: False
+#   random_action_prob: 0.001
+  optimizer:
+#     lr: 5e-4
+#     lr_z_mult: 50
+    n_train_steps: 10000
+    batch_size: 16
+  ppo_num_epochs: 4
+  ppo_epoch_size: 4
+  ppo_clip: 0.01
+  ppo_entropy_coef: 0.1
+  policy:
+    n_hid: 2048
+    n_layers: 2
+#     backward:
+#       # type: uniform
+#       shared_weights: True
+#   pct_offline: 0.0   
+
+# model:
+#   n_hid: 2048
+#   n_layers: 2
+
+# regressor:
+#   weight_decay: 1e-4
+#   lr: 1e-3
+#   max_epochs: 3
+#   history: 1
+
+dataset:
+  normalize_data: True
+  # n_samples: 300
+  train_fraction: 0.8
+  split: given #random all_train
+  dataloader:
+    train:
+      batch_size: 256
+    test:
+      batch_size: 256
+  path:
+    type: mf
+    oracle_dataset:
+      train: 
+        path: ${user.data_path}/amp/mf/data_train.csv
+        # /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-03-17_12-57-25/data/data_train.csv
+        get_scores: False
+      test: 
+        path: ${user.data_path}/amp/mf/data_test.csv
+        # /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-03-17_12-57-25/data/data_test.csv
+        get_scores: False
+        # /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/test_2000.csv
+        # get_scores: False
+      # train: null
+      # test: null
+  
+# Number of objects to sample at the end of training
+# Sample 5*K and choose topK
+n_samples: 32
+# Random seeds
+seed: 0
+# Device
+device: cuda
+# Float precision
+float_precision: 32
+al_n_rounds: 10
+do_figure: True
+multifidelity:
+  fid_embed: one_hot
+  fid_embed_dim: None
+  fixed_cost: 0
+  proxy: True
+  rescale: 10
+  candidate_set_path: null
+
+# Hydra config
+hydra:
+  # See: https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+    chdir: True
