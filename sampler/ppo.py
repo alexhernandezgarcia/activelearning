@@ -246,22 +246,6 @@ class PPOAgent(GFlowNetAgent):
         masks_s = torch.stack(masks_s)[idxs]
         G = torch.stack(G)[idxs]
         advantages = torch.stack(advantages)[idxs]
-        # G = G[idxs]
-        # advantages = advantages[idxs]
-
-        # zip(
-        #     *batch
-        # )
-        # (states, actions, logprobs, masks_s, advantages, rewards, done, traj_id) = map(
-        #     torch.cat,
-        #     [states, actions, logprobs, masks_s, advantages, rewards, done, traj_id],
-        # )
-        # G = rewards.clone()
-        # non_zero_indices = torch.nonzero(G).squeeze()
-        # Replace zero elements with the immediately succeeding non-zero element
-        # G[torch.cat([non_zero_indices[0].unsqueeze(0), non_zero_indices[:-1] + 1])] = G[
-        #     non_zero_indices
-        # ]
 
         policy_outputs = self.forward_policy(self.env.statetorch2policy(states))
         logits, values = policy_outputs[:, :-1], policy_outputs[:, -1]
@@ -300,40 +284,6 @@ class PPOAgent(GFlowNetAgent):
             action_loss,
             value_loss,
         ), ret_rewards
-
-        # policy_outputs = self.forward_policy(self.env.statetorch2policy(states[idxs]))
-        # logits, values = policy_outputs[:, :-1], policy_outputs[:, -1]
-        # if masks_s is not None:
-        #     logits[masks_s[idxs]] = -loginf
-        # action_indices = (
-        #     torch.tensor(
-        #         [
-        #             self.action_space.index(tuple(action.tolist()))
-        #             for action in actions[idxs]
-        #         ]
-        #     )
-        #     .to(int)
-        #     .to(self.device)
-        # )
-
-        # new_pol = Categorical(logits=logits)  # Categorical(logits: torch.Size([2, 3]))
-        # new_logprobs = new_pol.log_prob(action_indices)
-        # ratio = torch.exp(new_logprobs - logprobs)
-        # surr1 = ratio * advantages[idxs]
-        # surr2 = (
-        #     torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
-        #     * advantages[idxs]
-        # )
-        # action_loss = -torch.min(surr1, surr2).mean()
-
-        # value_loss = 0.5 * (G[idxs] - values).pow(2).mean()
-        # entropy = new_pol.entropy().mean()
-        # loss = action_loss + value_loss - entropy * self.entropy_coef
-
-        # if not it % 100:
-        #     print(G.mean())
-        # return (loss, action_loss, value_loss,), G[
-        #     done.eq(1)
 
     def sample_batch(
         self, envs, n_samples=None, train=True, model=None, progress=False
@@ -478,91 +428,6 @@ class PPOAgent(GFlowNetAgent):
             v_sp = self.forward_policy(self.env.statetorch2policy(states_sp))[:, -1]
         adv = rewards + v_sp * torch.logical_not(done) - v_s
         return batch, masks_s, G, adv, times
-
-        """
-        for tau in trajs.values():
-            (
-                states_in_traj,
-                actions_in_traj,
-                logprobs_in_traj,
-                states_sp_in_traj,
-                masks_sp_in_traj,
-                done_in_traj,
-                traj_id, #required for unpack_terminal_states
-                state_id_in_traj, #required for unpack_terminal_states
-            ) = [torch.cat(i, 0) for i in zip(*tau)]
-            rewards_in_traj = self.env.reward_torchbatch(states_in_traj, done_in_traj)
-            # state_id_in_traj = state_id_in_traj - state_id_in_traj.min() + 1
-            masks_s = torch.cat([self.mask_source, masks_sp_in_traj[:-1]])
-
-            # masks_s = torch.cat(
-            # [
-            #     masks_sp_in_traj[torch.where((state_id_in_traj == sid - 1))]
-            #     if sid > 0
-            #     else torch.zeros_like(masks_sp_in_traj[0])
-            #     for sid in state_id_in_traj
-            # ])
-            # advantages = torch.zeros_like(rewards_in_traj)
-            with torch.no_grad():  # masks not needed because dealing with values
-                v_s = self.forward_policy(self.env.statetorch2policy(states_in_traj))[
-                    :, -1
-                ]
-                v_sp = self.forward_policy(
-                    self.env.statetorch2policy(states_sp_in_traj)
-                )[:, -1]
-            adv = rewards_in_traj + v_sp * torch.logical_not(done_in_traj) - v_s 
-            # rewards_in_traj should always have the last element as the reward of the terminal state
-            for mask, i, A in zip(masks_s, tau, adv):
-                i.append(mask.unsqueeze(0))  # mask_s
-                i.append(
-                    rewards_in_traj[-1].unsqueeze(0)
-                )  # G, The return is always just the last reward, gamma is 1
-                i.append(A.unsqueeze(0))  # A
-        batch = sum(trajs.values(), [])
-        """
-
-        """
-        unpack batch
-        states, actions, logprobs, states_sp, masks_sp, done, traj_id, state_id = [
-            torch.cat(i, 0) for i in zip(*batch)
-        ] #everything is a tensor -- might be an issue is state is a list instead
-        # Compute rewards for all states (term and non-term)
-        rewards = self.env.reward_torchbatch(states, done)
-        # Shift state_id to [1, 2, ...]
-        for tid in traj_id.unique():
-            state_id[traj_id == tid] = (
-                state_id[traj_id == tid] - state_id[traj_id == tid].min()
-            ) + 1
-
-        # Build parents forward masks from state masks
-        masks_s = torch.cat(
-            [
-                masks_sp[torch.where((state_id == sid - 1) & (traj_id == pid))]
-                if sid > 1
-                else self.mask_source
-                for sid, pid in zip(state_id, traj_id)
-            ]
-        )
-        advantages = torch.zeros_like(rewards)
-        for tid in traj_id.unique():
-            traj_id_mask = traj_id == tid
-            state_in_traj = states[traj_id_mask]
-            state_sp_in_traj = states_sp[traj_id_mask]
-            rewards_in_traj = rewards[traj_id_mask]
-            with torch.no_grad(): #masks not needed because dealing with values
-                v_s = self.forward_policy(self.env.statetorch2policy(state_in_traj))[
-                    :, -1
-                ]
-                v_sp = self.forward_policy(
-                    self.env.statetorch2policy(state_sp_in_traj)
-                )[:, -1]
-            adv = rewards_in_traj + v_sp * torch.logical_not(done[traj_id_mask]) - v_s
-            advantages[traj_id_mask] = adv
-            # for a in advantages:
-                could not find a way to map the advantage to the corresponding batch element: mapping required because elements are added to batch ttsr number of times
-        """
-        # batch = [states, actions, logprobs, masks_s, advantages, rewards, done, traj_id]
-        return batch, times
 
     def unpack_terminal_states(self, batch):
         """
