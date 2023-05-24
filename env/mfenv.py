@@ -13,6 +13,7 @@ import pandas as pd
 import time
 from proxy.mol_oracles.mol_oracle import MoleculeOracle
 
+
 class MultiFidelityEnvWrapper(GFlowNetEnv):
     """
     Multi-fidelity environment for GFlowNet.
@@ -516,7 +517,9 @@ class MultiFidelityEnvWrapper(GFlowNetEnv):
         if self.is_state_list:
             state = state + [int(fid)]
         else:
-            state = torch.cat([state, torch.tensor([int(fid)])], dim=-1)
+            state = torch.cat(
+                [state, torch.tensor([int(fid)], device=state.device)], dim=-1
+            )
         return state
 
     def get_parents(self, state=None, done=None, action=None):

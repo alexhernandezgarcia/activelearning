@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import math
 import time
 
+
 class MLP(nn.Module):
     def __init__(
         self,
@@ -41,7 +42,7 @@ class MLP(nn.Module):
         # t1 = time.time()
         if self.transformerCall == False:
             x = self.preprocess(x)
-        output =  self.model(x)
+        output = self.model(x)
         # t2 = time.time()
         # xx = t2 - t1
         return output

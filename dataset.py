@@ -168,10 +168,12 @@ class DataHandler:
                 train_scores = None
             if self.n_fid > 1:
                 fidelities = states[:, -1].tolist()
-                # train_fidelities = train_states[:, -1].tolist()
-                # test_fidelities = test_states[:, -1].tolist()
+                train_fidelities = train_states[:, -1].tolist()
+                test_fidelities = test_states[:, -1].tolist()
             else:
                 fidelities = None
+                train_fidelities = None
+                test_fidelities = None
 
         else:
             raise NotImplementedError(
@@ -216,7 +218,7 @@ class DataHandler:
             self.env,
             train_states,
             train_scores,
-            fidelities,
+            train_fidelities,
             logger=self.logger,
             title="Initial Train Dataset",
             key="initial_train_dataset",
@@ -227,7 +229,7 @@ class DataHandler:
             self.env,
             test_states,
             test_scores,
-            fidelities,
+            test_fidelities,
             logger=self.logger,
             title="Initial Test Dataset",
             key="initial_test_dataset",

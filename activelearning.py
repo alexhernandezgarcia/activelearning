@@ -16,6 +16,7 @@ import numpy as np
 from utils.common import get_figure_plots
 from utils.eval_al_round import evaluate
 import pickle
+from proxy.mol_oracles.mol_oracle import MoleculeOracle
 
 
 @hydra.main(config_path="./config", config_name="mf_dkl")
@@ -313,13 +314,40 @@ def main(config):
                     picked_samples, picked_fidelity
                 )
                 energies_for_evaluation = oracle(picked_samples)
+                if isinstance(oracle, MoleculeOracle):
+                    hf_idxNaN = torch.isnan(energies_for_evaluation)
+                    cf_idxNaN = torch.isnan(picked_energies)
+                    idxNaN = hf_idxNaN | cf_idxNaN
+                    updated_picked_samples = []
+                    updated_picked_states = []
+                    for i in range(len(picked_samples)):
+                        if idxNaN[i]:
+                            continue
+                        else:
+                            updated_picked_samples.append(picked_samples[i])
+                            updated_picked_states.append(picked_states[i])
 
-                # use picked_energies to update dataset
-                # env.oracle is highest fidelity
-                # eval_energies = env.oracle(picked_samples)
+                    picked_energies = picked_energies[~idxNaN]
+                    energies_for_evaluation = energies_for_evaluation[~idxNaN]
+                    picked_samples = updated_picked_samples
+                    picked_states = updated_picked_states
             else:
                 picked_samples = env.statebatch2oracle(picked_states)
                 picked_energies = env.oracle(picked_samples)
+                if isinstance(oracle, MoleculeOracle):
+                    idxNaN = torch.isnan(picked_energies)
+                    updated_picked_samples = []
+                    updated_picked_states = []
+                    for i in range(len(picked_samples)):
+                        if idxNaN[i]:
+                            continue
+                        else:
+                            updated_picked_samples.append(picked_samples[i])
+                            updated_picked_states.append(picked_states[i])
+                    # picked_samples = picked_samples[picked_samples[i] for i in range(len(picked_samples)) if not idxNaN[i]]
+                    picked_energies = picked_energies[~idxNaN]
+                    picked_samples = updated_picked_samples
+                    picked_states = updated_picked_states
                 energies_for_evaluation = picked_energies
                 picked_fidelity = None
 

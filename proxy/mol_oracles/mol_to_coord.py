@@ -66,7 +66,7 @@ class MolToCoord:
             mol = Chem.MolFromSmiles(mol)
             if mol is None:
                 return None, None, None, None
-        elif mol_repr == "selfies":
+        elif mol_repr == "selfies" or len(smiles)<10:
             smiles = sf.decoder(mol)
             if smiles is None:
                 return None, None, None, None
