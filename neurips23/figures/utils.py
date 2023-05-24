@@ -422,7 +422,7 @@ def get_top_k_diverse(
     seqs = [seq.split(";")[0] for seq in seqs]
     if task in ("amp"):
         if diversity_thresh is None:
-            diversity_thresh = 0.35  # at most 0.35 similar to each other
+            diversity_thresh = 0.60  # at most 0.35 similar to each other
         seqs = [biotite_seq.ProteinSequence(seq) for seq in seqs]
         if substitution_matrix is None:
             substitution_matrix = align.SubstitutionMatrix.std_protein_matrix()
