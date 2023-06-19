@@ -43,10 +43,8 @@ class MLP(nn.Module):
 
         # TODO: this is grid specific for now, make it general (for apatamers and torus)
         if config_env.proxy_state_format == "ohe":
-            self.input_max_length = (
-                config_env.n_dim
-            )  # max_seq_length  # config_env.n_dim
-            self.input_classes = config_env.length  # config_env.length n_alphabet
+            self.input_max_length = config_env.n_dim
+            self.input_classes = config_env.length
         else:
             self.input_classes = 1
             self.input_max_length = config_env.n_dim

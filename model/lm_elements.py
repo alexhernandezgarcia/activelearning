@@ -48,7 +48,7 @@ class LanguageModel(nn.Module):
         self.mask_ratio = mask_ratio
         self.is_fid_param = False
 
-    def forward(self, inputs):  # torch.Size([426, 36])
+    def forward(self, inputs):
         return self.model(inputs)
 
     def get_features(self, inputs):
@@ -62,7 +62,7 @@ class LanguageModel(nn.Module):
         if n_fid > 1:
             input_batch = input_batch[..., :-1]
         # replace random tokens with mask token
-        mask_idxs = sample_mask(input_batch, self.tokenizer, mask_ratio)  # (32, 5)
+        mask_idxs = sample_mask(input_batch, self.tokenizer, mask_ratio)
         masked_token_batch = input_batch.clone().to(self.device)
         np.put_along_axis(
             masked_token_batch, mask_idxs, self.tokenizer.masking_idx, axis=1
@@ -73,7 +73,7 @@ class LanguageModel(nn.Module):
         vocab_size = logits.shape[-1]
         masked_logits = np.take_along_axis(logits, mask_idxs[..., None], axis=1).view(
             -1, vocab_size
-        )  # torch.Size([160, 26])
+        )
 
         # use the ground-truth tokens as labels
         masked_tokens = np.take_along_axis(input_batch, mask_idxs, axis=1)
@@ -90,28 +90,6 @@ class LanguageModel(nn.Module):
             src_tok_features, padding_mask=src_mask, pooling_mask=src_mask
         )
         return lat_tok_features, pooled_features
-
-    # WAS COMMENTED OUT IN THE LAMBO REPO
-    # def fit(self, train_seqs, weights=None, num_epochs=None, log_prefix='lanmt'):
-    #     num_epochs = self.num_epochs if num_epochs is None else num_epochs
-    #     records = fit_lanmt_model(
-    #         model=self.model,
-    #         train_seqs=train_seqs,
-    #         num_epochs=num_epochs,
-    #         batch_size=self.batch_size,
-    #         lr=self.lr,
-    #         patience=self.patience,
-    #         max_shift=self.max_shift,
-    #         weights=weights,
-    #         log_prefix=log_prefix,
-    #     )
-    #     return records
-
-    # def get_token_idx(self, token):
-    #     return self.model.tokenizer.convert_token_to_id(token)
-
-    # def get_token(self, idx):
-    #     return self.model.tokenizer.convert_id_to_token(idx)
 
     def get_token_features(self, src_tok_idxs):
         src_tok_features, src_mask = self.model.enc_tok_features(src_tok_idxs)
@@ -132,33 +110,6 @@ class LanguageModel(nn.Module):
         )
         tgt_tok_logits = self.model.tgt_tok_logits(tgt_tok_features)
         return tgt_tok_logits, tgt_mask
-
-    # def sample_tgt_tok_idxs(self, tgt_tok_logits, tgt_mask, temp=1.):
-    #     batch_size, num_tokens = tgt_mask.shape
-    #     tgt_lens = tgt_mask.float().sum(-1).long()
-    #     tgt_tok_logits /= temp
-
-    #     # don't sample special tokens
-    #     non_viable_idxs = np.array(self.tokenizer.special_idxs)[None, None, :]
-    #     np.put_along_axis(tgt_tok_logits, non_viable_idxs, -1e10, axis=-1)
-
-    #     tgt_tok_idxs = torch.full(tgt_mask.size(), self.tokenizer.padding_idx)
-    #     tgt_tok_idxs = tgt_tok_idxs.to(tgt_mask).long()
-    #     tok_dist = torch.distributions.Categorical(logits=tgt_tok_logits)
-    #     sample_tok_idxs = tok_dist.sample()
-
-    #     tgt_tok_idxs += tgt_mask * sample_tok_idxs
-
-    #     tgt_tok_idxs[:, 0] = self.tokenizer.bos_idx
-    #     tgt_tok_idxs[torch.arange(batch_size), tgt_lens - 1] = self.tokenizer.eos_idx
-
-    #     logit_entropy = -(
-    #         F.softmax(tgt_tok_logits, dim=-1) * F.log_softmax(tgt_tok_logits, dim=-1)
-    #     ).sum(-1)
-    #     logit_entropy *= tgt_mask.float()
-    #     logit_entropy = logit_entropy.sum() / tgt_mask.float().sum()
-
-    #     return tgt_tok_idxs, logit_entropy
 
     def param_groups(self, *args, **kwargs):
         return self.model.param_groups(*args, **kwargs)
@@ -225,13 +176,7 @@ class FunctionHead(nn.Module):
         padding_mask: Tensor,
         pooling_mask: Tensor,
     ):
-        """
-        :param tok_features: (batch_size, num_tokens, input_dim) = torch.Size([426, 36, 16])
-        :param padding_mask: (batch_size, num_tokens) True to NOT ignore = torch.Size([426, 36]) --> True for non-padding tokens and False for padding tokens
-        :param pooling_mask: (batch_size, num_tokens) True to NOT ignore = torch.Size([426, 36])
-        """
-        # conv layers expect inputs with shape (batch_size, input_dim, num_tokens)
-        # type = conv
+
         if self.type == "conv":
             tok_features, _ = self.att_layer(
                 (tok_features.permute(0, 2, 1), padding_mask)
@@ -248,11 +193,11 @@ class FunctionHead(nn.Module):
             )
             tok_features = self.dropout(F.gelu(tok_features))
 
-        pooling_mask = pooling_mask.unsqueeze(-1).float()  # torch.Size([426, 36, 1])
+        pooling_mask = pooling_mask.unsqueeze(-1).float()
         pooled_features = (pooling_mask * tok_features).sum(-2) / (
             pooling_mask.sum(-2) + 1e-6
-        )  # torch.Size([426, 16])
-        pooled_features = self.linear(pooled_features)  # torch.Size([426, 16])
+        )
+        pooled_features = self.linear(pooled_features)
         return tok_features, pooled_features
 
 
@@ -296,15 +241,10 @@ class LengthTransform(nn.Module):
         src_mask: Tensor,
         tgt_lens: Tensor,
     ):
-        """
-        :param src_tok_features: (batch_size, num_src_tokens, embed_dim)
-        :param src_mask: (batch_size, num_src_tokens)
-        :param tgt_lens: (batch_size,)
-        :return:
-        """
+
         batch_size, num_src_tokens = src_mask.shape
-        src_lens = src_mask.float().sum(-1)  # torch.Size([9])
-        tgt_lens = tgt_lens.to(src_lens)  # torch.Size([9])
+        src_lens = src_mask.float().sum(-1)
+        tgt_lens = tgt_lens.to(src_lens)
 
         if torch.all(
             src_lens == tgt_lens
@@ -312,30 +252,5 @@ class LengthTransform(nn.Module):
             return src_tok_features, src_mask.bool()
         else:
             raise NotImplementedError(
-                "Length Transformation nto supported here. Check Lambo."
+                "Length Transformation nto supported here. Check Lambo codebase."
             )
-
-        # src_arange = torch.arange(num_src_tokens).to(src_mask.device)
-        # src_arange = src_arange.expand(batch_size, -1).unsqueeze(-1).float()  # (batch_size, num_src_tokens, 1)
-
-        # tgt_arange = torch.arange(tgt_lens.max()).to(src_mask.device)
-        # tgt_arange = tgt_arange.expand(batch_size, -1).unsqueeze(-2).float()  # (batch_size, 1, num_tgt_tokens)
-
-        # len_ratio = src_lens / tgt_lens  # (batch_size,)
-        # len_ratio = len_ratio.view(-1, 1, 1)
-
-        # sq_diff = (src_arange - len_ratio * tgt_arange) ** 2
-        # sq_diff = sq_diff.to(self.lengthscale)
-
-        # logits = -sq_diff / (2 * self.lengthscale ** 2)  # (batch_size, num_src_tokens, num_tgt_tokens)
-        # logits = src_mask[..., None] * logits - (1 - src_mask[..., None]) * 1e10
-        # weights = F.softmax(logits, dim=-2)
-        # weights = weights.unsqueeze(-1).to(src_tok_features)
-
-        # tgt_token_features = src_tok_features.unsqueeze(-2)
-        # tgt_token_features = weights * tgt_token_features  # (batch_size, num_src_tokens, num_tgt_tokens, embed_dim)
-        # tgt_token_features = tgt_token_features.sum(-3)
-
-        # tgt_mask = (tgt_arange.squeeze(-2) < tgt_lens.unsqueeze(-1))
-
-        # return tgt_token_features, tgt_mask

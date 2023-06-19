@@ -38,8 +38,6 @@ class MultiFidelityInducingPointAllocator(InducingPointAllocator):
         output = x_output.mul(f_output)
         train_train_kernel = output.evaluate_kernel()
 
-        # train_train_kernel = covar_module(inputs).evaluate_kernel()
-
         # base case
         if train_train_kernel.ndimension() == 2:
             quality_scores = quality_function(inputs)

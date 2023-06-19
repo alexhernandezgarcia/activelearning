@@ -169,22 +169,6 @@ class RegressiveMLP(nn.Module):
         feature_masked = feature_tensor[fid_ohe == 1]
         return feature_masked
 
-    # def preprocess(self, x, fid):
-    #     """
-    #     Args:
-    #         x: one hot encoded tensor of shape (batch_size, obs_dim)
-    #             paddded till the maximum el lwngth in the batch
-    #         fid: tensor of shape (batch_size) with integers representing the fidelity
-    #     Returns:
-    #         input: tensor of shape (batch_size, init_layer_depth)
-    #             padded till the maximum length in the dataset
-    #         fid_ohe: one hot encoded represenation of fidelity (1 is represented as [1, 0] and 2 as [0, 1])
-    #     """
-    #     input = torch.zeros(x.shape[0], self.init_layer_depth)
-    #     input[:, : x.shape[1]] = x
-    #     fid_ohe = F.one_hot(fid, num_classes=self.num_fid + 1)[:, 1:].to(torch.float32)
-    #     return input.to(x.device), fid_ohe
-
     def forward_seq_regressive(self, input):
         """Implementation of DNN-MFBO
         Args:
@@ -196,29 +180,6 @@ class RegressiveMLP(nn.Module):
         feature = self.get_feature_seq_regressive(input)
         output = self.output_layer(feature)
         return output
-        # input, fid_ohe = self.preprocess(input, fid)
-        x, fid = (
-            input[:, : -self.num_fid_parameter],
-            input[:, -self.num_fid_parameter :],
-        )
-        if self.num_fid_parameter != self.n_fid:
-            fid = fid.squeeze(-1)
-            fid_ohe = F.one_hot(fid.long(), num_classes=self.n_fid + 1)[:, :-1].to(
-                torch.float32
-            )
-        else:
-            fid_ohe = fid
-        output_interm = self.base_module(x)
-        outputs = []
-        for m in range(self.n_fid):
-            # TODO: MIGHT BREAK BECAUSE OUTPUT_INTERM IS EMPTY
-            augment_input = torch.cat([output_interm, x], axis=1)
-            feature = self.layers[m](augment_input)
-            output_interm = self.output_layer(feature)
-            outputs.append(output_interm)
-        output_tensor = torch.stack(outputs, dim=1).to(self.device)
-        output_masked = output_tensor[fid_ohe == 1]
-        return output_masked
 
     def forward_full_regressive(self, input):
         """Implementation of BMBO-DARN
@@ -231,32 +192,6 @@ class RegressiveMLP(nn.Module):
         feature = self.get_feature_full_regressive(input)
         output = self.output_layer(feature)
         return output
-        x, fid = (
-            input[:, : -self.num_fid_parameter],
-            input[:, -self.num_fid_parameter :],
-        )
-        if self.num_fid_parameter != self.n_fid:
-            fid = fid.squeeze(-1)
-            fid_ohe = F.one_hot(fid.long(), num_classes=self.n_fid + 1)[:, :-1].to(
-                torch.float32
-            )
-        else:
-            fid_ohe = fid
-        # input, fid_ohe = self.preprocess(input, fid)
-        if self.base_module is not None:
-            output_interm = self.base_module(x)
-            augment_input = torch.cat([output_interm, x], axis=1)
-        else:
-            augment_input = x
-        outputs = []
-        for m in range(self.n_fid):
-            feature = self.layers[m](augment_input)
-            output_fid = self.output_layer(feature)
-            augment_input = torch.cat([output_fid, augment_input], axis=1)
-            outputs.append(output_fid)
-        output_tensor = torch.stack(outputs, dim=1).to(self.device)
-        output_masked = output_tensor[fid_ohe == 1]
-        return output_masked
 
     def param_groups(self, lr, weight_decay):
         shared_group = dict(
