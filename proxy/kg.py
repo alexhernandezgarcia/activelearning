@@ -60,12 +60,7 @@ class GaussianProcessKnowledgeGradient(MultiFidelity):
     def load_candidate_set(self):
         path = self.logger.data_path.parent / Path("data_train.csv")
         data = pd.read_csv(path, index_col=0)
-        # samples = data["samples"]
         energies = data["energies"]
-        # state = [self.env.readable2state(sample) for sample in samples]
-        # state_proxy = self.env.statebatch2proxy(state)[: self.regressor.n_samples]
-        # if isinstance(energies, torch.Tensor):
-        # return energies.to(self.device)
         return torch.tensor(energies, device=self.device, dtype=self.float)
 
     def project(self, states):

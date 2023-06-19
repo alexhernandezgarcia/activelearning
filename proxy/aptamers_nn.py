@@ -39,12 +39,9 @@ class MLP(nn.Module):
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
-        # t1 = time.time()
         if self.transformerCall == False:
             x = self.preprocess(x)
         output = self.model(x)
-        # t2 = time.time()
-        # xx = t2 - t1
         return output
 
     def preprocess(self, inputs):
@@ -153,20 +150,6 @@ class AptamersNN(Proxy):
         # as the indices were used to train the MLP
         # Amd the indices were assigned in the numbers2letters() function linked above
         self.lookup = {"A": 1, "T": 2, "C": 3, "G": 4}
-        # MLP Params
-        # IN_DIM = self.max_seq_length * NUM_TOKEN
-        # HIDDEN_FC = [1024, 1024, 1024, 1024, 1024]
-        # self.model = MLP(
-        #     IN_DIM,
-        #     NUM_OUTPUT,
-        #     HIDDEN_FC,
-        #     DROPOUT,
-        #     device=self.device,
-        #     transformerCall=False,
-        #     num_token=NUM_TOKEN,
-        #     seq_len=self.max_seq_length,
-        # )
-        # oraclePath = "/home/mila/n/nikita.saxena/activelearning/storage/dna/length30/mlp100k_correct.pt"
         NUM_HIDDEN_TRANSFORMER = 1024
         NUM_HEAD = 16
         PRE_LN = True

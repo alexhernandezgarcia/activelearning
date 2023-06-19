@@ -1,6 +1,6 @@
 import glob, subprocess, re, shutil, warnings, traceback
 
-# to fix shutil.Error: Destination path already exists
+# TODO: fix shutil.Error: Destination path already exists
 
 import os, time
 from rdkit import Chem

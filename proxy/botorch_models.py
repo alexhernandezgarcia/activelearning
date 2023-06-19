@@ -18,7 +18,6 @@ class FidelityCostModel(CostAwareUtility):
 
     def forward(self, X, deltas, **kwargs):
         fidelity = X[:, 0, -1]
-        # print(deltas)
         scaled_deltas = torch.zeros(X.shape[0], dtype=self.float).to(self.device)
         for fid in self.fidelity_weights.keys():
             idx_fid = torch.where(fidelity == fid)[0]
@@ -27,7 +26,6 @@ class FidelityCostModel(CostAwareUtility):
             )
             scaled_deltas[idx_fid] = (deltas[0, idx_fid] / cost_fid) + self.fixed_cost
         scaled_deltas = scaled_deltas.unsqueeze(0)
-        # print(scaled_deltas)
         return scaled_deltas
 
 
@@ -213,7 +211,6 @@ class MultifidelityOracleModel(Model):
         # batch and projected batch
         elif len(X.shape) == 4:
             # combination of target and original fidelity test set
-            #  X = 32 x 1 x 2 x 3
             var_curr_fidelity = torch.zeros(X.shape[0], 1)
             states = X[:, :, 0, :-1].squeeze(-2)
             states = states.squeeze(-2)
@@ -259,8 +256,6 @@ class MultifidelityOracleModel(Model):
 
         mean = mean.to(self.device)
         covar = covar.to(self.device)
-        # if covar.shape[0]>800:
-        #     print(covar[800])
         mvn = MultivariateNormal(mean, covar)
         posterior = GPyTorchPosterior(mvn)
         return posterior
