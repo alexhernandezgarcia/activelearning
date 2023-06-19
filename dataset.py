@@ -98,25 +98,6 @@ class DataHandler:
             data[indices] = 0.0
         return data
 
-    # def generate_fidelities(self, states):
-    #     """
-    #     Generates a list of fidelities for the dataset
-    #     """
-    #     n_samples = len(states)
-    #     if self.fidelity.mixed:
-    #         fidelities = torch.randint(low=0, high=self.n_fid, size=(n_samples, 1)).to(
-    #             self.float
-    #         )
-    #     else:
-    #         raise NotImplementedError(
-    #             "Logic not verified for when fidelity.mixed == False"
-    #         )
-    #         # One for each sample
-    #         fidelities = torch.zeros((n_samples * self.n_fid, 1)).to(self.device)
-    #         for i in range(self.n_fid):
-    #             fidelities[i * n_samples : (i + 1) * n_samples, 0] = i
-    #         states = [states for _ in range(self.n_fid)]
-    #     return states, fidelities
 
     def initialise_dataset(self):
         # TODO: Modify to ensure validation set has equal number of points across fidelities
@@ -422,13 +403,6 @@ class DataHandler:
         test_energies = self.convert_to_tensor(test_energies)
         train_energies = self.convert_to_tensor(train_energies)
 
-        # if isinstance(states, TensorType) == False:
-        #     states = torch.tensor(
-        #         np.array(states), device=self.device
-        #     )  # dtype=self.float,
-        # else:
-        #     states = states.to(self.device)  # dtype=self.float
-
         if self.normalize_data:
             self.train_dataset["energies"] = self.denormalize(
                 self.train_dataset["energies"], stats=self.train_stats
@@ -494,7 +468,6 @@ class DataHandler:
                     )
                 )
 
-        # Update data_train.csv so that buffer can pick it up
         train_path = self.logger.data_path.parent / Path("data_train.csv")
         train_dataset = pd.read_csv(train_path, index_col=0)
         train_energies = self.scale_by_target_factor(train_energies)
