@@ -126,18 +126,3 @@ def evaluate(
         print(f"\n Cumulative Cost: {cumulative_cost}")
     metrics_dict.update({"post_al_cum_cost": cumulative_cost})
     logger.log_metrics(metrics_dict, use_context=False)
-
-
-"""
-if extrema is not None and proxy_extrema is not None:
-    simple_regret = abs(torch.mean(extrema - energies[0]))
-    inference_regret = abs(
-        torch.mean(proxy_extrema.to(energies.device) - energies[0])
-    )
-    metrics_dict.update({"simple_regret": simple_regret})
-    metrics_dict.update({"inference_regret": inference_regret})
-    if logger.progress:
-        print(f"\t Simple Regret: {simple_regret}")
-        print(f"\t Inference Regret: {inference_regret}")
-        
-"""
