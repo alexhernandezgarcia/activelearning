@@ -33,7 +33,6 @@ def main(config):
     set_seeds(config.seed)
     # Configure device count to avoid deserialise error
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    # print(torch.cuda.device_count())
 
     print(
         "\n \tUser-Defined Warning: Oracles must be in increasing order of fidelity. \n \t Best oracle should be the last one in the config list."
@@ -142,29 +141,17 @@ def main(config):
     else:
         is_mes = False
 
-    if config.multifidelity.proxy == True:
-        data_handler = hydra.utils.instantiate(
-            config.dataset,
-            env=env,
-            logger=logger,
-            oracle=oracle,
-            device=config.device,
-            float_precision=config.float_precision,
-            rescale=rescale,
-            is_mes=is_mes,
-        )
-    # check if path exists
-    elif config.multifidelity.proxy == False:
-        regressor = None
-        if not os.path.exists(config.multifidelity.candidate_set_path):
-            # makes context set for acquisition function
-            make_dataset(
-                env,
-                oracles,
-                N_FID,
-                device=config.device,
-                path=config.multifidelity.candidate_set_path,
-            )
+    data_handler = hydra.utils.instantiate(
+        config.dataset,
+        env=env,
+        logger=logger,
+        oracle=oracle,
+        device=config.device,
+        float_precision=config.float_precision,
+        rescale=rescale,
+        is_mes=is_mes,
+    )
+
     if logger.resume == False:
         cumulative_cost = 0.0
         cumulative_sampled_states = []
@@ -186,22 +173,16 @@ def main(config):
         ]
         iter = logger.resume_dict["iter"] + 1
 
-    # env.reward_beta = env.reward_beta / env.beta_factor
     env.reward_norm = env.reward_norm * env.norm_factor
     initial_reward_beta = env.reward_beta
     initial_reward_norm = env.reward_norm
     while cumulative_cost < BUDGET:
+        # BETA and NORM SCHEDULING
         env.reward_beta = initial_reward_beta + (
             initial_reward_beta * env.beta_factor * (iter - 1)
         )
         env.reward_norm = initial_reward_norm / (env.norm_factor ** (iter - 1))
-        # env.max_init_steps = env.max_init_steps + 5 *(iter-1)
-        # env.reward_norm = initial_reward_norm - (
-        #     initial_reward_norm * env.norm_factor * (iter - 1)
-        # )
         if config.multifidelity.proxy == True:
-            # Moved in AL iter because of inducing point bug:
-            # Different number of inducing points calculated by cholesky method in each iteration
             regressor = hydra.utils.instantiate(
                 config.regressor,
                 config_env=config.env,
@@ -281,10 +262,10 @@ def main(config):
                 states_tensor = torch.vstack(states)
             states_tensor = states_tensor.unique(dim=0)
             if isinstance(states[0], list):
-                # for all other envs, when we want list of lists
+                # for envs in which we want list of lists
                 states = states_tensor.tolist()
             else:
-                # for AMP, when we want list of tensors
+                # for the envs in which we want list of tensors
                 states = list(states_tensor)
             state_proxy = env.statebatch2proxy(states)
             if isinstance(state_proxy, list):
@@ -344,7 +325,6 @@ def main(config):
                         else:
                             updated_picked_samples.append(picked_samples[i])
                             updated_picked_states.append(picked_states[i])
-                    # picked_samples = picked_samples[picked_samples[i] for i in range(len(picked_samples)) if not idxNaN[i]]
                     picked_energies = picked_energies[~idxNaN]
                     picked_samples = updated_picked_samples
                     picked_states = updated_picked_states
@@ -381,9 +361,7 @@ def main(config):
                 cumulative_cost += np.sum(cost_al_round)
                 avg_cost = np.mean(cost_al_round)
                 logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
-                # logger.log_metrics(
-                #     {"post_al_cum_cost": cumulative_cost}, use_context=False
-                # )
+
             else:
                 cost_al_round = torch.ones(len(picked_states))
                 if hasattr(oracle, "cost"):
@@ -391,9 +369,6 @@ def main(config):
                 avg_cost = torch.mean(cost_al_round).detach().cpu().numpy()
                 cumulative_cost += torch.sum(cost_al_round).detach().cpu().numpy()
                 logger.log_metrics({"post_al_avg_cost": avg_cost}, use_context=False)
-                # logger.log_metrics(
-                #     {"post_al_cum_cost": cumulative_cost}, use_context=False
-                # )
 
             if config.env.proxy_state_format != "oracle":
                 evaluate(
