@@ -71,21 +71,28 @@ Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidel
 
 Below we list other configuration options. See the config files in `./config` for all configurable parameters. Note that any config field can be overridden from the command line, and some configurations are not supported.
 
-### Environment Options
+**Environment Options**
 - `grid` (for the synthetic tasks, Branin and Hartmann)
 - `aptamers`  (for DNA)
 - `amp` (for antimicrobial peptides)
 - `mols` (for molecules represented as SELFIES strings)
 
-### Oracle Options
+**Oracle Options**
 The oracles are prefixed by the environment (`branin`, `hartmann`, `amp`, `aptamers`, `mols_ea`, `mols_ip`) and indexed by increasing level of fidelity. 
 
-### Sampler Options
+**Sampler Options**
 - `gflownet` (gflownet with the flowmatch objective)
 - `trajectorybalance` (gflownet with the trajectory balance objective, recommended for reproducing results)
 - `ppo` (RL baseline, proximal policy optimization algorithm)
 
-### Model Options 
+**Proxy Options**
+Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidelity and multi-fidelity variants repectively.
+- `<fid>_gp` (exact gaussian process for regression)
+- `<fid>_svgp` (stochastic vartiation gaussian process for regression)
+- `<fid>_dkl` (deep kernel regressor with backbone as one of the model options and index kernel for learning the fidelity parameter)
+- `mf_dkl_linear` (multi-fidelity deep kernel regressor with backbone as one of the model options (below) and linear downsampling kernel for learning the fidelity parameter)
+
+**Model Options** 
 - `mlp`
 - `transformer`
 - `mlm_cnn` (masked language model based on CNN layers)
@@ -93,14 +100,8 @@ The oracles are prefixed by the environment (`branin`, `hartmann`, `amp`, `aptam
 - `regressive` (based on the [DNN-MFBO implementation](https://github.com/shib0li/DNN-MFBO))
 - `mf_mlp` (MLP with an additional layer over the concatenated representation of the feature with fidelity)
 
-### Proxy Options
-Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidelity and multi-fidelity variants repectively.
-- `<fid>_gp` (exact gaussian process for regression)
-- `<fid>_svgp` (stochastic vartiation gaussian process for regression)
-- `<fid>_dkl` (deep kernel regressor with backbone as one of the model options and index kernel for learning the fidelity parameter)
-- `mf_dkl_linear` (multi-fidelity deep kernel regressor with backbone as one of the model options and linear downsampling kernel for learning the fidelity parameter)
 
-### Acquisition Function Options
+**Acquisition Function Options**
 Single and multi-fidelity variants of the Max Entropy Search (MES) acquisiton function have been implemented. The suffix (`<gp>`, `<svgp>`, `<dkl>` indicate with which regressor the implementation is compatible with.)
 
 ## Citation
