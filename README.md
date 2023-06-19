@@ -46,7 +46,7 @@ used to evaluate them.
 python -m pip install --upgrade https://github.com/alexhernandezgarcia/gflownet/archive/cont_mf.zip 
 ```
 2.  Clone this repository and install other dependencies by running ```pip install -r requirements.txt``` where this repository is cloned.
-3. Set up the AMP oracles (optional, required only if you wish to run experiments with the anti-microbial protien environment). Install the clamp-common-eval library from [MJ10/clamp-gen-data](https://github.com/MJ10/clamp-gen-data/tree/mfgfn-v1.0) by cloning the repo and then running the following where the repository is cloned: 
+3. Set up the AMP oracles (optional, required only if you wish to run experiments with the anti-microbial peptide environment). Install the clamp-common-eval library from [MJ10/clamp-gen-data](https://github.com/MJ10/clamp-gen-data/tree/mfgfn-v1.0) by cloning the repo and then running the following where the repository is cloned: 
 ```
 pip install -r requirements.txt && pip install -e .
 ``` 
@@ -69,6 +69,7 @@ Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidel
 - `<fid>_mols_ea`: Molecules with the objective of maximizing electron affinity 
 - `<fid>_mols_ip`: Molecules with the objective of maximizing (negative) ionization potential  
 
+### Additional Config Options
 Below we list other configuration options. See the config files in `./config` for all configurable parameters. Note that any config field can be overridden from the command line, and some configurations are not supported.
 
 **Environment Options**
@@ -78,6 +79,7 @@ Below we list other configuration options. See the config files in `./config` fo
 - `mols` (for molecules represented as SELFIES strings)
 
 **Oracle Options**
+
 The oracles are prefixed by the environment (`branin`, `hartmann`, `amp`, `aptamers`, `mols_ea`, `mols_ip`) and indexed by increasing level of fidelity. 
 
 **Sampler Options**
@@ -86,6 +88,7 @@ The oracles are prefixed by the environment (`branin`, `hartmann`, `amp`, `aptam
 - `ppo` (RL baseline, proximal policy optimization algorithm)
 
 **Proxy Options**
+
 Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidelity and multi-fidelity variants repectively.
 - `<fid>_gp` (exact gaussian process for regression)
 - `<fid>_svgp` (stochastic vartiation gaussian process for regression)
@@ -102,7 +105,8 @@ Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidel
 
 
 **Acquisition Function Options**
-Single and multi-fidelity variants of the Max Entropy Search (MES) acquisiton function have been implemented. The suffix (`<gp>`, `<svgp>`, `<dkl>` indicate with which regressor the implementation is compatible with.)
 
+Single and multi-fidelity variants of the Max Entropy Search (MES) acquisiton function have been implemented. The suffix (`<gp>`, `<svgp>`, `<dkl>` indicate with which regressor the implementation is compatible with.)
+<!-- 
 ## Citation
-If you use any part of this code for your own work, please cite
+If you use any part of this code for your own work, please cite -->
