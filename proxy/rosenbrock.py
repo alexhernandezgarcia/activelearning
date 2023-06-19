@@ -22,7 +22,6 @@ class Rosenbrock(Proxy):
             torch.ones((len(states), 2), device=self.device, dtype=self.float)
             * self.fid
         )
-        # fidelity[:,0] = fidelity[:, 0] - 0.1
         states = states - 5
         state_fid = torch.cat([states, fidelity], dim=1)
         scores = self.task(state_fid)

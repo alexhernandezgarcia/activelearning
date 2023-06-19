@@ -18,12 +18,16 @@ class MLP(nn.Module):
         num_output,
         dropout_prob,
         activation,
+        feature_dim,
+        beta1=0.9,
+        beta2=0.999,
         transformerCall=False,
         config_env=None,
         input_dim=None,
         **kwargs,
     ):
         super(MLP, self).__init__()
+        self.feature_dim = feature_dim
         """
         Args:
             model parameters
@@ -35,10 +39,15 @@ class MLP(nn.Module):
 
         """
         self.activation = ACTIVATION_KEY[activation]
+        self.is_fid_param = False
 
         # TODO: this is grid specific for now, make it general (for apatamers and torus)
-        self.input_max_length = config_env.max_seq_length  # config_env.n_dim
-        self.input_classes = config_env.n_alphabet  # config_env.length
+        if config_env.proxy_state_format == "ohe":
+            self.input_max_length = config_env.n_dim
+            self.input_classes = config_env.length
+        else:
+            self.input_classes = 1
+            self.input_max_length = config_env.n_dim
         self.out_dim = num_output
 
         if transformerCall == False:
@@ -65,8 +74,11 @@ class MLP(nn.Module):
                     nn.Dropout(self.dropout_prob),
                 ]
             )
-        layers.append(nn.Linear(self.hidden_layers[-1], self.out_dim))
-        self.model = nn.Sequential(*layers)
+        self.feature_extractor = nn.Sequential(*layers)
+        self.output_layer = nn.Linear(self.hidden_layers[-1], self.out_dim)
+        self.betas = (beta1, beta2)
+
+        # layers.append(nn.Linear(self.hidden_layers[-1], self.out_dim))
 
     def forward(self, x, **kwargs):
         """
@@ -76,10 +88,59 @@ class MLP(nn.Module):
 
         """
         # Pads the tensor till maximum length of dataset
-        input = torch.zeros(x.shape[0], self.init_layer_depth)
-        input[:, : x.shape[1]] = x
+        # input = torch.zeros(x.shape[0], self.init_layer_depth).to(x.device)
+        # input[:, : x.shape[1]] = x
         # Performs a forward call
-        return self.model(x)
+        feature = self.feature_extractor(x)
+        output = self.output_layer(feature)
+        return output
+
+    def get_features(self, x, **kwargs):
+        feature = self.feature_extractor(x)
+        return feature
+
+    def param_groups(self, lr, weight_decay):
+        shared_group = dict(
+            params=[], lr=lr, weight_decay=weight_decay, betas=self.betas
+        )
+        for p_name, param in self.named_parameters():
+            shared_group["params"].append(param)
+        return [shared_group]
+
+    def train_step(
+        self,
+        input_batch,
+        optimizer,
+        target_batch,
+        n_fid=1,
+        criterion=nn.MSELoss(),
+        **kwargs,
+    ):
+        optimizer.zero_grad()
+        if n_fid > 1:
+            input_batch = input_batch[..., :-1]
+        output = self(input_batch)
+        loss = criterion(output, target_batch.unsqueeze(-1))
+        # self.zero_grad()
+        loss.backward()
+        optimizer.step()
+        return loss
+
+    def eval_epoch(self, loader, criterion=nn.MSELoss(), n_fid=1, **kwargs):
+
+        metrics = {"loss": 0.0}
+        self.eval()
+        with torch.no_grad():
+            for (x, y) in loader:
+                x = x.to("cuda")
+                if n_fid > 1:
+                    x = x[..., :-1]
+                y = y.to("cuda").unsqueeze(-1)
+                y_hat = self(x)
+                loss = criterion(y_hat, y)
+                metrics["loss"] += loss.item() / len(loader)
+        metrics = {f"test_{key}": val for key, val in metrics.items()}
+        return metrics
 
 
 class PositionalEncoding(nn.Module):

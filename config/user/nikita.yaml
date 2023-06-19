@@ -1,2 +1,3 @@
 logdir:
-  root: /network/scratch/n/nikita.saxena/logs/activelearning
+  root: /home/mila/n/nikita.saxena/scratch/logs/activelearning
+data_path: /home/mila/n/nikita.saxena/activelearning/storage

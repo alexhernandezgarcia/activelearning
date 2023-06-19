@@ -2,3 +2,4 @@ defaults:
   - base
 _target_: proxy.ucb.UCB
 kappa: 0.1
+num_dropout_samples: 25

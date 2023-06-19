@@ -14,6 +14,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from abc import abstractmethod
 from botorch.models.approximate_gp import SingleTaskVariationalGP
 from gpytorch.mlls import VariationalELBO
+from botorch.settings import debug
 
 """
 Assumes that in single fidelity, fid =1
@@ -33,8 +34,7 @@ class SingleTaskGPRegressor:
 
         # Logger
         self.progress = self.logger.progress
-        if maximize == False:
-            self.target_factor = -1
+        self.target_factor = self.dataset.target_factor
 
     @abstractmethod
     def init_model(self, train_x, train_y):
@@ -46,19 +46,19 @@ class SingleTaskGPRegressor:
         train = self.dataset.train_dataset
         train_x = train["states"]
         train_y = train["energies"].unsqueeze(-1)
-        train_y = train_y * self.target_factor
-
         self.init_model(train_x, train_y)
+        with debug(state=True):
+            self.mll = fit_gpytorch_mll(self.mll)
 
-        self.mll = fit_gpytorch_mll(self.mll)
-
-    def get_predictions(self, env, states):
+    def get_predictions(self, env, states, denorm=False):
         """Input is states
         Proxy conversion happens within."""
         detach = True
         if isinstance(states, torch.Tensor) == False:
             states = torch.tensor(states, device=self.device, dtype=env.float)
             detach = False
+        if states.ndim == 1:
+            states = states.unsqueeze(0)
         states_proxy_input = states.clone()
         states_proxy = env.statetorch2proxy(states_proxy_input)
         model = self.model
@@ -75,6 +75,16 @@ class SingleTaskGPRegressor:
         else:
             y_mean = y_mean.squeeze(-1)
             y_std = y_std.squeeze(-1)
+        if denorm == True and self.dataset.normalize_data == True:
+            y_mean = (
+                y_mean
+                * (
+                    self.dataset.train_stats["max"].cpu()
+                    - self.dataset.train_stats["min"].cpu()
+                )
+                + self.dataset.train_stats["min"].cpu()
+            )
+            y_mean = y_mean.squeeze(-1)
         return y_mean, y_std
 
     def get_metrics(self, y_mean, y_std, env, states):
@@ -165,6 +175,8 @@ class SingleTaskGPRegressor:
             self._mode = state_pick_fid
 
     def evaluate_model(self, env, do_figure=True):
+        if env.n_dim > 2:
+            return None, 0.0, 0.0, 0.0, 0.0
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
         y_mean, y_std = self.get_predictions(env, states)
         rmse, nll = self.get_metrics(y_mean, y_std, env, states)
@@ -173,10 +185,12 @@ class SingleTaskGPRegressor:
         mode_mean, mode_std = self.get_predictions(env, self._mode)
         mode_rmse, mode_nll = self.get_metrics(mode_mean, mode_std, env, self._mode)
         if do_figure:
-            figure = self.plot_predictions(states, y_mean, env.length, env.rescale)
+            figure1 = self.plot_predictions(states, y_mean, env.length, env.rescale)
+            figure2 = self.plot_predictions(states, y_std, env.length, env.rescale)
+            fig = [figure1, figure2]
         else:
-            figure = None
-        return figure, rmse, nll, mode_rmse, mode_nll
+            fig = None
+        return fig, rmse, nll, mode_rmse, mode_nll
 
 
 class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
@@ -184,12 +198,13 @@ class MultiFidelitySingleTaskRegressor(SingleTaskGPRegressor):
         super().__init__(logger, device, dataset, **kwargs)
 
     def init_model(self, train_x, train_y):
+        fid_column = train_x.shape[-1] - 1
         self.model = SingleTaskMultiFidelityGP(
             train_x,
             train_y,
             outcome_transform=Standardize(m=1),
             # fid column
-            data_fidelity=self.n_fid - 1,
+            data_fidelity=fid_column,
         )
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
             self.model.likelihood, self.model
@@ -211,21 +226,3 @@ class SingleFidelitySingleTaskRegressor(SingleTaskGPRegressor):
             self.model.likelihood, self.model
         )
         self.mll.to(train_x)
-
-
-class VariationalSingleTaskRegressor(SingleTaskGPRegressor):
-    def __init__(self, logger, device, dataset, **kwargs):
-        super().__init__(logger, device, dataset, **kwargs)
-        self.num_inducing_points = 64
-
-    def init_model(self, train_x, train_y):
-        train_x = train_x[: self.num_inducing_points]
-        train_y = train_y[: self.num_inducing_points]
-        self.model = SingleTaskVariationalGP(
-            train_x,
-            train_y,
-            outcome_transform=Standardize(m=1),
-        )
-        self.mll = VariationalELBO(
-            self.model.likelihood, self.model.model, num_data=train_x.shape[-2]
-        )

@@ -10,12 +10,23 @@ from botorch.test_functions.synthetic import Branin as BotorchBranin
 
 class Branin(Proxy):
     def __init__(self, **kwargs):
+        """
+        Modes compatible with 100x100 grid"""
+        self.modes = [
+            [12.4, 81.833],
+            [54.266, 15.16],
+            [94.98, 16.5],
+        ]
+        self.extrema = 0.397887
         super().__init__(**kwargs)
 
     def plot_true_rewards(self, env, ax, rescale):
         states = torch.FloatTensor(env.get_all_terminating_states()).to(self.device)
-        states_input_oracle = states.clone()
-        states_oracle = env.statetorch2oracle(states_input_oracle)
+        states_oracle = states.clone()
+        grid_size = env.length
+        states_oracle = states_oracle / (grid_size - 1)
+        states_oracle[:, 0] = states_oracle[:, 0] * rescale - 5
+        states_oracle[:, 1] = states_oracle[:, 1] * rescale
         scores = self(states_oracle).detach().cpu().numpy()
         if hasattr(self, "fid"):
             title = "Oracle Energy (TrainY) with fid {}".format(self.fid)
@@ -52,9 +63,11 @@ class MultiFidelityBranin(Branin):
         self.cost = cost
 
     def __call__(self, states: TensorType["batch", "state_dim"]) -> TensorType["batch"]:
+        fid_dict = {0: 0.5, 1: 0.75, 2: 1.0}
+        fid = self.fid
+        fid = fid_dict[fid]
         fidelity = (
-            torch.ones((len(states), 1), device=self.device, dtype=self.float)
-            * self.fid
+            torch.ones((len(states), 1), device=self.device, dtype=self.float) * fid
         )
         if isinstance(states, TensorType) == False:
             states = torch.tensor(states, device=self.device, dtype=self.float)
@@ -69,7 +82,8 @@ class MultiFidelityBranin(Branin):
 
 
 class SingleFidelityBranin(Branin):
-    def __init__(self, **kwargs):
+    def __init__(self, cost, **kwargs):
+        self.cost = cost
         super().__init__(**kwargs)
         # minimisation problem so negate = False
         self.task = BotorchBranin(negate=False)

@@ -1,9 +1,13 @@
 import torch
 from .botorch_models import ProxyBotorchUCB
-from botorch.acquisition.monte_carlo import qUpperConfidenceBound
+from botorch.acquisition.monte_carlo import (
+    qUpperConfidenceBound,
+)
 from botorch.sampling import SobolQMCNormalSampler
 from .dropout_regressor import DropoutRegressor
 import numpy as np
+from regressor.dkl import DeepKernelRegressor
+from regressor.regressor import DropoutRegressor as SurrogateDropoutRegressor
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -14,12 +18,12 @@ class UCB(DropoutRegressor):
         self.kappa = kappa
 
     def __call__(self, inputs):
-        # TODO: modify this. input arg would never be fids
         """
         Args
             inputs: batch x obs_dim
         Returns:
             score of dim (n_samples,), i.e, ndim=1"""
+        self.regressor.eval()
         if isinstance(inputs, np.ndarray):
             inputs = torch.FloatTensor(inputs).to(self.device)
         outputs = self.regressor.forward_with_uncertainty(
@@ -32,28 +36,58 @@ class UCB(DropoutRegressor):
 
 
 class BotorchUCB(UCB):
+    """
+    1. NN based Proxy
+    2. DKL based Proxy (Single Fidelity AMP)
+    3. Stochastic VGP based on DKL Code
+    """
+
     def __init__(self, sampler, **kwargs):
         super().__init__(**kwargs)
         self.sampler_config = sampler
-        model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
+        if isinstance(self.regressor, SurrogateDropoutRegressor):
+            model = ProxyBotorchUCB(self.regressor, self.num_dropout_samples)
+        else:
+            model = self.regressor.surrogate
+            model.eval()
         sampler = SobolQMCNormalSampler(
             sample_shape=torch.Size([self.sampler_config.num_samples]),
             seed=self.sampler_config.seed,
         )
         self.acqf = qUpperConfidenceBound(model=model, beta=self.kappa, sampler=sampler)
+        self.out_dim = 1
+        self.batch_size = 32
 
     def __call__(self, inputs):
         if isinstance(inputs, np.ndarray):
             inputs = torch.tensor(inputs, device=self.device, dtype=self.float)
+        if isinstance(self.regressor, DeepKernelRegressor) == True:
+            # TODO: Make uniform to get_features()
+            if hasattr(self.regressor.language_model, "get_token_features"):
+                (
+                    input_tok_features,
+                    input_mask,
+                ) = self.regressor.language_model.get_token_features(inputs)
+                _, pooled_features = self.regressor.language_model.pool_features(
+                    input_tok_features, input_mask
+                )
+                inputs = pooled_features
+            elif hasattr(self.regressor.language_model, "get_features"):
+                inputs = self.regressor.language_model.get_features(inputs)
         inputs = inputs.unsqueeze(-2)
         acq_values = self.acqf(inputs)
         return acq_values
 
 
 class GaussianProcessUCB(UCB):
+    """
+    Used for Single Fidelity Branin where the Proxy is a GP and Plotting of Acq Rewards can be done.
+    """
+
     def __init__(self, sampler, env, logger, **kwargs):
         super().__init__(**kwargs)
         model = self.regressor.model
+        model.eval()
         self.sampler_config = sampler
         self.logger = logger
         self.env = env
@@ -76,6 +110,8 @@ class GaussianProcessUCB(UCB):
         return acq_values
 
     def plot_acquisition_rewards(self, **kwargs):
+        if self.env.n_dim != 2:
+            return None
         if hasattr(self.env, "get_all_terminating_states") == False:
             return None
         states = torch.tensor(
