@@ -25,7 +25,7 @@ discovery. Our results show that multi-fidelity active learning with GFlowNets
 can efficiently leverage the availability of multiple oracles with different costs and
 fidelities to accelerate scientific discovery and engineering design.
 
-![Overview of the algorithm](http://url/to/img.png)
+![Overview of the algorithm](https://github.com/nikita-0209/mf-al-gfn/blob/main/assets/figs/overview.png)
 
 ## Key Results 
 We evaluate the proposed MF-GFN approach in both synthetic tasks (Branin, Hartmann) and benchmark tasks of practical relevance, such as DNA
@@ -37,7 +37,7 @@ diversity of sampled candidates, but it also offers an advantage over other mult
 to its ability to learn a stochastic policy to jointly sample objects and the fidelity of the oracle to be
 used to evaluate them.
 
-![Results on AMP, DNA and Molecules (IP)](http://url/to/img.png)
+![Results on AMP, DNA and Molecules (IP)](https://github.com/nikita-0209/mf-al-gfn/blob/main/assets/figs/key_results.png)
 
 ## Setup
 
