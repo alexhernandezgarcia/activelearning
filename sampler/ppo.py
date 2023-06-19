@@ -10,10 +10,7 @@ from gflownet.envs.base import Buffer
 from collections import defaultdict
 from torch.distributions import Categorical, Bernoulli
 
-# from gflownet.gflownet import make_opt
 from torchtyping import TensorType
-
-# make self.forward_policy.model MLP and not self.forward_policy directly
 
 
 class Policy:
@@ -28,9 +25,6 @@ class Policy:
             + [env.policy_output_dim + 1]
         )
         self.is_model = True
-        # self.random_output = torch.ones(env.random_policy_output + 1).to(
-        #     dtype=self.float, device=self.device
-        # )
         if self.is_model:
             self.model.to(self.device)
 
@@ -70,7 +64,6 @@ class PPOAgent(GFlowNetAgent):
         device,
         float_precision,
         optimizer,
-        # buffer,
         policy,
         ppo_num_epochs,
         ppo_epoch_size,
@@ -84,8 +77,6 @@ class PPOAgent(GFlowNetAgent):
         *args,
         **kwargs,
     ):
-        # optimizer has clip_grad_norm=0
-        # super().__init__(*args, **kwargs)
         # Seed
         self.rng = np.random.default_rng(seed)
         # Device
@@ -105,7 +96,6 @@ class PPOAgent(GFlowNetAgent):
         self.batch_size = optimizer.batch_size
         self.ema_alpha = optimizer.ema_alpha
         self.early_stopping = optimizer.early_stopping
-        # +1 for value function
         self.forward_policy = Policy(policy, self.env, self.device, self.float)
         if "checkpoint" in policy:
             self.logger.set_forward_policy_ckpt_path(policy.checkpoint)
@@ -166,8 +156,7 @@ class PPOAgent(GFlowNetAgent):
         temperature : float
             Temperature to adjust the logits by logits /= temperature
         """
-        # TODO: implement backward sampling from forward policy as in old
-        # backward_sample.
+
         if sampling_method == "random":
             random_action_prob = 1.0
         if not isinstance(envs, list):
@@ -177,23 +166,6 @@ class PPOAgent(GFlowNetAgent):
         mask_invalid_actions = self._tbool(
             [env.get_mask_invalid_actions_forward() for env in envs]
         )
-        # Build policy outputs
-        # policy_outputs = model.random_distribution(states)
-        # idx_norandom = (
-        #     Bernoulli(
-        #         (1 - random_action_prob) * torch.ones(len(states), device=self.device)
-        #     )
-        #     .sample()
-        #     .to(bool)
-        # )
-        # if idx_norandom.sum() > 0:
-        # policy_outputs[idx_norandom, :] = model(
-        #     self._tfloat(
-        #         self.env.statebatch2policy(
-        #             [s for s, do in zip(states, idx_norandom) if do]
-        #         )
-        #     )
-        # )
         policy_outputs = model(self._tfloat(self.env.statebatch2policy(states)))
         # Skip v from policy outputs
         policy_outputs = policy_outputs[:, :-1]
@@ -208,7 +180,7 @@ class PPOAgent(GFlowNetAgent):
 
     def loss(self, it, batch, masks_s, G, advantages, loginf=1000):
         loginf = self._tfloat([loginf])
-        # NEED TO RETURN MEAN OF ALL REWARDS SO NO IDX FILTERING HERE
+
         (
             _,
             _,
@@ -218,9 +190,6 @@ class PPOAgent(GFlowNetAgent):
             is_terminal,
             _,
             _,
-            # _,
-            # rewards,
-            # _,
         ) = zip(*batch)
         is_terminal = torch.cat(is_terminal, 0)
 
@@ -234,14 +203,11 @@ class PPOAgent(GFlowNetAgent):
             states,
             actions,
             logprobs,
-            states_sp,
-            masks_sp,
+            _,
+            _,
             is_terminal,
-            traj_id,
-            state_id,
-            # masks_s,
-            # G,
-            # advantages,
+            _,
+            _,
         ) = [torch.cat(i, 0) for i in zip(*[batch[i] for i in idxs])]
         masks_s = torch.stack(masks_s)[idxs]
         G = torch.stack(G)[idxs]
@@ -262,11 +228,8 @@ class PPOAgent(GFlowNetAgent):
             .to(self.device)
         )
 
-        new_pol = Categorical(logits=logits)  # Categorical(logits: torch.Size([2, 3]))
+        new_pol = Categorical(logits=logits)
         new_logprobs = new_pol.log_prob(action_indices)
-        """
-        was action a tensor of tuples?
-        """
         ratio = torch.exp(new_logprobs - logprobs)
         surr1 = ratio * advantages
         surr2 = (
@@ -369,13 +332,12 @@ class PPOAgent(GFlowNetAgent):
                         temperature=1.0,
                     )
             s = []
-            # get current states, s
             for env in envs:
                 if env.is_state_list == True:
                     s.append(env.state.copy())
                 else:
                     s.append(env.state.clone())
-                # mask_s.append(env.get_mask_invalid_actions_forward())
+
             # Update environments with sampled actions
             envs, actions, valids = self.step(envs, actions, is_forward=True)
             # Add to batch
@@ -385,8 +347,6 @@ class PPOAgent(GFlowNetAgent):
             envs = [env for env in envs if not env.done]
             t1_a_envs = time.time()
             times["actions_envs"] += t1_a_envs - t0_a_envs
-            # if progress and n_samples is not None:
-            #     print(f"{n_samples - len(envs)}/{n_samples} done")
         if train is False:
             batch = sum(trajs.values(), [])
             return batch, times
@@ -395,11 +355,7 @@ class PPOAgent(GFlowNetAgent):
         states, _, _, states_sp, masks_sp, done, traj_id, state_id = [
             torch.cat(i, 0) for i in zip(*batch)
         ]
-        # Shift state_id to [1, 2, ...]
-        # for tid in traj_id.unique():
-        #     state_id[traj_id == tid] = (
-        #         state_id[traj_id == tid] - state_id[traj_id == tid].min()
-        #     ) + 1
+
         masks_s = torch.cat(
             [
                 masks_sp[torch.where((state_id == sid - 1) & (traj_id == pid))]
@@ -409,7 +365,6 @@ class PPOAgent(GFlowNetAgent):
             ]
         )
         rewards = self.env.reward_torchbatch(states, done)
-        # rewards = self.env.reward_torchbatch(states_sp, done)
 
         # G is simply reward of the trajectory
         G = rewards.clone()
@@ -434,8 +389,6 @@ class PPOAgent(GFlowNetAgent):
         Unpacks the terminating states and trajectories of a batch and converts them
         to Python lists/tuples.
         """
-        # TODO: make sure that unpacked states and trajs are sorted by traj_id (like
-        # rewards will be)
         trajs = [[] for _ in range(self.batch_size)]
         states = [None] * self.batch_size
         for el in batch:
@@ -513,24 +466,14 @@ class PPOAgent(GFlowNetAgent):
                         self.opt.zero_grad()
                     all_losses.append([i.item() for i in losses])
             # Buffer
-            # t0_buffer = time.time()
             states_term, trajs_term = self.unpack_terminal_states(batch)
-            # check rewards is not NaN
-            # if isinstance(rewards, TensorType)==False:
-            #     proxy_vals = rewards
-            # else:
+
             proxy_vals = self.env.reward2proxy(rewards).tolist()
             rewards = rewards.tolist()
             if self.logger.do_test(it) and hasattr(self.env, "get_cost"):
                 costs = self.env.get_cost(states_term)
             else:
                 costs = 0.0
-            # self.buffer.add(states_term, trajs_term, rewards, proxy_vals, it)
-            # self.buffer.add(
-            # states_term, trajs_term, rewards, proxy_vals, it, buffer="replay"
-            # )
-            # t1_buffer = time.time()
-            # times.update({"buffer": t1_buffer - t0_buffer})
             # Log
             if self.logger.lightweight:
                 all_losses = all_losses[-100:]
