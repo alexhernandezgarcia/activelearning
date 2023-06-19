@@ -98,7 +98,7 @@ Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidel
 **Model Options** 
 - `mlp`
 - `transformer`
-- `mlm_cnn` (masked language model based on CNN layers)
+- `mlm_cnn` (masked language model based on CNN)
 - `mlm_transformer` (masked language model based transformer)
 - `regressive` (based on the [DNN-MFBO implementation](https://github.com/shib0li/DNN-MFBO))
 - `mf_mlp` (MLP with an additional layer over the concatenated representation of the feature with fidelity)
