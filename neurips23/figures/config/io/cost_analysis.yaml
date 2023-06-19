@@ -5,10 +5,13 @@ output_csv: data/cost_analysis.csv
 output_filename: cost_analysis.pdf
 do_methods:
     - sfgfn
-    - mf_random
-    - random_fid_gfn
+#     - mf_random
+#     - random_fid_gfn
     - mfppo
-    - mfgfn
+#     - mfgfn_a
+    - mfgfn_b
+    - mfgfn_c
+    - mfgfn_d
 data:
   methods:
    sfgfn:
@@ -42,28 +45,28 @@ data:
    mfgfn_a:
      highlight: True
      dirname: "dna/gfn_linear_kernel"
-     name: "MF-GFlowNet_A"
+     name: "MF-GFlowNet"
      seeds:
        1:
          logdir: "2023-05-06_04-35-33"
    mfgfn_b:
      highlight: True
      dirname: "dna/cost_ablation"
-     name: "MF-GFlowNet_B"
+     name: "MF-GFlowNet (0.01, 1)"
      seeds:
        1:
          logdir: "2023-05-06_17-27-20"
    mfgfn_c:
      highlight: True
      dirname: "dna/cost_ablation"
-     name: "MF-GFlowNet_C"
+     name: "MF-GFlowNet (0.05, 1)"
      seeds:
        1:
          logdir: "2023-05-08_16-55-59"
    mfgfn_d:
      highlight: True
      dirname: "dna/cost_ablation"
-     name: "MF-GFlowNet_D"
+     name: "MF-GFlowNet (0.5, 1)"
      seeds:
        1:
          logdir: "2023-05-09_16-31-25"

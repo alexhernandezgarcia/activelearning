@@ -180,6 +180,8 @@ def process_diversity(df, config):
 def make_maximimization(df, config):
     if not config.io.data.higherbetter:
         df.energy = -1 * df.energy
+        if "energy_diverse" in df:
+            df.energy_diverse = -1 * df.energy_diverse
     return df
 
 
@@ -251,7 +253,7 @@ def plot(df, config):
             ax=ax,
             data=df,
             x="cost",
-            y="energy",
+            y=config.energy,
             hue="method",
             style="k",
             estimator=config.plot.estimator,
@@ -265,7 +267,7 @@ def plot(df, config):
             ax=ax,
             data=df.loc[df.k == k_plot],
             x="cost",
-            y="energy",
+            y=config.energy,
             hue="method",
             style="method",
             size="method",
@@ -288,7 +290,7 @@ def plot(df, config):
                 ax=ax,
                 data=df_means.loc[df_means.k == k_plot],
                 x="cost",
-                y="energy",
+                y=config.energy,
                 hue="diversity",
                 #             sizes=(10.0, 100.0),
                 palette="cividis",
@@ -305,9 +307,9 @@ def plot(df, config):
             div_cmap = "cividis_r"
             sm = plt.cm.ScalarMappable(cmap=div_cmap, norm=div_norm)
             cbar = fig.colorbar(sm, ax=ax, location="top")
-            cbar.ax.set_xlabel("(-) Diversity (+)")
-            cbar.ax.tick_params(axis="both", which="both", length=0)
-            cbar.ax.set_xticklabels([])
+            cbar.ax.set_xlabel("Diversity")
+#             cbar.ax.tick_params(axis="both", which="both", length=0)
+#             cbar.ax.set_xticklabels([])
 
     # Change spines
     # sns.despine(ax=ax, left=True, bottom=True)
@@ -363,7 +365,7 @@ def plot(df, config):
                 leg_handles.append(handle)
                 leg_labels.append(config.plot.methods[label].name)
 
-        if len(config.io.do_methods) > 4:
+        if len(config.io.do_methods) > 4 and config.plot.legend.no_cols is False:
             n_cols = 2
         else:
             n_cols = 1
