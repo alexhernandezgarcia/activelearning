@@ -47,7 +47,7 @@ env:
   reward_beta: 1
   beta_factor: 0
   reward_norm: 0.00001
-  norm_factor: 1.5
+  norm_factor: 2
   buffer:
     train:
       path: data_train.csv
