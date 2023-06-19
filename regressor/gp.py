@@ -35,10 +35,6 @@ class SingleTaskGPRegressor:
         # Logger
         self.progress = self.logger.progress
         self.target_factor = self.dataset.target_factor
-        # if maximize == False:
-        # self.target_factor = -1
-        # else:
-        # self.target_factor = 1
 
     @abstractmethod
     def init_model(self, train_x, train_y):
@@ -47,7 +43,6 @@ class SingleTaskGPRegressor:
         pass
 
     def fit(self):
-        # debug(state=True)
         train = self.dataset.train_dataset
         train_x = train["states"]
         train_y = train["energies"].unsqueeze(-1)
@@ -180,7 +175,7 @@ class SingleTaskGPRegressor:
             self._mode = state_pick_fid
 
     def evaluate_model(self, env, do_figure=True):
-        if env.n_dim>2:
+        if env.n_dim > 2:
             return None, 0.0, 0.0, 0.0, 0.0
         states = torch.FloatTensor(env.get_all_terminating_states()).to("cuda")
         y_mean, y_std = self.get_predictions(env, states)

@@ -28,29 +28,6 @@ from torch.optim.lr_scheduler import MultiStepLR
 from torchtyping import TensorType
 from typing import List
 
-# import pytorch_lightning as pl
-# from apex.optimizers import FusedAdam
-
-# class TorchTensorboardProfilerCallback(pl.Callback):
-#   """Quick-and-dirty Callback for invoking TensorboardProfiler during training.
-
-#   For greater robustness, extend the pl.profiler.profilers.BaseProfiler. See
-#   https://pytorch-lightning.readthedocs.io/en/stable/advanced/profiler.html"""
-
-#   def __init__(self, profiler):
-#     super().__init__()
-#     self.profiler = profiler
-
-#   def on_train_batch_end(self, trainer, pl_module, outputs, *args, **kwargs):
-#     self.profiler.step()
-#     pl_module.log_dict(outputs)  # also logging the loss, while we're here
-
-"""
-This DKL regressor strictly assumes that the states are integral. 
-If not, the states are converted to integral. 
-This might lead to loss of precision if the states were intended to be fractional for traning purposes. 
-"""
-
 
 class Tokenizer:
     def __init__(self, non_special_vocab):
@@ -97,7 +74,8 @@ class Tokenizer:
             else len(sequence)
             for sequence in sequence_tensor
         ]
-        # Padding element is added to all sequences so that [EOS] token can be added post the sequence, i.e, at index 50 (assuming 0 indexing) if the sequence is of max length 50
+        # Padding element is added to all sequences so that [EOS] token can be added post the sequence, i.e,
+        # at index 50 (assuming 0 indexing) if the sequence is of max length 50
         pad_tensor = (
             torch.ones(sequence_tensor.shape[0], 1).long().to(sequence_tensor)
             * self.padding_idx
@@ -186,7 +164,6 @@ class DeepKernelRegressor:
         self.lr_sched_type = lr_sched_type
 
     def initialize_surrogate(self, X_train, Y_train):
-        # X_train = torch.Size([5119, 51])
         if (
             hasattr(self.surrogate, "init_inducing_points")
             and self.surrogate.num_inducing_points <= X_train.shape[0]
@@ -212,50 +189,17 @@ class DeepKernelRegressor:
         )
         self.mll.to(self.surrogate.device)
 
-    # def mlm_train_step(self, optimizer, token_batch, mask_ratio, loss_scale=1.0):
-    #     optimizer.zero_grad(set_to_none=True)
-
-    #     if self.n_fid > 1:
-    #         token_batch = token_batch[..., :-1]
-    #     # replace random tokens with mask token
-    #     mask_idxs = sample_mask(token_batch, self.tokenizer, mask_ratio)  # (32, 5)
-    #     masked_token_batch = token_batch.clone().to(self.language_model.device)
-    #     np.put_along_axis(
-    #         masked_token_batch, mask_idxs, self.tokenizer.masking_idx, axis=1
-    #     )
-
-    #     # get predicted logits for masked tokens
-    #     logits, _ = self.language_model.logits_from_tokens(masked_token_batch)
-    #     vocab_size = logits.shape[-1]
-    #     masked_logits = np.take_along_axis(logits, mask_idxs[..., None], axis=1).view(
-    #         -1, vocab_size
-    #     )  # torch.Size([160, 26])
-
-    #     # use the ground-truth tokens as labels
-    #     masked_tokens = np.take_along_axis(token_batch, mask_idxs, axis=1)
-    #     masked_tokens = masked_tokens.view(-1).to(
-    #         self.language_model.device
-    #     )  # torch.Size([160])
-
-    #     loss = loss_scale * F.cross_entropy(masked_logits, masked_tokens)
-    #     loss.backward()
-    #     optimizer.step()
-
-    #     return loss, masked_logits, masked_tokens
-
     def gp_train_step(self, optimizer, inputs, targets, mll):
         self.surrogate.zero_grad(set_to_none=True)
         self.surrogate.clear_cache()  # possibly unnecessary
         features = self.surrogate.get_features(
             inputs.to(self.surrogate.device), self.batch_size, transform=False
-        )  # torch.Size([32, 16])
+        )
 
         dtype = features.dtype if (features.dtype is not torch.bool) else torch.float
         targets = self.surrogate.reshape_targets(targets).to(
             features.device, dtype=dtype
         )
-        # if isinstance(surrogate, (SingleTaskGP, KroneckerMultiTaskGP)):
-        # surrogate.set_train_data(features, targets, strict=False)
 
         output = self.surrogate.forward(features)
         loss = -mll(output, targets).mean()
@@ -332,11 +276,7 @@ class DeepKernelRegressor:
 
         print("\n---- fitting all SVGP params ----")
         pbar = tqdm(range(1, self.surrogate.num_epochs + 1), disable=not self.progress)
-        for epoch_idx in pbar:  # 128
-            # if (epoch_idx%2==0):
-            #     self.surrogate.encoder.requires_grad_(
-            #             False
-            #         )
+        for epoch_idx in pbar:
 
             metrics = {}
             avg_train_loss = 0.0
@@ -345,21 +285,13 @@ class DeepKernelRegressor:
             self.surrogate.train()
             if self.encoder_obj != "mlm":
                 mlm_loss = torch.tensor(0.0, device=self.surrogate.device)
-            # with torch.profiler.profile(
-            #         schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
-            #         on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/resnet18'),
-            #         record_shapes=True,
-            #         profile_memory=True,
-            #         with_stack=True
-            # ) as prof:
+
             for inputs, targets in train_loader:
                 inputs = inputs.to(self.surrogate.device)
                 targets = targets.to(self.surrogate.device)
                 # train encoder through unsupervised MLM objective
                 if self.encoder_obj == "mlm":
-                    self.surrogate.encoder.requires_grad_(
-                        True
-                    )  # inputs = 32 x 36, mask_ratio=0.125, loss_scale=1.
+                    self.surrogate.encoder.requires_grad_(True)
                     mlm_loss = self.surrogate.encoder.train_step(
                         optimizer=optimizer,
                         input_batch=inputs,
@@ -373,7 +305,6 @@ class DeepKernelRegressor:
                 )
                 avg_mlm_loss += mlm_loss.detach() / len(train_loader)
                 avg_gp_loss += gp_loss.detach() / len(train_loader)
-                # prof.step()
 
             lr_sched.step(avg_train_loss)
 
@@ -409,18 +340,6 @@ class DeepKernelRegressor:
                     )
                 )
                 pbar.set_description(description)
-                # elif has_encoder and encoder_obj == "lanmt":
-                #     if val_loader is not None:
-                #         metrics.update(
-                #             lanmt_eval_epoch(
-                #                 surrogate.encoder.model, val_loader, split="val"
-                #             )
-                #         )
-                #     metrics.update(
-                #         lanmt_eval_epoch(
-                #             surrogate.encoder.model, test_loader, split="test"
-                #         )
-                #     )
 
             # use validation NLL for model selection
             select_crit = metrics.get(select_crit_key, None)
@@ -484,11 +403,6 @@ class DeepKernelRegressor:
         self.surrogate.clear_cache()
         self.surrogate.eval()
         self.surrogate.set_train_data(X_train, Y_train, strict=False)
-
-    # def evaluate(self, **kwargs):
-    #     test_nll = self.best_score
-    #     test_rmse = self.best_loss
-    #     return test_rmse, test_nll, 0.0, 0.0, None
 
     def get_predictions(self, env, states, denorm=False):
         self.surrogate.eval()
@@ -588,54 +502,3 @@ class DeepKernelRegressor:
         plt.tight_layout()
         plt.close()
         return fig
-
-    # def load_model(self):
-    #     """
-    #     Load and returns the model
-    #     """
-    #     name = (
-    #         self.logger.proxy_ckpt_path.stem + self.logger.context + "final" + ".ckpt"
-    #     )
-    #     path = self.logger.proxy_ckpt_path.parent / name
-
-    #     self.surrogate = hydra.utils.instantiate(
-    #         self.surrogate_config,
-    #         tokenizer=self.language_model.tokenizer,
-    #         encoder=self.language_model,
-    #         device=self.device,
-    #         float_precision=self.float,
-    #     )
-    #     optimizer = torch.optim.Adam(self.surrogate.param_groups)
-
-    #     if os.path.exists(path):
-    #         # make the following line cpu compatible
-    #         checkpoint = torch.load(path, map_location="cuda:0")
-    #         self.surrogate.load_state_dict(checkpoint["model_state_dict"])
-    #         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    #         self.surrogate.to(self.device).to(self.float)
-    #         for state in optimizer.state.values():  # move optimizer to GPU
-    #             for k, v in state.items():
-    #                 if isinstance(v, torch.Tensor):
-    #                     state[k] = v.to(self.device)
-    #         return True
-    #     else:
-    #         raise FileNotFoundError
-
-    def define_metric(self):
-        try:
-            self.logger.define_metric("epoch")
-            self.logger.define_metric("1/svgp/best_loss", step_metric="epoch")
-            self.logger.define_metric("1/svgp/test_rmse", step_metric="epoch")
-            self.logger.define_metric("lengthscale", step_metric="epoch")
-            self.logger.define_metric("train_loss", step_metric="epoch")
-            self.logger.define_metric("best_score", step_metric="epoch")
-            self.logger.define_metric("best_loss_epoch", step_metric="epoch")
-            self.logger.define_metric("test_nll", step_metric="epoch")
-            self.logger.define_metric("best_epoch", step_metric="epoch")
-            self.logger.define_metric("test_occ_diff", step_metric="epoch")
-            self.logger.define_metric("test_ece", step_metric="epoch")
-            self.logger.define_metric("test_post_var", step_metric="epoch")
-            self.logger.define_metric("test_s_rho", step_metric="epoch")
-            self.logger.define_metric("noise", step_metric="epoch")
-        except:
-            pass
