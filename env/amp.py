@@ -89,15 +89,6 @@ class AMP(GFlowNetEnv, GflowNetAMP):
             plt.close()
         return ax
 
-    # def initialize_dataset(self, config):
-    #     train_df = pd.read_csv(config.train.path)
-    #     train_states = train_df["samples"]
-    #     train_states = train_states.values.tolist()
-    #     train_states = torch.tensor(states)
-    #     # such that nucleotide count lies in 0 -3
-    #     scores = train_df["energies"]
-    #     return states, scores
-
     def initialize_dataset(self, config, n_samples, resume, **kwargs):
         train_scores = torch.tensor([])
         test_scores = torch.tensor([])

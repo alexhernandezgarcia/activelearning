@@ -9,8 +9,6 @@ import pandas as pd
 import selfies as sf
 import matplotlib.pyplot as plt
 
-# from rdkit import Chem, AllChem, DataStructs
-
 
 class GFlowNetMolSelfies(GflowNetSequence):
     """
@@ -24,8 +22,6 @@ class GFlowNetMolSelfies(GflowNetSequence):
     ):
 
         special_tokens = ["[nop]", "[EOS]"]
-        # "[SEP]", "[UNK]", "[MASK]"
-
         if selfies_vocab == "small":
             selfies_vocab = SELFIES_VOCAB_SMALL
         elif selfies_vocab == "large":
@@ -37,10 +33,6 @@ class GFlowNetMolSelfies(GflowNetSequence):
             **kwargs,
             special_tokens=special_tokens,
         )
-        # pad_to_len = self.
-        # max(sf.len_selfies(s) for s in selfies)  # 5
-        # self.vocab = list(sorted(self.vocab))
-        # self.symbol_to_idx = {s: i for i, s in enumerate(self.vocab)}
 
 
 class MolSelfies(GFlowNetEnv, GFlowNetMolSelfies):
@@ -161,7 +153,7 @@ class MolSelfies(GFlowNetEnv, GFlowNetMolSelfies):
             return states, scores
         else:
             return train_states, train_scores, test_states, test_scores
-        
+
     def plot_reward_distribution(
         self, states=None, scores=None, ax=None, title=None, oracle=None, **kwargs
     ):

@@ -96,17 +96,6 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
             plt.close()
         return ax
 
-    # def energy_vs_reward(self, energies, rewards):
-    #     # Plot a scatter plot of energy vs reward
-    #     fig, ax = plt.subplots()
-    #     ax.scatter(energies, rewards)
-    #     ax.set_ybound(0.0, 0.01)
-    #     ax.set_xlabel("Energy")
-    #     ax.set_ylabel("Reward")
-    #     plt.show()
-    #     plt.close()
-    #     return ax
-
     def initialize_dataset(self, config, n_samples, resume, **kwargs):
         train_scores = torch.tensor([])
         test_scores = torch.tensor([])
@@ -158,58 +147,10 @@ class Aptamers(GFlowNetEnv, GflowNetAptamers):
         else:
             return train_states, train_scores, test_states, test_scores
 
-    # def load_test_dataset(self, logger):
-    #     # path = logger.data_path.parent / Path("data_test.csv")
-    #     print("Loading UNIFORM Test Dataset")
-    #     path = Path("/home/mila/n/nikita.saxena/activelearning/storage/dna/length30/test_2000_FINAL.csv")
-    #     dataset = pd.read_csv(path, index_col=0)
-    #     samples = dataset["samples"]
-    #     scores = dataset["energies"]
-    #     states = [self.readable2state(sample) for sample in samples]
-    #     states = torch.stack(states)
-    #     return states, scores
-
     def write_samples_to_file(self, samples, path):
         samples = [self.state2readable(state) for state in samples]
         df = pd.DataFrame(samples, columns=["samples"])
         df.to_csv(path)
-
-    # def initialize_dataset(self, config, n_samples, resume, **kwargs):
-    #     train_states = torch.tensor([])
-    #     train_scores = torch.tensor([])
-    #     test_states = torch.tensor([])
-    #     test_scores = torch.tensor([])
-    #     if config.oracle_dataset is not None:
-    #         if config.oracle_dataset.train is not None:
-    #             train_df = pd.read_csv(config.oracle_dataset.train.path)
-    #             train_states = train_df["indices"].apply(split_str)
-    #             train_states = train_states.values.tolist()
-    #             train_states = torch.tensor(train_states)
-    #             # such that nucleotide count lies in 0 -3
-    #             train_states = train_states - 1
-    #             train_scores = train_df["energies"].values.tolist()
-    #             train_scores = torch.tensor(train_scores)
-    #         if config.oracle_dataset.test is not None:
-    #             test_df = pd.read_csv(config.oracle_dataset.test.path)
-    #             test_states = test_df["indices"].apply(split_str)
-    #             test_states = test_states.values.tolist()
-    #             test_states = torch.tensor(test_states)
-    #             # such that nucleotide count lies in 0 -3
-    #             test_states = test_states - 1
-    #             test_scores = test_df["energies"].values.tolist()
-    #             test_scores = torch.tensor(test_scores)
-    #     if test_states.shape[0] == 0:
-    #         states = train_states
-    #         scores = train_scores
-    #     else:
-    #         states = torch.vstack([train_states, test_states])
-    #         scores = torch.cat([train_scores, test_scores])
-    #     # states = train_states + test_states
-    #     # scores = train_scores + test_scores
-    #     if resume == False:
-    #         return states, scores
-    #     else:
-    #         return train_states, train_scores, test_states, test_scores
 
     def get_random_terminating_states(self, n_samples, **kwargs):
         states = torch.randint(low=0, high=4, size=(5 * n_samples, self.max_seq_length))
