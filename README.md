@@ -1,6 +1,6 @@
 # Multi-Fidelity Active Learning with GFlowNets
 
-This repository contains code for the paper Multi-Fidelity Active Learning with GFLowNets. The code has been extracted from an [exisiting repository](https://github.com/alexhernandezgarcia/activelearning). Original commits are lost here.
+This repository contains code for the paper Multi-Fidelity Active Learning with GFLowNets. 
 
 ## Abstract
 
@@ -56,7 +56,7 @@ pip install -r requirements.txt && pip install -e .
 The project uses [Hydra](https://hydra.cc/) for configuration and [Weights and Biases](https://docs.wandb.ai/) for logging.
 For reproducing the results, configuration files with the default settings for experiments with the synthetic and benchmark tasks have been created in `config/`. Run
 ```
-python activelearning.py --config_name=<config-filename> user=<user-config-filename>
+python activelearning.py --config_name=<config-filename>
 ```
 
 ### Default Config Options
