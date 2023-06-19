@@ -41,23 +41,19 @@ used to evaluate them.
 
 ## Setup
 
-1. Install the GFlowNet code.
+1. Install the GFlowNet codebase compatible with this implementation from [alexhernandezgarcia/gflownet](https://github.com/alexhernandezgarcia/gflownet/tree/mfgfn-v1.0).
 ``` 
 python -m pip install --upgrade https://github.com/alexhernandezgarcia/gflownet/archive/cont_mf.zip 
 ```
 2.  Clone this repository and install other dependencies by running ```pip install -r requirements.txt``` where this repository is cloned.
-3. Set up the AMP oracles (optional, required only if you wish to run experiments with the anti-microbial protien environment). Install the clamp-common-eval library from [MJ10/clamp-gen-data](https://github.com/MJ10/clamp-gen-data) by cloning the repo and then running the following where the repository is cloned: 
+3. Set up the AMP oracles (optional, required only if you wish to run experiments with the anti-microbial protien environment). Install the clamp-common-eval library from [MJ10/clamp-gen-data](https://github.com/MJ10/clamp-gen-data/tree/mfgfn-v1.0) by cloning the repo and then running the following where the repository is cloned: 
 ```
 pip install -r requirements.txt && pip install -e .
 ``` 
-4. Create a user config file in `config/user` and copy the following contents:
-```
-logdir:
-  root: <directory-where-logs-will-be-stored>
-data_path: <data-directory>
-```
+4. Rename the log directory and data directory arguments (if necessary) in `config/user/anonymous.yaml` 
 
 ## Usage
+The project uses [Hydra](https://hydra.cc/) for configuration and [Weights and Biases](https://docs.wandb.ai/) for logging.
 For reproducing the results, configuration files with the default settings for experiments with the synthetic and benchmark tasks have been created in `config/`. Run
 ```
 python activelearning.py --config_name=<config-filename> user=<user-config-filename>

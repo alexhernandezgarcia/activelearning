@@ -3,15 +3,15 @@
 defaults:
   # - _self_
   - env: aptamers
-  - oracle@_oracle_dict.1: aptamers_nn
+  - oracle@_oracle_dict.1: aptamers1
   # Second is better
-  - oracle@_oracle_dict.2: aptamers_nupack
+  - oracle@_oracle_dict.2: aptamers2
   - gflownet: trajectorybalance
-  - user: nikita
-  - proxy: mf_mes_dkl #botorch_ucb #mes_svgp #mf_mes_proxy
+  - user: anonymous
+  - proxy: mf_mes_dkl 
   - dataset: dataset
-  - regressor: mf_dkl_linear #dropout_regressor
-  - model: mlm_transformer #mf_mlp #regressive
+  - regressor: mf_dkl_linear 
+  - model: mlm_transformer 
   - logger: wandb
 
 regressor:
@@ -22,12 +22,7 @@ regressor:
     num_inducing_points: 64
 
 logger:
-  # resume: True 
-  # logdir: 
-  #   root: /network/scratch/n/nikita.saxena/logs/activelearning/2023-05-10_22-18-45
-  #   overwrite: False
-  # run_id: kmlgrals
-  project_name: "Aptamers-DKL"
+  project_name: "MF-AL-GFN"
   lightweight: False
   plot:
     period: -1
@@ -38,26 +33,12 @@ logger:
     first_it: True
   oracle:
     period: -1
-  # ckpts:
-  #   policy:
-  #     period: 1000
   do:
     times: False
     online: True
   tags:
-    # - r(x) = (1000x)^8
-    # - ucb
-    # - test
-    # - reward_inf
-    - skewed_fid
+    - aptamers
     - mf
-    # - proxy_ablation
-    # - time_eval
-    # - corrected_source_in_corr
-    # - correct_padding_mlm_train
-    # - amp-mf-mes
-    # - backward_policy = shared
-    # - sampling_temp=1.0
 
 env:
   corr_type: from_trajectory
@@ -65,13 +46,11 @@ env:
   reward_func: power
   reward_beta: 1
   beta_factor: 0
-  # length: 10
   reward_norm: 0.00001
   norm_factor: 1.5
   buffer:
     train:
       path: data_train.csv
-      # /home/mila/n/nikita.saxena/activelearning/storage/amp/data_train.csv
       n: null
       type: all
       seed: null
@@ -88,7 +67,6 @@ env:
 
 gflownet:
   active_learning: True
-  # sample_only: True
   random_action_prob: 0.0 #0.001
   optimizer:
     lr: 5e-4
@@ -110,7 +88,6 @@ gflownet:
 
 dataset:
   normalize_data: True
-  # n_samples: 30
   split: given #random
   train_fraction: 0.8
   dataloader:
@@ -136,10 +113,7 @@ dataset:
         path: /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/mf/data_test.csv
         # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-05-01_22-12-21/data/data_test.csv
         get_scores: False
-        # /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/test_2000.csv
-        # get_scores: False
-      # train: null
-      # test: null
+
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
 n_samples: 512 #512
@@ -155,9 +129,6 @@ do_figure: False
 
 multifidelity:
   proxy: True
-  #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
-  # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
-  # proxy_state_format: oracle
   fixed_cost: 0
   rescale: 1
   fid_embed: one_hot

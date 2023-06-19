@@ -7,7 +7,7 @@ defaults:
   - oracle@_oracle_dict.2: branin2
   - oracle@_oracle_dict.3: branin3
   - gflownet: trajectorybalance
-  - user: anon
+  - user: anonymous
   - proxy: mf_mes_gp 
   - regressor: mf_gp 
   - logger: wandb
@@ -15,7 +15,7 @@ defaults:
 
 
 logger:
-  project_name: "MF-GFN"
+  project_name: "MF-AL-GFN"
   lightweight: False
   plot:
     period: -1

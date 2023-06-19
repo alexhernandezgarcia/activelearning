@@ -3,38 +3,19 @@
 defaults:
   # - _self_
   - env: grid
-  # - oracle@_oracle_dict.1: hartmann
   - oracle@_oracle_dict.1: hartmann1
   - oracle@_oracle_dict.2: hartmann2
   - oracle@_oracle_dict.3: hartmann3
   - gflownet: trajectorybalance
-  - user: nikita
-  - proxy: mf_mes_gp # mf_mes_proxy #botorch_ucb mf_mes_svgp mes_svgp #mf_mes_dkl
+  - user: anonymous
+  - proxy: mf_mes_gp 
   - dataset: dataset
-  - regressor: mf_gp #mf_dkl_linear #sf_dkl #mf_svgp #sf_svgp #mf_dkl
-  # - model: mlp #mlp regressive
+  - regressor: mf_gp 
   - logger: wandb
 
-# regressor:
-#   surrogate:
-#     eval_period: 1
-#     num_epochs: 1 #2048
-#     patience: 1 #15
-#     num_inducing_points: 10
-
-    # RN svgp has Gamma and dkl has Normal as defaults
-    # BE SURE TO CHECK LENGTHSCALE PRIOR AND NOISE PRIOR
-
-# model:
-#   feature_dim: 64
-#   n_hid: 64
-  # dropout_prob: 0.0
-  # regressive_mode: "full"
-  # dropout_fid: 0.0
-  # dropout_base: 0.0
 
 logger:
-  project_name: "Hartmann"
+  project_name: "MF-AL-GFN"
   lightweight: False
   plot:
     period: -1
@@ -44,33 +25,22 @@ logger:
     n: 1
   oracle:
     period: -1
-  # ckpts:
-  #   policy:
-  #     period: 1000
   do:
     times: False
     online: True
   tags:
-    # - r(x) = (1e-3)x
-    # - svgp_botorch
-    # - r(x) = 10x
-    - proxy_test
+    - mf
     - hartmann
-    # - multi_fidelity
-    # - mf-mes
-    # - ucb
-    # - cum_cost
-    # - 100x100
 
 env:
   corr_type: None
   n_dim: 6
-  proxy_state_format: state #state state_fidIdx
+  proxy_state_format: state 
   reward_func: power
-  reward_beta: 1 #1
+  reward_beta: 1 
   length: 10
   rescale: ${env.length}
-  reward_norm: 0.01 #1e-3 #1
+  reward_norm: 0.01 
   buffer:
     train:
       path: null
@@ -79,10 +49,10 @@ env:
       seed: null
       output_csv: null 
     test:
-      path: null #data_test.csv
-      type: null #uniform
-      output_pkl: null #buffer_data_test.csv
-      n: null #500
+      path: null 
+      type: null 
+      output_pkl: null 
+      n: null 
       seed: null
       output_csv: null 
     
@@ -94,7 +64,7 @@ gflownet:
   optimizer:
     lr: 5e-4
     lr_z_mult: 20
-    n_train_steps: 0 #10000 #0000
+    n_train_steps: 10000
     batch_size: 32
   policy:
     forward:
@@ -124,20 +94,9 @@ dataset:
     oracle_dataset: 
       train:
         path: ${user.data_path}/hartmann/${dataset.path.type}/cost_data_train.csv
-        # path: ${user.data_path}/hartmann/${dataset.path.type}/0.8_0.8_1_cost_data_train.csv
         get_scores: True
       test: null
-      # test: 
-        # path: ${user.data_path}/hartmann/${dataset.path.type}/data_test.csv
-        # get_scores: True
-      # train: 
-      #   path: /home/mila/n/nikita.saxena/activelearning/storage/branin/nfid1_100x100.csv
-      #   path: /home/mila/n/nikita.saxena/activelearning/storage/branin/mf_train.csv
-      #   get_scores: True
-      # train: /home/mila/n/nikita.saxena/activelearning/storage/amp/data_train.csv
-      # test: /home/mila/n/nikita.saxena/activelearning/storage/amp/data_test.csv
-      # train: null
-      # test: null
+    
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
 n_samples: 10
@@ -148,17 +107,11 @@ device: cuda
 # Float precision
 float_precision: 64
 #It is strongly recommended to use double precision in BoTorch, as this improves both precision and stability and can help avoid numerical errors. See https://github.com/pytorch/botorch/discussions/1444
-al_n_rounds: 30
+al_n_rounds: 10
 do_figure: False
-# budget: 1500000
-# for the sanity check, 5*1e4 + 5
 
 multifidelity:
   proxy: True
-  # candidate_set_path: /home/mila/n/nikita.saxena/activelearning/storage/hartmann/sf_train300.csv
-  # /home/mila/n/nikita.saxena/activelearning/storage/branin/mf_train50.csv
-  #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
-  # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
   fid_embed: one_hot
   fid_embed_dim: None
 

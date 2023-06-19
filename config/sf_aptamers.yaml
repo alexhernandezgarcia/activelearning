@@ -5,11 +5,11 @@ defaults:
   - env: aptamers
   - oracle@_oracle_dict.1: aptamers_nupack
   - gflownet: trajectorybalance
-  - user: nikita
-  - proxy: mes_svgp #botorch_ucb #mes_svgp
+  - user: anonymous
+  - proxy: mes_svgp 
   - dataset: dataset
-  - regressor: sf_dkl #dropout_regressor
-  - model: mlm_transformer #mlm_transformer 
+  - regressor: sf_dkl 
+  - model: mlm_transformer 
   - logger: wandb
 
 regressor:
@@ -19,12 +19,7 @@ regressor:
     eval_period: 1
 
 logger:
-  # resume: True 
-  # logdir: 
-  #   root: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-05-02_16-47-16
-  #   overwrite: False
-  # run_id: win8pvxt #fuy1i0gz  #uwjujwlg
-  project_name: "Aptamers-DKL" #"Aptamers-DKL"
+  project_name: "MF-AL-GFN" 
   lightweight: False
   plot:
     period: -1
@@ -35,35 +30,31 @@ logger:
     first_it: True
   oracle:
     period: -1
-  # ckpts:
-  #   policy:
-  #     period: 1000
   do:
     times: False
     online: False
   tags:
     - sf
+    - aptamers
 
 env:
   denorm_proxy: False #True for ucb, False for mes
-  corr_type: None #from_trajectory
+  corr_type: None 
   proxy_state_format: state
-  reward_func: power #boltzmann
+  reward_func: power 
   reward_beta: 1 #0.2 for ucb and 2e1 for mes
   norm_factor: 1.5
-  # length: 10
   reward_norm: 0.00001
   buffer:
     train:
       path: data_train.csv
-      # /home/mila/n/nikita.saxena/activelearning/storage/amp/data_train.csv
       n: null
       type: all
       seed: null
       output_pkl: buffer_data_train.csv 
       output_csv: null
     test:
-      path: ${user.data_path}/dna/length30/test_2000_FINAL.csv #data_test.csv
+      path: ${user.data_path}/dna/length30/test_2000_FINAL.csv 
       type: all
       output_pkl: buffer_data_test.csv
       n: null
@@ -73,7 +64,6 @@ env:
 
 gflownet:
   active_learning: True
-  # sample_only: True
   random_action_prob: 0.0 #0.001
   optimizer:
     lr: 5e-4
@@ -86,17 +76,16 @@ gflownet:
       n_hid: 2048
       n_layers: 2
       checkpoint: fp
-    # backward:
-    #   type: mlp
-    #   shared_weights: True
+    backward:
+      type: mlp
+      shared_weights: True
   pct_offline: 0.0 #0.3
   oracle:
     n: 500
 
 dataset:
   normalize_data: True
-  # n_samples: 30
-  split: given #random
+  split: given 
   train_fraction: 0.8
   dataloader:
     train:
@@ -107,20 +96,10 @@ dataset:
     type: sf
     oracle_dataset:
       train: 
-        # path: /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/oracle_dataset.csv
         path:  ${user.data_path}/dna/length30/sf/80_data_train.csv
-        # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-05-02_16-47-16/data/data_train.csv
-        # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-04-25_12-14-24/data/data_sampled_iter1.csv
-        # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-04-25_12-14-24/data/data_train.csv
-        # path:  /home/mila/n/nikita.saxena/activelearning/storage/dna/sampled_data_sf.csv
-        # path: /home/mila/n/nikita.saxena/activelearning/storage/dna/sampled_init_combined_sf.csv
-        # TODO: Need to make this true before actual experiment
         get_scores: True
       test: 
         path: ${user.data_path}/dna/length30/sf/80_data_test.csv
-        # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-05-02_16-47-16/data/data_test.csv
-        # # ${user.data_path}/dna/length30/exact_dkl/sf/data_test.csv
-        # # /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/test_2000.csv
         get_scores: True
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK
@@ -137,9 +116,6 @@ do_figure: False
 
 multifidelity:
   proxy: True
-  #  /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3_lower_quad.csv
-  # /home/mila/n/nikita.saxena/activelearning/storage/grid/nfid3.csv
-  # proxy_state_format: oracle
   fixed_cost: 0.0
   rescale: 1
 
