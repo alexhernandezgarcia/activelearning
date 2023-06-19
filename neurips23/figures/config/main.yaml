@@ -1,4 +1,5 @@
 root_logdir: "/network/scratch/h/hernanga/mfal"
+energy: "energy"
 plot:
     dpi: 150
     height: 6
@@ -35,19 +36,19 @@ plot:
         mfgfn_b:
             palette: flare
             palette_idx: 0
-            name: "MF-GFN (0.01, 1)"
+            name: "MF-GFN (0.2, 20)"
             dash: solid
             linewidth: 3
         mfgfn_c:
             palette: flare
             palette_idx: 4
-            name: "MF-GFN (0.05, 1)"
+            name: "MF-GFN (1, 20)"
             dash: solid
             linewidth: 3
         mfgfn_d:
             palette: flare
             palette_idx: 8
-            name: "MF-GFN (0.5, 1)"
+            name: "MF-GFN (10, 20)"
             dash: solid
             linewidth: 3
         mfgfn_linear:
