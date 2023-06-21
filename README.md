@@ -1,6 +1,6 @@
 # Multi-Fidelity Active Learning with GFlowNets
 
-This repository contains code for the paper Multi-Fidelity Active Learning with GFLowNets. 
+This repository contains code for the paper [Multi-Fidelity Active Learning with GFLowNets](http://arxiv.org/abs/2306.11715). 
 
 ## Abstract
 
