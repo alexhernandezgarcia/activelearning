@@ -60,7 +60,7 @@ python activelearning.py --config_name=<config-filename>
 ```
 
 ### Default Config Options
-Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidelity and multi-fidelity variants respectively. Files prefixed with `ppo` train the PPO (instead of the GFlowNet) algorithm as the sampler.
+Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidelity and multi-fidelity variants respectively. 
 
 - `<fid>_branin`: Branin 
 - `<fid>_hartmann`: Hartmann 
@@ -107,6 +107,17 @@ Options `sf` and `mf` for the `<fid>` placeholder correspond to the single-fidel
 **Acquisition Function Options**
 
 Single and multi-fidelity variants of the Max Entropy Search (MES) acquisiton function have been implemented. The suffix (`<gp>`, `<svgp>`, `<dkl>` indicate with which regressor the implementation is compatible with.)
-<!-- 
+
+
 ## Citation
-If you use any part of this code for your own work, please cite -->
+If you use any part of this code for your own work, please cite
+```
+@misc{hernandezgarcia2023multifidelity,
+      title={Multi-Fidelity Active Learning with GFlowNets}, 
+      author={Alex Hernandez-Garcia and Nikita Saxena and Moksh Jain and Cheng-Hao Liu and Yoshua Bengio},
+      year={2023},
+      eprint={2306.11715},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+```
