@@ -97,10 +97,10 @@ dataset:
     type: mf
     oracle_dataset:
       train: 
-        path: ${user.data_path}/mols/EA/mf/data_train.csv
+        path: ${user.data_path}/mols/ea/mf/data_train.csv
         get_scores: False
       test: 
-        path: ${user.data_path}/mols/EA/mf/data_test.csv
+        path: ${user.data_path}/mols/ea/mf/data_test.csv
         get_scores: False
 
 # Number of objects to sample at the end of training

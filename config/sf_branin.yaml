@@ -92,7 +92,7 @@ dataset:
     oracle_dataset: 
       fid_type: random
       train: 
-        path: /home/mila/n/nikita.saxena/activelearning/storage/branin/sf/data_train.csv
+        path: ${user.data_path}/branin/sf/data_train.csv
         get_scores: True
       test: null
 # Number of objects to sample at the end of training

@@ -94,10 +94,10 @@ dataset:
     type: sf
     oracle_dataset:
       train: 
-        path:  ${user.data_path}/mols/fid3/150_train_IP.csv
+        path:  ${user.data_path}/mols/ip/sf/data_train.csv
         get_scores: False
       test: 
-        path: ${user.data_path}/mols/fid3/150_test_IP.csv
+        path: ${user.data_path}/mols/ip/sf/data_test.csv
         get_scores: False
 
 # Number of objects to sample at the end of training

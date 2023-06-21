@@ -93,7 +93,7 @@ dataset:
     type: mf
     oracle_dataset: 
       train:
-        path: ${user.data_path}/hartmann/${dataset.path.type}/cost_data_train.csv
+        path: ${user.data_path}/hartmann/${dataset.path.type}/data_train.csv
         get_scores: True
       test: null
     

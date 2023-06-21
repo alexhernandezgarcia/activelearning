@@ -98,10 +98,10 @@ dataset:
     type: mf
     oracle_dataset:
       train: 
-        path:  ${user.data_path}/mols/IP/mf/data_train.csv
+        path:  ${user.data_path}/mols/ip/mf/data_train.csv
         get_scores: False
       test: 
-        path: ${user.data_path}/mols/IP/mf/data_test.csv
+        path: ${user.data_path}/mols/ip/mf/data_test.csv
         get_scores: False
 # Number of objects to sample at the end of training
 # Sample 5*K and choose topK

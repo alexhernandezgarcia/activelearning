@@ -101,16 +101,12 @@ dataset:
       fid_type: random
       type: null
       train: 
-      # AS OG oracle dataset was different
-      # TODO: CHANGE TO NON_EXACTDKL DATASET WHEN RUNNIN EXPERIMENTS
-        # path: /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/oracle_dataset.csv
-        # path: ${user.data_path}/dna/length30/mf/data_train.csv
-        path: /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/mf/data_train.csv
+        path: ${user.data_path}/dna/mf/data_train.csv
         # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-05-01_22-12-21/data/data_train.csv
         get_scores: False
       test: 
         # path: ${user.data_path}/dna/length30/mf/data_test.csv
-        path: /home/mila/n/nikita.saxena/activelearning/storage/dna/length30/mf/data_test.csv
+        path: ${user.data_path}/dna/mf/data_test.csv
         # path: /home/mila/n/nikita.saxena/scratch/logs/activelearning/2023-05-01_22-12-21/data/data_test.csv
         get_scores: False
 
