@@ -60,6 +60,7 @@ def build_dataframe(config):
         ]
     )
     for method in config.io.data.methods:
+        print(f"Building data from method {method}")
         if method == "sfgfn":
             datadir = "sf"
         else:
@@ -196,6 +197,8 @@ def get_wandb_runpath(logdir):
     entity, project, _, run_id = (
         url.rstrip().replace("https://wandb.ai/", "").split("/")
     )
+    if project == "Scratch":
+        project = "IP-DKL"
     runpath = entity + "/" + project + "/" + run_id
     runpath = runpath.replace("%20", " ")
     return runpath
