@@ -119,7 +119,12 @@ def build_dataframe(config):
 
 
 def process_methods(df, config):
-    return df.loc[df.method.isin(config.io.do_methods)]
+    df = df.loc[df.method.isin(config.io.do_methods)]
+    # Replace by alias
+    for method in config.io.do_methods:
+        if "alias" in config.io.data.methods[method]:
+            df.replace(to_replace=method, value=config.io.data.methods[method].alias, inplace=True)
+    return df
 
 
 def process_cost(df, config):
@@ -361,7 +366,11 @@ def plot(df, config):
     if not config.plot.do_all_k:
         leg_handles, leg_labels = [], []
         for handle, label in zip(leg_handles_def, leg_labels_def):
-            if label in config.io.data.methods:
+            if "orig" in config.plot.methods[label]:
+                key = config.plot.methods[label].orig
+            else:
+                key = label
+            if key in config.io.data.methods:
                 leg_handles.append(handle)
                 leg_labels.append(config.plot.methods[label].name)
 
