@@ -60,6 +60,7 @@ def build_dataframe(config):
         ]
     )
     for method in config.io.data.methods:
+        print(f"Building data from method {method}")
         if method == "sfgfn":
             datadir = "sf"
         else:
