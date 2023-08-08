@@ -94,7 +94,7 @@ plot:
             dash: loosely dotted
             linewidth: 2
     x_axis:
-        log: True
+        log: False
         type: "fraction_budget"
         label: "Fraction of total ${plot.methods.sfgfn.name} budget"
     do_all_k: False

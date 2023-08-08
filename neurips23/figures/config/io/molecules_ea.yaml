@@ -53,6 +53,7 @@ data:
     - 50
     - 100
     - 200
+  k_plot: 100
   batch_size_al: 128
   do_diversity: True
   do_topk_diverse: True

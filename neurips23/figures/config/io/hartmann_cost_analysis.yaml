@@ -1,0 +1,101 @@
+task: hartmann
+input_csv: data/hartmann.csv
+output_dir: output
+output_csv: data/hartmann_cost_analysis.csv
+output_filename: hartmann_cost_analysis.pdf
+do_methods:
+    - sfgfn
+    - mfgfn
+    - mfgfn_b
+    - mfgfn_c
+    - mfgfn_d
+    - mfgfn_a
+data:
+  methods:
+   sfgfn:
+     highlight: False
+     dirname: "hartmann/gfn_sf"
+     seeds:
+       1:
+         logdir: "2023-05-05_01-08-33"
+       2:
+         logdir: "2023-05-04_06-27-13"
+       3:
+         logdir: "2023-05-04_06-27-13"
+   mf_random:
+     highlight: False
+     dirname: "hartmann/gfn_random"
+     seeds:
+       1:
+         logdir: "2023-05-12_18-53-21"
+       2:
+         logdir: "2023-05-12_18-53-26"
+   random_fid_gfn:
+     highlight: False
+     dirname: "hartmann/gfn_random_fid"
+     seeds:
+       1:
+         logdir: "2023-05-10_22-12-28"
+       2:
+         logdir: "2023-05-12_00-30-34"
+       3:
+         logdir: "2023-05-12_00-31-01"
+   mfppo:
+     highlight: False
+     dirname: "hartmann/ppo"
+     seeds:
+       1:
+         logdir: "2023-05-13_18-46-10"
+   mfbo:
+     highlight: False
+     dirname: "hartmann/mfbo"
+     seeds:
+       1:
+         logdir: ""
+   mfgfn:
+     highlight: True
+     dirname: "hartmann/gfn_mf"
+     name: "original"
+     seeds:
+       1:
+         logdir: "2023-05-05_10-51-53"
+       2:
+         logdir: "2023-05-04_06-27-11"
+       3:
+         logdir: "2023-05-04_06-27-12"
+   mfgfn_b:
+     highlight: True
+     dirname: "hartmann/cost_ablation"
+     name: "2023-05-05_13-53-13"
+     seeds:
+       1:
+         logdir: "2023-05-05_13-53-13"
+   mfgfn_c:
+     highlight: True
+     dirname: "hartmann/cost_ablation"
+     name: "2023-05-05_14-02-23"
+     seeds:
+       1:
+         logdir: "2023-05-05_14-02-23"
+   mfgfn_d:
+     highlight: True
+     dirname: "hartmann/cost_ablation"
+     name: "2023-05-05_20-18-08"
+     seeds:
+       1:
+         logdir: "2023-05-05_20-18-08"
+   mfgfn_a:
+     highlight: True
+     dirname: "hartmann/cost_ablation"
+     name: "2023-05-06_04-47-38"
+     seeds:
+       1:
+         logdir: "2023-05-06_04-47-38"
+  higherbetter: True
+  k:
+    - 1
+    - 10
+  k_plot: 10
+  batch_size_al: 10
+  do_diversity: False
+  do_topk_diverse: False
