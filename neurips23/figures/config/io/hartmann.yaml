@@ -9,6 +9,10 @@ do_methods:
     - mfppo
 #     - mfbo
     - mfgfn
+    - mfgfn_b
+    - mfgfn_c
+    - mfgfn_d
+    - mfgfn_e
 data:
   methods:
    sfgfn:
@@ -61,9 +65,34 @@ data:
          logdir: "2023-05-04_06-27-11"
        3:
          logdir: "2023-05-04_06-27-12"
+   mfgfn_b:
+     highlight: True
+     dirname: "hartmann/cost_ablation"
+     seeds:
+       1:
+         logdir: "2023-05-05_13-53-13"
+   mfgfn_c:
+     highlight: True
+     dirname: "hartmann/cost_ablation"
+     seeds:
+       1:
+         logdir: "2023-05-05_14-02-23"
+   mfgfn_d:
+     highlight: True
+     dirname: "hartmann/cost_ablation"
+     seeds:
+       1:
+         logdir: "2023-05-05_20-18-08"
+   mfgfn_e:
+     highlight: True
+     dirname: "hartmann/cost_ablation"
+     seeds:
+       1:
+         logdir: "2023-05-06_04-47-38"
   higherbetter: True
   k:
     - 1
     - 10
   batch_size_al: 10
   do_diversity: False
+  do_topk_diverse: False

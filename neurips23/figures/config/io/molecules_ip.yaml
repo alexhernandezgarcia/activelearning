@@ -17,6 +17,32 @@ data:
      seeds:
        1:
          logdir: "2023-05-11_20-52-32"
+   sfgfn_cost1:
+     highlight: False
+     dirname: "molecules_ip/gfn_sf_cost1"
+     seeds:
+       1:
+         logdir: "2023-08-03_04-00-17"
+       2:
+         logdir: "2023-08-03_04-55-01"
+       3:
+         logdir: "2023-08-03_05-13-55"
+   sfgfn_b256:
+     highlight: False
+     dirname: "molecules_ip/batch_ablation/b256/sf"
+     seeds:
+       1:
+         logdir: "2023-08-05_14-32-48"
+       2:
+         logdir: "2023-08-05_14-42-01"
+   sfgfn_b64:
+     highlight: False
+     dirname: "molecules_ip/batch_ablation/b64/sf"
+     seeds:
+       1:
+         logdir: "2023-08-05_14-32-07"
+       2:
+         logdir: "2023-08-05_14-43-06"
    mf_random:
      highlight: False
      dirname: "molecules_ip/gfn_random"
@@ -45,11 +71,33 @@ data:
      seeds:
        1:
          logdir: "2023-05-12_07-18-46"
+   mfgfn_b256:
+     highlight: False
+     dirname: "molecules_ip/batch_ablation/b256/mf"
+     seeds:
+       1:
+         logdir: "2023-08-04_01-40-29"
+       2:
+         logdir: "2023-08-04_02-33-42"
+       3:
+         logdir: "2023-08-04_03-39-45"
+   mfgfn_b64:
+     highlight: False
+     dirname: "molecules_ip/batch_ablation/b64/mf"
+     seeds:
+       1:
+         logdir: "2023-08-04_01-39-35"
+       2:
+         logdir: "2023-08-04_02-39-43"
+       3:
+         logdir: "2023-08-04_03-06-40"
   higherbetter: False
   k:
     - 1
+    - 10
     - 50
     - 100
+    - 200
   batch_size_al: 128
   do_diversity: True
   do_topk_diverse: True
