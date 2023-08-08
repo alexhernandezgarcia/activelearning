@@ -1,14 +1,17 @@
 task: dna
-input_csv: data/dna.csv
+input_csv: data/cost_analysis.csv
 output_dir: output
-output_csv: data/dna.csv
-output_filename: dna.pdf
+output_csv: data/cost_analysis.csv
+output_filename: cost_analysis.pdf
 do_methods:
     - sfgfn
-    - mf_random
-    - random_fid_gfn
+#     - mf_random
+#     - random_fid_gfn
     - mfppo
-    - mfgfn
+#     - mfgfn_a
+    - mfgfn_b
+    - mfgfn_c
+    - mfgfn_d
 data:
   methods:
    sfgfn:
@@ -39,43 +42,41 @@ data:
      seeds:
        1:
          logdir: "2023-05-13_15-42-49"
-   mfgfn:
+   mfgfn_a:
      highlight: True
-     dirname: "dna/cost_ablation"
+     dirname: "dna/gfn_linear_kernel"
      name: "MF-GFlowNet"
      seeds:
        1:
+         logdir: "2023-05-06_04-35-33"
+   mfgfn_b:
+     highlight: True
+     dirname: "dna/cost_ablation"
+     name: "MF-GFlowNet (0.01, 1)"
+     seeds:
+       1:
          logdir: "2023-05-06_17-27-20"
-#    mfgfn:
-#      highlight: True
-#      dirname: "dna/gfn_linear_kernel"
-#      name: "MF-GFlowNet"
-#      seeds:
-#        1:
-#          logdir: "2023-05-06_04-35-33"
-#    mf_linear:
-#      highlight: True
-#      dirname: "dna/gfn_linear_kernel"
-#      seeds:
-#        1:
-#          logdir: "2023-05-06_04-35-33"
-#    mf_index:
-#      highlight: True
-#      dirname: "dna/gfn_index_kernel"
-#      seeds:
-#        1:
-#          logdir: "2023-05-05_14-26-31"
+   mfgfn_c:
+     highlight: True
+     dirname: "dna/cost_ablation"
+     name: "MF-GFlowNet (0.05, 1)"
+     seeds:
+       1:
+         logdir: "2023-05-08_16-55-59"
+   mfgfn_d:
+     highlight: True
+     dirname: "dna/cost_ablation"
+     name: "MF-GFlowNet (0.5, 1)"
+     seeds:
+       1:
+         logdir: "2023-05-09_16-31-25"
   higherbetter: False
   k:
     - 1
     - 10
-    - 50
     - 100
-    - 200
-  k_plot: 100
   batch_size_al: 512
   do_diversity: True
-  do_topk_diverse: True
 plot:
     x_axis:
         log: False

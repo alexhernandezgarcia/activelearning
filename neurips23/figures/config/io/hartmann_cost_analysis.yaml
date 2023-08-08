@@ -1,18 +1,15 @@
 task: hartmann
 input_csv: data/hartmann.csv
 output_dir: output
-output_csv: data/hartmann.csv
-output_filename: hartmann.pdf
+output_csv: data/hartmann_cost_analysis.csv
+output_filename: hartmann_cost_analysis.pdf
 do_methods:
     - sfgfn
-    - random_fid_gfn
-    - mfppo
-#     - mfbo
     - mfgfn
     - mfgfn_b
     - mfgfn_c
     - mfgfn_d
-    - mfgfn_e
+    - mfgfn_a
 data:
   methods:
    sfgfn:
@@ -58,6 +55,7 @@ data:
    mfgfn:
      highlight: True
      dirname: "hartmann/gfn_mf"
+     name: "original"
      seeds:
        1:
          logdir: "2023-05-05_10-51-53"
@@ -68,24 +66,28 @@ data:
    mfgfn_b:
      highlight: True
      dirname: "hartmann/cost_ablation"
+     name: "2023-05-05_13-53-13"
      seeds:
        1:
          logdir: "2023-05-05_13-53-13"
    mfgfn_c:
      highlight: True
      dirname: "hartmann/cost_ablation"
+     name: "2023-05-05_14-02-23"
      seeds:
        1:
          logdir: "2023-05-05_14-02-23"
    mfgfn_d:
      highlight: True
      dirname: "hartmann/cost_ablation"
+     name: "2023-05-05_20-18-08"
      seeds:
        1:
          logdir: "2023-05-05_20-18-08"
-   mfgfn_e:
+   mfgfn_a:
      highlight: True
      dirname: "hartmann/cost_ablation"
+     name: "2023-05-06_04-47-38"
      seeds:
        1:
          logdir: "2023-05-06_04-47-38"
@@ -93,6 +95,7 @@ data:
   k:
     - 1
     - 10
+  k_plot: 10
   batch_size_al: 10
   do_diversity: False
   do_topk_diverse: False
