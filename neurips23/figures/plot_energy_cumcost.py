@@ -192,6 +192,8 @@ def get_wandb_runpath(logdir):
     entity, project, _, run_id = (
         url.rstrip().replace("https://wandb.ai/", "").split("/")
     )
+    if project == "Scratch":
+        project = "IP-DKL"
     runpath = entity + "/" + project + "/" + run_id
     runpath = runpath.replace("%20", " ")
     return runpath
