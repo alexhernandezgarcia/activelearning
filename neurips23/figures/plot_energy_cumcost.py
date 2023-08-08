@@ -262,7 +262,7 @@ def plot(df, config):
         )
         leg_handles_def, leg_labels_def = ax.get_legend_handles_labels()
     else:
-        k_plot = df.k.max()
+        k_plot = config.io.data.k_plot
         sns.lineplot(
             ax=ax,
             data=df.loc[df.k == k_plot],
