@@ -17,13 +17,19 @@ data:
      seeds:
        1:
          logdir: "2023-05-06_11-38-43"
+       2:
+         logdir: "2023-05-07_16-26-59"
+       3:
+         logdir: "2023-07-18_05-04-59"
    mf_random:
      highlight: False
      dirname: "dna/gfn_random"
      seeds:
        1:
-         logdir: "2023-05-12_19-17-41"
+         logdir: "2023-05-12_19-17-29"
        2:
+         logdir: "2023-05-12_19-17-41"
+       3:
          logdir: "2023-05-12_19-23-46"
    random_fid_gfn:
      highlight: False
@@ -33,12 +39,18 @@ data:
          logdir: "2023-05-12_00-02-07"
        2:
          logdir: "2023-05-12_20-05-48"
+       3:
+         logdir: "2023-07-31_12-14-36"
    mfppo:
      highlight: False
      dirname: "dna/ppo"
      seeds:
        1:
          logdir: "2023-05-13_15-42-49"
+       2:
+         logdir: "2023-07-27_04-03-55"
+       3:
+         logdir: "2023-07-27_04-07-02"
    mfgfn:
      highlight: True
      dirname: "dna/cost_ablation"
@@ -46,25 +58,26 @@ data:
      seeds:
        1:
          logdir: "2023-05-06_17-27-20"
-#    mfgfn:
-#      highlight: True
-#      dirname: "dna/gfn_linear_kernel"
-#      name: "MF-GFlowNet"
-#      seeds:
-#        1:
-#          logdir: "2023-05-06_04-35-33"
-#    mf_linear:
-#      highlight: True
-#      dirname: "dna/gfn_linear_kernel"
-#      seeds:
-#        1:
-#          logdir: "2023-05-06_04-35-33"
-#    mf_index:
-#      highlight: True
-#      dirname: "dna/gfn_index_kernel"
-#      seeds:
-#        1:
-#          logdir: "2023-05-05_14-26-31"
+       2:
+         logdir: "2023-05-08_16-55-59"
+       3:
+         logdir: "2023-05-09_16-31-25"
+   mf_linear:
+     highlight: True
+     dirname: "dna/gfn_linear_kernel"
+     seeds:
+       1:
+         logdir: "2023-05-06_04-35-33"
+       2:
+         logdir: "2023-05-06_17-27-20"
+       3:
+         logdir: "2023-07-18_06-43-37"
+   mf_index:
+     highlight: False
+     dirname: "dna/gfn_index_kernel"
+     seeds:
+       1:
+         logdir: "2023-05-05_14-26-31"
   higherbetter: False
   k:
     - 1

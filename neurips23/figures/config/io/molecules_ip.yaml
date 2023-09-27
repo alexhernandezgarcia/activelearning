@@ -17,6 +17,10 @@ data:
      seeds:
        1:
          logdir: "2023-05-11_20-52-32"
+       2:
+         logdir: "2023-07-18_04-48-18"
+       3:
+         logdir: "2023-07-18_04-49-20"
    sfgfn_cost1:
      highlight: False
      dirname: "molecules_ip/gfn_sf_cost1"
@@ -59,18 +63,30 @@ data:
      seeds:
        1:
          logdir: "2023-05-13_19-58-14"
+       2:
+         logdir: "2023-05-13_19-58-16"
+       3:
+         logdir: "2023-07-18_04-25-27"
    mfppo:
      highlight: False
      dirname: "molecules_ip/ppo"
      seeds:
        1:
          logdir: "2023-05-14_15-55-42"
+       2:
+         logdir: "2023-07-18_07-10-33"
+       3:
+         logdir: "2023-07-27_04-21-56"
    mfgfn:
      highlight: True
      dirname: "molecules_ip/gfn_mf"
      seeds:
        1:
          logdir: "2023-05-12_07-18-46"
+       2:
+         logdir: "2023-07-18_05-32-27"
+       3:
+         logdir: "2023-07-18_05-38-22"
    mfgfn_b256:
      highlight: False
      dirname: "molecules_ip/batch_ablation/b256/mf"

@@ -17,6 +17,10 @@ data:
      seeds:
        1:
          logdir: "2023-05-11_20-52-24"
+       2:
+         logdir: "2023-07-18_04-45-24"
+       3:
+         logdir: "2023-07-18_04-47-34"
    mf_random:
      highlight: False
      dirname: "molecules_ea/gfn_random"
@@ -33,12 +37,20 @@ data:
      seeds:
        1:
          logdir: "2023-05-12_20-17-51"
+       2:
+         logdir: "2023-07-18_04-22-29"
+       3:
+         logdir: "2023-07-18_04-24-51"
    mfppo:
      highlight: False
      dirname: "molecules_ea/ppo"
      seeds:
        1:
          logdir: "2023-05-14_15-56-25"
+       2:
+         logdir: "2023-07-18_07-11-29"
+       3:
+         logdir: "2023-07-27_04-30-58"
    mfgfn:
      highlight: True
      dirname: "molecules_ea/gfn_mf"
@@ -46,6 +58,10 @@ data:
      seeds:
        1:
          logdir: "2023-05-12_01-42-34"
+       2:
+         logdir: "2023-07-18_05-31-26"
+       3:
+         logdir: "2023-07-27_04-51-58"
   higherbetter: True
   k:
     - 1

@@ -17,6 +17,10 @@ data:
      seeds:
        1:
          logdir: "2023-05-03_11-56-45"
+       2:
+         logdir: "2023-05-06_14-31-20"
+       3:
+         logdir: "2023-07-18_04-58-50"
    mf_random:
      highlight: False
      dirname: "amp/gfn_random"
@@ -35,6 +39,8 @@ data:
          logdir: "2023-05-10_22-15-42"
        2:
          logdir: "2023-05-12_20-08-56"
+       3:
+         logdir: "2023-07-31_12-08-38"
    mfppo:
      highlight: False
      dirname: "amp/ppo"
@@ -47,18 +53,16 @@ data:
      seeds:
        1:
          logdir: "2023-05-06_14-31-20"
-#    mfgfn_linear:
-#      highlight: True
-#      dirname: "amp/gfn_linear_kernel"
-#      seeds:
-#        1:
-#          logdir: "2023-05-06_14-31-20"
-#    mfgfn_index:
-#      highlight: True
-#      dirname: "amp/gfn_index_kernel"
-#      seeds:
-#        1:
-#          logdir: "2023-05-01_23-18-47"
+       2:
+         logdir: "2023-07-18_05-26-16"
+       3:
+         logdir: "2023-07-20_05-32-03"
+   mfgfn_index:
+     highlight: True
+     dirname: "amp/gfn_index_kernel"
+     seeds:
+       1:
+         logdir: "2023-05-01_23-18-47"
   higherbetter: True
   k:
     - 1
