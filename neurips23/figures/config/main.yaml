@@ -20,6 +20,7 @@ plot:
         - "d"
         - "o"
         - "o"
+        - "o"
     methods:
         mfgfn:
             palette: colorblind
@@ -81,6 +82,20 @@ plot:
             name: "SF-GFN"
             dash: dotted
             linewidth: 2
+        sfgfn_highest_cost:
+            orig: sfgfn
+            palette: crest
+            palette_idx: 0
+            name: "SF-GFN (highest cost)"
+            dash: dotted
+            linewidth: 2
+        sfgfn_lowest_cost:
+            orig: sfgfn_cost1
+            palette: crest
+            palette_idx: 4
+            name: "SF-GFN (lowest cost)"
+            dash: dotted
+            linewidth: 2
         mfppo:
             palette: tab10
             palette_idx: 5
@@ -93,6 +108,79 @@ plot:
             name: "MF-BO"
             dash: loosely dotted
             linewidth: 2
+        mfgfn_hartmann_costs_a:
+            orig: mfgfn
+            palette: colorblind
+            palette_idx: 0
+            name: "MF-GFN orig. (0.125, 0.25, 1.0)"
+            dash: solid
+            linewidth: 3
+        mfgfn_hartmann_costs_b:
+            orig: mfgfn_b
+            palette: flare
+            palette_idx: 0
+            name: "MF-GFN (0.5, 0.5, 1)"
+            dash: solid
+            linewidth: 3
+        mfgfn_hartmann_costs_c:
+            orig: mfgfn_c
+            palette: flare
+            palette_idx: 3
+            name: "MF-GFN (0.25, 0.5, 1)"
+            dash: solid
+            linewidth: 3
+        mfgfn_hartmann_costs_d:
+            orig: mfgfn_d
+            palette: flare
+            palette_idx: 6
+            name: "MF-GFN (0.5, 0.75, 1)"
+            dash: solid
+            linewidth: 3
+        mfgfn_hartmann_costs_e:
+            orig: mfgfn_e
+            palette: flare
+            palette_idx: 9
+            name: "MF-GFN (0.8, 0.8, 1)"
+            dash: solid
+            linewidth: 3
+        sfgfn_b64:
+            palette: crest
+            palette_idx: 0
+            name: "SF-GFN Acq. size 64"
+            dash: solid
+            linewidth: 3
+        sfgfn_b128:
+            orig: sfgfn
+            palette: crest
+            palette_idx: 4
+            name: "SF-GFN Acq. size 128 (original)"
+            dash: solid
+            linewidth: 3
+        sfgfn_b256:
+            palette: crest
+            palette_idx: 8
+            name: "SF-GFN Acq. size 256"
+            dash: solid
+            linewidth: 3
+        mfgfn_b64:
+            palette: flare
+            palette_idx: 0
+            name: "MF-GFN Acq. size 64"
+            dash: solid
+            linewidth: 3
+        mfgfn_b128:
+            orig: mfgfn
+            palette: flare
+            palette_idx: 4
+            name: "MF-GFN Acq. size 128 (original)"
+            dash: solid
+            linewidth: 3
+        mfgfn_b256:
+            palette: flare
+            palette_idx: 8
+            name: "MF-GFN Acq. size 256"
+            dash: solid
+            linewidth: 3
     x_axis:
         log: False
         type: "fraction_budget"
