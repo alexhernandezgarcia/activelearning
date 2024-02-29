@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import wandb
 
 
 class AL_Logger(Logger):
@@ -71,11 +72,19 @@ class AL_Logger(Logger):
     def save_dataset(self, dataset, type):
         if self.data_path is not None:
             data = pd.DataFrame(dataset)
+            # sort dataframe by energies column in descending order
+            data = data.sort_values(by="energies", ascending=False)
             if type == "sampled":
                 type = type + "_iter" + self.context
             name = Path(self.data_path.stem + "_" + type + ".csv")
             path = self.data_path.parent / name
             data.to_csv(path)
+        if self.do.online:
+            # return
+            wandb_path = Path(
+                self.wandb.run.dir + "/" + self.data_path.stem + "_" + type + ".csv"
+            )
+            data.to_csv(wandb_path)
 
     def log_figure(self, key, fig, use_context):
         if not self.do.online and fig is not None:
@@ -87,3 +96,8 @@ class AL_Logger(Logger):
             figimg = self.wandb.Image(fig)
             self.wandb.log({key: figimg})
             plt.close()
+
+    def define_metric(self, metric, step_metric=None):
+        if not self.do.online:
+            return
+        wandb.define_metric(metric, step_metric=step_metric)

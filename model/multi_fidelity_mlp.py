@@ -77,12 +77,6 @@ class MultiFidelityMLP(nn.Module):
             self.fid_module = nn.Sequential(*fid_layers)
             self.forward = self.forward_shared_head
 
-    # def preprocess(self, x, fid):
-    #     # input = torch.zeros(x.shape[0], self.init_layer_depth)
-    #     # input[:, : x.shape[1]] = x
-    #     fid_ohe = F.one_hot(fid, num_classes=self.n_fid + 1)[:, 1:].to(torch.float32)
-    #     return input.to(x.device), fid_ohe
-
     def forward_shared_head(self, input):
         x, fid = input[:, : -self.n_fid], input[:, -self.n_fid :]
         state = (
@@ -91,7 +85,7 @@ class MultiFidelityMLP(nn.Module):
             .to(input.dtype)
         )
         state[:, : x.shape[1]] = x
-        # self.preprocess(input, fid)
+
         embed = self.embed_module(state)
         embed_with_fid = torch.concat([embed, fid], dim=1)
         out = self.fid_module(embed_with_fid)

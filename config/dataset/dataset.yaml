@@ -1,6 +1,6 @@
 _target_: dataset.DataHandler
 
-normalise_data: False
+normalize_data: False
 train_fraction: 0.8
 dataloader: 
   train: 
@@ -15,4 +15,3 @@ path:
   oracle_dataset: null
   # to store the dataset
   dataset: data
-dataset_size: 200

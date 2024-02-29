@@ -1,0 +1,22 @@
+_target_: model.lm_elements.LanguageModel
+name: mlm_cnn
+
+model:
+  _target_: model.shared_elements.mCNN
+  tokenizer: null
+  max_len: ${env.max_seq_length}
+  embed_dim: 8
+  latent_dim: 8
+  out_dim: 8
+  kernel_size: 5
+  p: 0.
+  layernorm: True
+  max_len_delta: 0
+
+batch_size: 32
+num_epochs: 128
+patience: 32
+lr: 1e-3
+max_shift: 0
+mask_ratio: 0.125
+feature_dim: ${model.model.out_dim}

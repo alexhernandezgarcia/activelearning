@@ -2,6 +2,9 @@ _target_: model.mlp.MLP
 
 activation: "relu"
 num_output: 1
-n_hid: 64
+n_hid: 16
+feature_dim: ${model.n_hid}
 dropout_prob: 0.1
 n_layers: 4
+beta1: 0.9
+beta2: 0.999

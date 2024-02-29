@@ -3,3 +3,4 @@ defaults:
 _target_: proxy.mes.ProxyMultiFidelityMES
 cost_type: user
 maximize: True
+num_dropout_samples: 25
