@@ -1,1 +1,7 @@
 __pycache__/
+
+logs
+.vscode
+data
+_al_logger
+wandb

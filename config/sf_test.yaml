@@ -25,7 +25,7 @@ logger:
     period: -1
   do:
     times: False
-    online: False
+    online: True
   tags:
     - branin
     - sf
@@ -62,7 +62,7 @@ gflownet:
   optimizer:
     lr: 5e-4
     lr_z_mult: 20
-    n_train_steps: 10000
+    n_train_steps: 1000
     batch_size: 16
   policy:
     forward:

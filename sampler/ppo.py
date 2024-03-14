@@ -333,7 +333,7 @@ class PPOAgent(GFlowNetAgent):
                     )
             s = []
             for env in envs:
-                if env.is_state_list == True:
+                if not hasattr(env, "is_state_list") or env.is_state_list == True:
                     s.append(env.state.copy())
                 else:
                     s.append(env.state.clone())

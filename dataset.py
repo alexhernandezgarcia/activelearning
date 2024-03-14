@@ -369,7 +369,6 @@ class DataHandler:
             key="post_al_iter_sampled_dataset",
             use_context=True,
         )
-
         samples = [self.env.state2readable(state) for state in states]
         readable_dataset = {
             "samples": samples,
