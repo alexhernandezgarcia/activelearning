@@ -3,6 +3,9 @@ import gpytorch
 from botorch.models.gp_regression_fidelity import (
     SingleTaskGP,
 )
+from botorch.acquisition.max_value_entropy_search import (
+    qLowerBoundMaxValueEntropy,
+)
 from botorch.models.transforms.outcome import Standardize
 from botorch.fit import fit_gpytorch_mll
 import numpy as np
@@ -58,6 +61,13 @@ class SingleTaskGPRegressor(Surrogate):
         y_mean = y_mean.squeeze(-1)
         y_std = y_std.squeeze(-1)
         return y_mean, y_std
+
+    def get_acquisition_values(self, candidate_set):
+        acqf = qLowerBoundMaxValueEntropy(
+            self.model,
+            candidate_set=candidate_set,
+        )
+        return acqf(candidate_set.unsqueeze(1))
 
     # def get_metrics(self, y_mean, y_std, env, states):
     #     state_oracle_input = states.clone()

@@ -1,29 +1,20 @@
-from sklearn.utils import shuffle
 from torch.utils.data import Dataset, DataLoader
 import torch
 from torch.nn.utils.rnn import pad_sequence
-import numpy as np
-from pathlib import Path
-from sklearn.model_selection import train_test_split
 import pandas as pd
-import matplotlib.pyplot as plt
-from gflownet.utils.common import set_device, set_float_precision
+from gflownet.utils.common import set_float_precision
 from torch.nn.utils.rnn import pad_sequence
-from torchtyping import TensorType
-from typing import List
 from abc import ABC, abstractmethod
-# from utils.common import get_figure_plots
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data, device="cpu", float=torch.float64):
+    def __init__(self, X_data, y_data, float=torch.float64):
         self.X_data = X_data
         self.y_data = y_data
-        self.device = device
         self.float = float
 
     def __getitem__(self, index):
-        return self.X_data[index].to(self.float).to(self.device), self.y_data[index].to(self.float).to(self.device)
+        return self.X_data[index].to(self.float), self.y_data[index].to(self.float)
 
     def __len__(self):
         return len(self.X_data)
@@ -48,8 +39,8 @@ class Branin_Data(Data):
 
 
     """
-    def __init__(self, X_data, y_data, normalize_scores=True, grid_size=100, device="cpu", float=torch.float64):
-        super().__init__(X_data, y_data, device=device, float=float)
+    def __init__(self, X_data, y_data, normalize_scores=True, grid_size=100, float=torch.float64):
+        super().__init__(X_data, y_data, float=float)
         self.normalize_scores = normalize_scores
         self.grid_size = grid_size
         self.stats = self.get_statistics(y_data)
@@ -236,7 +227,6 @@ class Branin_DatasetHandler(AL_DatasetHandler):
             train_states, 
             train_scores,
             normalize_scores=self.normalize_scores,
-            device=self.device,
             float=self.float
         )
 
@@ -245,7 +235,6 @@ class Branin_DatasetHandler(AL_DatasetHandler):
                 test_states, 
                 test_scores,
                 normalize_scores=self.normalize_scores,
-                device=self.device,
                 float=self.float
             )
         else:
