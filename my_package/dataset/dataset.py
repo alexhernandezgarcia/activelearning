@@ -100,7 +100,7 @@ class Branin_Data(Data):
 
 
 
-class AL_DatasetHandler(ABC):
+class DatasetHandler(ABC):
     """
     loads initial dataset. this contains the parameters (X), the target (y), and for multiple oracles, the oracle ID that created this datapoint. 
     """
@@ -123,7 +123,7 @@ class AL_DatasetHandler(ABC):
         pass
 
 
-class Branin_DatasetHandler(AL_DatasetHandler):
+class BraninDatasetHandler(DatasetHandler):
     """
     loads initial dataset. a path must be passed from where the initial csv file is loaded. it also checks whether other iteration steps are present in the directory and loads them too.
 
