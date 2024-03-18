@@ -16,15 +16,24 @@ from abc import ABC, abstractmethod
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data):
-        self.X_data = X_data.detach().cpu()
-        self.y_data = y_data.detach().cpu()
+    def __init__(self, X_data, y_data, device="cpu", float=torch.float64):
+        self.X_data = X_data
+        self.y_data = y_data
+        self.device = device
+        self.float = float
 
     def __getitem__(self, index):
-        return self.X_data[index], self.y_data[index]
+        return self.X_data[index].to(self.float).to(self.device), self.y_data[index].to(self.float).to(self.device)
 
     def __len__(self):
         return len(self.X_data)
+    
+    def append(self, X, y):
+        """
+        append new instances to the data
+        """
+        self.X_data = torch.cat((self.X_data, X), 0)
+        self.y_data = torch.cat((self.y_data, y), 0)
 
 
 class Branin_Data(Data):
@@ -39,10 +48,9 @@ class Branin_Data(Data):
 
 
     """
-    def __init__(self, X_data, y_data, normalize_scores=True, grid_size=100, device="cpu"):
-        super().__init__(X_data, y_data)
+    def __init__(self, X_data, y_data, normalize_scores=True, grid_size=100, device="cpu", float=torch.float64):
+        super().__init__(X_data, y_data, device=device, float=float)
         self.normalize_scores = normalize_scores
-        self.device = device
         self.grid_size = grid_size
         self.stats = self.get_statistics(y_data)
         
@@ -64,39 +72,40 @@ class Branin_Data(Data):
         y = self.y_data[index]
         return self.preprocess(X, y)
     
-    def normalize(self, y):
+    
+    def append(self, X, y):
         """
-        Args:
-            y: targets to normalize (tensor)
-        Returns:
-            y: normalized targets (tensor)
+        append new instances to the data
         """
-        y = (y - self.stats["min"]) / (self.stats["max"] - self.stats["min"])
-        # y = (y - stats["mean"]) / stats["std"]
-        return y
-
-    def denormalize(self, y):
-        """
-        Args:
-            y: targets to denormalize (tensor)
-        Returns:
-            y: denormalized targets (tensor)
-        """
-        y = y * (self.stats["max"] - self.stats["min"]) + self.stats["min"]
-        # y = y * stats["std"] + stats["mean"]
-        return y
-
+        # X, y = self.deprocess(X, y) # append data in raw form (i.e., not normalized)
+        X /= self.grid_size
+        super().append(X, y)
+        self.stats = self.get_statistics(self.y_data) # update the score statistics
     
     def preprocess(self, X, y):
         """
-        - normalizes the scoers
+        - normalizes the scores
         - normalizes the states
         """
         states = X / self.grid_size
         if self.normalize_scores:
-            scores = self.normalize(y)
+            scores = (y - self.stats["min"]) / (self.stats["max"] - self.stats["min"])
 
         return states, scores
+    
+    # def deprocess(self, X, y):
+    #     """
+    #     - denormalizes the scores
+    #     - denormalizes the states
+    #     """
+    #     states = X * self.grid_size
+    #     # TODO: check if we have to denormalize the scores
+    #     if self.normalize_scores:
+    #         scores = y * (self.stats["max"] - self.stats["min"]) + self.stats["min"]
+
+    #     return states, scores
+
+    
 
 
 
@@ -134,38 +143,28 @@ class Branin_DatasetHandler(AL_DatasetHandler):
 
     def __init__(
         self,
-        normalize_data=True,
+        normalize_scores=True,
         train_fraction=0.8,
         batch_size=256,
         shuffle=True,
         train_path="storage/branin/sf/data_train.csv",
         test_path=None,
-        target_factor=1.0,
         device="cpu",
         float_precision=64,
         grid_size=100,
     ):
-        self.normalize_data = normalize_data
+        self.normalize_scores = normalize_scores
         self.train_fraction = train_fraction
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.train_path = train_path
         self.test_path = test_path
-        self.target_factor = target_factor
         self.device = device
         self.float = set_float_precision(float_precision)
         self.grid_size = grid_size
 
         self.initialise_dataset()
 
-
-    def scale_by_target_factor(self, data):
-        if data is not None:
-            data = torch.tensor(data)
-            data = data * self.target_factor
-            indices = torch.where(data == -0.0)
-            data[indices] = 0.0
-        return data
     
     def statetorch2readable(self, state, alphabet={}):
         """
@@ -183,48 +182,43 @@ class Branin_DatasetHandler(AL_DatasetHandler):
         """
         return [int(el) for el in readable.strip("[]").split(" ") if el != ""]
 
-    def state2readable(self, state = None):
+    def state2readable(self, state):
         """
         Converts a state (a list of positions) into a human-readable string
         representing a state.
         """
-        state = self._get_state(state)
         return str(state).replace("(", "[").replace(")", "]").replace(",", "")
 
     def initialise_dataset(self):
         """
         Loads the initial dataset from a directory
         """
-        train_scores = []
-        test_scores = []
-        train_samples = []
-        test_samples = []
 
         # TODO: load all iterations that are saved in the directory
         # load train data
         train_states = torch.Tensor()
+        train_scores = torch.Tensor()
         if self.train_path is not None:
             train = pd.read_csv(self.train_path)
-            train_samples = train["samples"].values.tolist()
-            train_scores = train["energies"].values.tolist()
+            train_samples_X = train["samples"].values.tolist()
+            train_samples_y = train["energies"].values.tolist()
+            train_scores = torch.tensor(train_samples_y)
             train_states = torch.stack([
-                torch.tensor(self.readable2state(sample)) for sample in train_samples
+                torch.tensor(self.readable2state(sample)) for sample in train_samples_X
             ])
 
 
         # load test data
         test_states = torch.Tensor()
+        test_scores = torch.Tensor()
         if self.test_path is not None:
             test = pd.read_csv(self.test_path)
-            test_samples = test["samples"].values.tolist()
-            test_scores = test["energies"].values.tolist()
+            test_samples_X = test["samples"].values.tolist()
+            test_samples_y = test["energies"].values.tolist()
+            test_scores = torch.tensor(test_samples_y)
             test_states = torch.stack([
-                torch.tensor(self.readable2state(sample)) for sample in test_samples
+                torch.tensor(self.readable2state(sample)) for sample in test_samples_X
             ])
-
-        # TODO: check if we need to scale; if yes, we might want to put this in the Data preprocessing
-        train_scores = self.scale_by_target_factor(train_scores)
-        test_scores = self.scale_by_target_factor(test_scores)
 
         # if we don't have test data and we specified a train_fraction, 
         # use a random subsample from the train data as test data
@@ -237,27 +231,22 @@ class Branin_DatasetHandler(AL_DatasetHandler):
             test_scores = train_scores[test_index]
             train_scores = train_scores[train_index]
 
-        # send to device
-        # train_states = train_states.to(self.device)
-        # test_states = test_states.to(self.device)
-        # train_scores = train_scores.to(self.float).to(self.device)
-        # test_scores = test_scores.to(self.float).to(self.device)
 
         self.train_data = Branin_Data(
             train_states, 
             train_scores,
-            normalize_data=self.normalize_data,
-            float=self.float,
-            device=self.device
+            normalize_scores=self.normalize_scores,
+            device=self.device,
+            float=self.float
         )
 
         if len(test_states) > 0:
             self.test_data = Branin_Data(
-                self.test_dataset["states"], 
-                self.test_dataset["energies"],
-                normalize_data=self.normalize_data,
-                float=self.float,
-                device=self.device
+                test_states, 
+                test_scores,
+                normalize_scores=self.normalize_scores,
+                device=self.device,
+                float=self.float
             )
         else:
             self.test_data = None
@@ -274,7 +263,7 @@ class Branin_DatasetHandler(AL_DatasetHandler):
         for (_sequence, _label) in batch:
             y.append(_label)
             x.append(_sequence)
-        y = torch.tensor(y, dtype=self.float)  # , device=self.device
+        # y = torch.tensor(y, dtype=self.float)  # , device=self.device
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
         return xPadded, y
 
@@ -282,8 +271,8 @@ class Branin_DatasetHandler(AL_DatasetHandler):
         """
         Build and return the dataloader for the networks
         The dataloader should return x and y such that:
-            x: self.statebatch2proxy(input)
-            y: normalized (if need be) energies
+            x: in the domain [0; 1]
+            y: normalized (if need be) energies [0; 1]
         """
         train_loader = DataLoader(
             self.train_data,
@@ -307,109 +296,33 @@ class Branin_DatasetHandler(AL_DatasetHandler):
         return train_loader, test_loader
 
 
-    def convert_to_tensor(self, data):
+    def update_dataset(self, X, y):
         """
-        Converts a list of arrays to a tensor
-        """
-        if isinstance(data, TensorType):
-            return data
-        elif isinstance(data, List) and len(data) == 0:
-            return torch.tensor(data, dtype=self.float, device=self.device)
-        elif isinstance(data, List) and isinstance(data[0], TensorType):
-            return torch.stack(data).to(self.device)
-        elif isinstance(data, List):
-            return torch.tensor(data, dtype=self.float, device=self.device)
-        else:
-            raise NotImplementedError(
-                "Data type not recognized for conversion to tensor"
-            )
-
-    def update_dataset(self, states, energies, fidelity=None):
-        # TODO christina: not refactored yet!
-        """
-        Args:
-            queries: list of queries [[0, 0], [1, 1], ...]
-            energies: list of energies [-0.6, -0.1, ...]
         Update the dataset with new data after AL iteration
-        Updates the dataset stats
         Saves the updated dataset if save_data=True
+        Args:
+            X: array(N, 2) in the domain [0; 1]; states (i.e., grid positions) 
+            y: array(N, 1); scores at each position
+        Return:
+            DataLoader
         """
 
-        energies = torch.tensor(energies, dtype=self.float, device=self.device)
+        states = X
+        energies = y
 
-        samples = [self.state2readable(state) for state in states]
+        # append to in-memory dataset
+        # TODO: also save a fraction to test_data?
+        self.train_data.append(states, energies)
+
+        # TODO: save the new datapoints in a new csv file
+        readable_states = [self.state2readable(state) for state in states]
         readable_dataset = {
-            "samples": samples,
+            "samples": readable_states,
             "energies": energies.tolist(),
         }
-        energies = self.scale_by_target_factor(energies)
-        states_proxy = self.statebatch2proxy(states)
 
-        train_energies, test_energies = [], []
-        train_states, test_states = [], []
-        train_samples, test_samples = [], []
-        train_states_proxy, test_states_proxy = [], []
-        for sample, state, state_proxy, energy in zip(
-            samples, states, states_proxy, energies
-        ):
-            if np.random.uniform() < (1 / 10):
-                test_samples.append(sample)
-                test_states.append(state)
-                test_states_proxy.append(state_proxy)
-                test_energies.append(energy.item())
-            else:
-                train_samples.append(sample)
-                train_states.append(state)
-                train_states_proxy.append(state_proxy)
-                train_energies.append(energy.item())
+        print("TODO: check what format the states and scores have and make sure that everything is stored in the same format")
 
-        test_states_proxy = self.convert_to_tensor(test_states_proxy)
-        train_states_proxy = self.convert_to_tensor(train_states_proxy)
-        test_energies = self.convert_to_tensor(test_energies)
-        train_energies = self.convert_to_tensor(train_energies)
-
-        if self.normalize_data:
-            self.train_dataset["energies"] = self.denormalize(
-                self.train_dataset["energies"], stats=self.train_stats
-            )
-            if self.test_dataset is not None:
-                self.test_dataset["energies"] = self.denormalize(
-                    self.test_dataset["energies"], stats=self.test_stats
-                )
-
-        self.train_dataset["energies"] = torch.cat(
-            (self.train_dataset["energies"], train_energies), dim=0
-        )
-        if self.test_dataset is not None:
-            self.test_dataset["energies"] = torch.cat(
-                (self.test_dataset["energies"], test_energies), dim=0
-            )
-
-        self.train_dataset["states"] = torch.cat(
-            (self.train_dataset["states"], train_states_proxy), dim=0
-        )
-        if self.test_dataset is not None:
-            self.test_dataset["states"] = torch.cat(
-                (self.test_dataset["states"], test_states_proxy), dim=0
-            )
-
-        self.train_stats = self.get_statistics(self.train_dataset["energies"])
-        if self.test_dataset is not None:
-            self.test_stats = self.get_statistics(self.test_dataset["energies"])
-        if self.normalize_data:
-            self.train_dataset["energies"] = self.normalize(
-                self.train_dataset["energies"], self.train_stats
-            )
-            if self.test_dataset is not None:
-                self.test_dataset["energies"] = self.normalize(
-                    self.test_dataset["energies"], self.test_stats
-                )
-        self.train_data = Data(
-            self.train_dataset["states"], self.train_dataset["energies"]
-        )
-        if self.test_dataset is not None:
-            self.test_data = Data(
-                self.test_dataset["states"], self.test_dataset["energies"]
-            )
+        return self.get_dataloader()
 
 
