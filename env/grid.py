@@ -156,6 +156,7 @@ class Grid(GFlowNetEnv, GflowNetGrid):
                 train_samples = train["samples"].values.tolist()
                 if config.oracle_dataset.train.get_scores == False:
                     train_scores = train["scores"].values.tolist()
+                print("env init", train_samples, train_scores)
 
             if config.oracle_dataset.test is not None:
                 test = pd.read_csv(config.oracle_dataset.test.path)
@@ -182,6 +183,7 @@ class Grid(GFlowNetEnv, GflowNetGrid):
             states_oracle_input = states.clone()
             state_oracle = self.statetorch2oracle(states_oracle_input)
             scores = self.oracle(state_oracle)
+        print("oracle scores", train_samples, train_scores)
 
         if resume == False:
             return states, scores

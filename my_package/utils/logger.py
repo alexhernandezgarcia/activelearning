@@ -1,4 +1,4 @@
-from gflownet.utils.logger import Logger
+from gflownet.utils.logger import Logger as GFN_Logger
 import torch
 from pathlib import Path
 import numpy as np
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 
-class AL_Logger(Logger):
+class Logger(GFN_Logger):
     """
     Utils functions to compute and handle the statistics (saving them or send to
     wandb). It can be passed on to querier, gfn, proxy, ... to get the
@@ -21,7 +21,7 @@ class AL_Logger(Logger):
         logdir: dict,
         **kwargs,
     ):
-        super().__init__(config, logdir=logdir, checkpoints=ckpts.policy, **kwargs)
+        super().__init__(config, logdir=logdir, checkpoints=ckpts["policy"], **kwargs)
         self.proxy_period = (
             np.inf
             if ckpts.regressor.period == None or ckpts.regressor.period == -1

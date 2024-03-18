@@ -134,6 +134,7 @@ class DataHandler:
             state_score_tuple = self.env.initialize_dataset(
                 self.path, self.n_samples, logger_resume
             )
+            print("after env init", state_score_tuple)
             if self.logger.resume == True or self.split == "given":
                 self.split = "given"
                 train_states = state_score_tuple[0]
@@ -161,6 +162,7 @@ class DataHandler:
                 fidelities = None
                 train_fidelities = None
                 test_fidelities = None
+            print("after splitting", train_states, test_states, train_scores, test_scores)
 
         else:
             raise NotImplementedError(
