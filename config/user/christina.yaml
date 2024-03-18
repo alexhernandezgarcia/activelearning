@@ -1,0 +1,3 @@
+logdir:
+  root: ./logs/
+data_path: /home/mila/c/christina.humer/activelearning/storage

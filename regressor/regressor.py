@@ -6,7 +6,7 @@ import os
 from torch.optim import Adam
 import hydra
 from tqdm import tqdm
-from utils.multifidelity_toy import plot_predictions
+# from utils.multifidelity_toy import plot_predictions
 from gflownet.utils.common import set_device, set_float_precision
 
 
