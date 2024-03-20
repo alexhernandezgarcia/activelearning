@@ -36,7 +36,7 @@ def main():
 
 
     for i in range(n_iterations):
-        print("iteration", i)
+        print("--iteration", i)
         # Surrogate (e.g., Bayesian Optimization)
         # starts with a clean slate each iteration
         surrogate = SingleTaskGPRegressor(float_precision=float_prec, device=device)
