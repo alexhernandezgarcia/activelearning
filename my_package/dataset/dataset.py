@@ -8,23 +8,34 @@ from abc import ABC, abstractmethod
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data, float=torch.float64):
-        self.X_data = X_data
-        self.y_data = y_data
+    def __init__(self, X_data, y_data=None, device="cpu", float=torch.float64):
         self.float = float
+        self.device = device
+        self.X_data = X_data.to(self.float).to(self.device)
+        self.y_data = None
+        if y_data is not None:
+            self.y_data = y_data.to(self.float).to(self.device)
 
     def __getitem__(self, index):
-        return self.X_data[index].to(self.float), self.y_data[index].to(self.float)
+        x_set, y_set = self.preprocess(self.X_data, self.y_data)
+        if y_set is not None:
+            y_set = y_set[index]
+
+        return x_set[index], y_set
 
     def __len__(self):
         return len(self.X_data)
+
+    def preprocess(self, X, y):
+        return X, y
     
     def append(self, X, y):
         """
         append new instances to the data
         """
         self.X_data = torch.cat((self.X_data, X), 0)
-        self.y_data = torch.cat((self.y_data, y), 0)
+        if self.y_data is not None:
+            self.y_data = torch.cat((self.y_data, y), 0)
 
 
 class Branin_Data(Data):
@@ -39,8 +50,8 @@ class Branin_Data(Data):
 
 
     """
-    def __init__(self, X_data, y_data, normalize_scores=True, grid_size=100, float=torch.float64):
-        super().__init__(X_data, y_data, float=float)
+    def __init__(self, X_data, y_data=None, normalize_scores=True, grid_size=100, device="cpu", float=torch.float64):
+        super().__init__(X_data, y_data, float=float, device=device)
         self.normalize_scores = normalize_scores
         self.grid_size = grid_size
         self.stats = self.get_statistics(y_data)
@@ -50,6 +61,9 @@ class Branin_Data(Data):
         """
         called each time the dataset is updated so has the most recent metrics
         """
+        if y is None:
+            return None
+        
         dict = {}
         dict["mean"] = torch.mean(y)
         dict["std"] = torch.std(y)
@@ -57,19 +71,14 @@ class Branin_Data(Data):
         dict["min"] = torch.min(y)
         return dict
 
-
-    def __getitem__(self, index):
-        X = self.X_data[index]
-        y = self.y_data[index]
-        return self.preprocess(X, y)
-    
+  
     
     def append(self, X, y):
         """
         append new instances to the data
         """
         # X, y = self.deprocess(X, y) # append data in raw form (i.e., not normalized)
-        X /= self.grid_size
+        X *= self.grid_size
         super().append(X, y)
         self.stats = self.get_statistics(self.y_data) # update the score statistics
     
@@ -79,7 +88,8 @@ class Branin_Data(Data):
         - normalizes the states
         """
         states = X / self.grid_size
-        if self.normalize_scores:
+        scores = None
+        if self.normalize_scores and y is not None:
             scores = (y - self.stats["min"]) / (self.stats["max"] - self.stats["min"])
 
         return states, scores
@@ -90,8 +100,7 @@ class Branin_Data(Data):
     #     - denormalizes the states
     #     """
     #     states = X * self.grid_size
-    #     # TODO: check if we have to denormalize the scores
-    #     if self.normalize_scores:
+    #     if self.normalize_scores and self.y_data is not None:
     #         scores = y * (self.stats["max"] - self.stats["min"]) + self.stats["min"]
 
     #     return states, scores
@@ -227,7 +236,8 @@ class BraninDatasetHandler(DatasetHandler):
             train_states, 
             train_scores,
             normalize_scores=self.normalize_scores,
-            float=self.float
+            float=self.float,
+            device=self.device
         )
 
         if len(test_states) > 0:
@@ -235,7 +245,8 @@ class BraninDatasetHandler(DatasetHandler):
                 test_states, 
                 test_scores,
                 normalize_scores=self.normalize_scores,
-                float=self.float
+                float=self.float,
+                device=self.device
             )
         else:
             self.test_data = None
