@@ -180,7 +180,7 @@ class BraninDatasetHandler(DatasetHandler):
         Converts a human-readable string representing a state into a state as a list of
         positions.
         """
-        return [int(el) for el in readable.strip("[]").split(" ") if el != ""]
+        return [float(el) for el in readable.strip("[]").split(" ") if el != ""]
 
     def state2readable(self, state):
         """
@@ -320,8 +320,6 @@ class BraninDatasetHandler(DatasetHandler):
             "samples": readable_states,
             "energies": energies.tolist(),
         }
-
-        print("TODO: check what format the states and scores have and make sure that everything is stored in the same format")
 
         return self.get_dataloader()
 
