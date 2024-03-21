@@ -15,7 +15,9 @@ from gflownet.utils.common import set_float_precision
 
 
 class Surrogate:
-    def __init__(self, float_precision=64, device="cpu"):
+    def __init__(self, float_precision=64, device="cpu", maximize=False):
+        # self.target_factor = 1
+        self.target_factor = 1 if maximize else -1
         self.float = set_float_precision(float_precision)
         self.device = device
 
@@ -29,7 +31,7 @@ class SingleTaskGPRegressor(Surrogate):
     def init_model(self, train_x, train_y):
         self.model = SingleTaskGP(
             train_x,
-            train_y,
+            train_y * self.target_factor,
             outcome_transform=Standardize(m=1), 
         )
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
@@ -39,7 +41,7 @@ class SingleTaskGPRegressor(Surrogate):
 
     def fit(self, train_data):
         train_x, train_y = train_data[:]
-        train_y = train_y.unsqueeze(-1).to(self.device).to(self.float)
+        train_y = train_y.unsqueeze(-1).to(self.device).to(self.float) * self.target_factor
         train_x = train_x.to(self.device).to(self.float)
 
         self.init_model(train_x, train_y)

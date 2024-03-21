@@ -4,8 +4,8 @@ Runnable script for the active learning pipeline
 import sys
 from dataset.dataset import BraninDatasetHandler, Branin_Data
 from surrogate.surrogate import SingleTaskGPRegressor
-from sampler.sampler import Sampler, RandomSampler
-from filter.filter import Filter, OracleFilter
+from sampler.sampler import RandomSampler
+from filter.filter import OracleFilter
 from gflownet.proxy.box.branin import Branin
 
 import torch

@@ -3,22 +3,26 @@ import torch
 
 
 class Sampler:
-    '''
-    The base Sampler class returns the top n samples according to the acquisition function.
-    '''
     def __init__(self, surrogate):
         self.surrogate = surrogate
 
+    @abstractmethod
     def get_samples(self, n_samples, candidate_set):
-        acq_values = self.surrogate.get_acquisition_values(candidate_set)
-        idx_pick = torch.argsort(acq_values)[-n_samples:]
-        return candidate_set[idx_pick]
+        pass
 
     @abstractmethod
     def fit(self):
         pass
 
-
+class GreedySampler(Sampler):
+    '''
+    The Greedy Sampler class returns the top n samples according to the acquisition function.
+    '''
+    def get_samples(self, n_samples, candidate_set):
+        acq_values = self.surrogate.get_acquisition_values(candidate_set).detach()
+        idx_pick = torch.argsort(acq_values)[-n_samples:]
+        return candidate_set[idx_pick]
+    
 
 class RandomSampler(Sampler):
     '''

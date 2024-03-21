@@ -50,7 +50,7 @@ class Branin_Data(Data):
 
 
     """
-    def __init__(self, X_data, y_data=None, normalize_scores=True, grid_size=100, device="cpu", float=torch.float64):
+    def __init__(self, grid_size, X_data, y_data=None, normalize_scores=True, device="cpu", float=torch.float64):
         super().__init__(X_data, y_data, float=float, device=device)
         self.normalize_scores = normalize_scores
         self.grid_size = grid_size
@@ -143,6 +143,7 @@ class BraninDatasetHandler(DatasetHandler):
 
     def __init__(
         self,
+        grid_size,
         normalize_scores=True,
         train_fraction=0.8,
         batch_size=256,
@@ -151,7 +152,6 @@ class BraninDatasetHandler(DatasetHandler):
         test_path=None,
         device="cpu",
         float_precision=64,
-        grid_size=100,
     ):
         self.normalize_scores = normalize_scores
         self.train_fraction = train_fraction
@@ -233,6 +233,7 @@ class BraninDatasetHandler(DatasetHandler):
 
 
         self.train_data = Branin_Data(
+            self.grid_size,
             train_states, 
             train_scores,
             normalize_scores=self.normalize_scores,
@@ -242,6 +243,7 @@ class BraninDatasetHandler(DatasetHandler):
 
         if len(test_states) > 0:
             self.test_data = Branin_Data(
+                self.grid_size,
                 test_states, 
                 test_scores,
                 normalize_scores=self.normalize_scores,
