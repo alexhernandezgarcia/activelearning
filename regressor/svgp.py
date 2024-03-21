@@ -12,6 +12,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 # TODO: Change this to a class that DOES NOT inherit from nn.Module
 # Breaks line 348 in model/gp_models.py
 class AsItIs(nn.Module):

@@ -131,7 +131,7 @@ class MLP(nn.Module):
         metrics = {"loss": 0.0}
         self.eval()
         with torch.no_grad():
-            for (x, y) in loader:
+            for x, y in loader:
                 x = x.to("cuda")
                 if n_fid > 1:
                     x = x[..., :-1]

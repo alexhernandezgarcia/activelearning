@@ -8,7 +8,7 @@ class Filter:
 
     def __call__(self, n_samples, candidate_set, maximize=False):
         return candidate_set[-n_samples:]
-    
+
 
 class OracleFilter(Filter):
 
