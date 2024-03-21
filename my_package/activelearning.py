@@ -15,7 +15,7 @@ import numpy as np
 n_iterations = 5 # TODO: replace with budget
 grid_size = 10
 float_prec = 64
-n_samples = 5
+n_samples = 3
 train_path = "./storage/branin/data_%i_train.csv"%grid_size
 
 def main():
@@ -28,7 +28,7 @@ def main():
     
     
     # Dataset
-    dataset_handler = BraninDatasetHandler(train_path=train_path, train_fraction=1.0, device=device, float_precision=float_prec)
+    dataset_handler = BraninDatasetHandler(grid_size=grid_size, train_path="./storage/branin/data_%i_train.csv"%grid_size, train_fraction=1.0, device=device, float_precision=float_prec)
     # Oracle
     oracle = Branin(fidelity=1, do_domain_map=True, device=device, float_precision=float_prec)
     # Filter
@@ -39,7 +39,7 @@ def main():
         print("--iteration", i)
         # Surrogate (e.g., Bayesian Optimization)
         # starts with a clean slate each iteration
-        surrogate = SingleTaskGPRegressor(float_precision=float_prec, device=device)
+        surrogate = SingleTaskGPRegressor(float_precision=float_prec, device=device, maximize=maximize)
         surrogate.fit(dataset_handler.train_data)
         
         # Sampler (e.g., GFlowNet, or Random Sampler)
@@ -48,13 +48,14 @@ def main():
         sampler.fit() # only necessary for samplers that train a model
 
         samples = sampler.get_samples(n_samples*3, candidate_set=candidate_set.clone())
-        filtered_samples = filter(n_samples=n_samples, candidate_set=samples.clone(), maximize=False)
+        filtered_samples = filter(n_samples=n_samples, candidate_set=samples.clone(), maximize=maximize)
         
         scores = oracle(filtered_samples.clone())
         dataset_handler.update_dataset(filtered_samples, scores)
 
         print("Proposed Candidates:", filtered_samples)
         print("Oracle Scores:", scores)
+        print("Best Score": scores.min().cpu())
 
 
 
