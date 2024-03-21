@@ -22,7 +22,8 @@ class Surrogate(ABC):
         self.device = device
 
     @abstractmethod
-    def fit(self, train_X, train_y):
+    def fit(self, train_data):
+        # train_data is a pytorch dataloader
         pass
 
     # TODO: what is this method for? needed by Environment
@@ -40,7 +41,21 @@ class Surrogate(ABC):
 
 class SingleTaskGPRegressor(Surrogate):
 
-    def init_model(self, train_x, train_y):
+    def dataloader_to_data(self, train_data):
+        # TODO: check if there is a better way to use dataloaders with botorch
+        train_x = torch.Tensor()
+        train_y = torch.Tensor()
+        for state, score in train_data:
+            train_x = torch.cat((train_x, state), 0)
+            train_y = torch.cat((train_y, score), 0)
+
+        return train_x, train_y
+
+    def fit(self, train_data):
+        train_x, train_y = self.dataloader_to_data(train_data)
+        train_y = train_y.unsqueeze(-1).to(self.device).to(self.float)
+        train_x = train_x.to(self.device).to(self.float)
+
         self.model = SingleTaskGP(
             train_x,
             train_y * self.target_factor,
@@ -50,15 +65,6 @@ class SingleTaskGPRegressor(Surrogate):
             self.model.likelihood, self.model
         )
         self.mll.to(train_x)
-
-    def fit(self, train_data):
-        train_x, train_y = train_data[:]
-        train_y = (
-            train_y.unsqueeze(-1).to(self.device).to(self.float) * self.target_factor
-        )
-        train_x = train_x.to(self.device).to(self.float)
-
-        self.init_model(train_x, train_y)
         with debug(state=True):
             self.mll = fit_gpytorch_mll(self.mll)
 

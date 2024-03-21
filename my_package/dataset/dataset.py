@@ -8,13 +8,12 @@ from abc import ABC, abstractmethod
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data=None, device="cpu", float=torch.float64):
+    def __init__(self, X_data, y_data=None, float=torch.float64):
         self.float = float
-        self.device = device
-        self.X_data = X_data.to(self.float).to(self.device)
+        self.X_data = X_data.to(self.float)
         self.y_data = None
         if y_data is not None:
-            self.y_data = y_data.to(self.float).to(self.device)
+            self.y_data = y_data.to(self.float)
 
     def __getitem__(self, index):
         x_set, y_set = self.preprocess(self.X_data, self.y_data)
@@ -46,8 +45,6 @@ class Branin_Data(Data):
         y_data: array(N, 1); scores at each position
         normalize_scores: bool; maps the scores to [0; 1]
         grid_size: int; specifies the width and height of the Branin grid (grid_size x grid_size); used to normalize the state positions
-        device: pytorch device used for calculations
-
 
     """
 
@@ -57,10 +54,9 @@ class Branin_Data(Data):
         X_data,
         y_data=None,
         normalize_scores=True,
-        device="cpu",
         float=torch.float64,
     ):
-        super().__init__(X_data, y_data, float=float, device=device)
+        super().__init__(X_data, y_data, float=float)
         self.normalize_scores = normalize_scores
         self.grid_size = grid_size
         self.stats = self.get_statistics(y_data)
@@ -156,7 +152,6 @@ class BraninDatasetHandler(DatasetHandler):
         shuffle=True,
         train_path="storage/branin/sf/data_train.csv",
         test_path=None,
-        device="cpu",
         float_precision=64,
     ):
         self.normalize_scores = normalize_scores
@@ -165,7 +160,6 @@ class BraninDatasetHandler(DatasetHandler):
         self.shuffle = shuffle
         self.train_path = train_path
         self.test_path = test_path
-        self.device = device
         self.float = set_float_precision(float_precision)
         self.grid_size = grid_size
 
@@ -244,7 +238,6 @@ class BraninDatasetHandler(DatasetHandler):
             train_scores,
             normalize_scores=self.normalize_scores,
             float=self.float,
-            device=self.device,
         )
 
         if len(test_states) > 0:
@@ -254,7 +247,6 @@ class BraninDatasetHandler(DatasetHandler):
                 test_scores,
                 normalize_scores=self.normalize_scores,
                 float=self.float,
-                device=self.device,
             )
         else:
             self.test_data = None
@@ -270,7 +262,7 @@ class BraninDatasetHandler(DatasetHandler):
         for _sequence, _label in batch:
             y.append(_label)
             x.append(_sequence)
-        # y = torch.tensor(y, dtype=self.float)  # , device=self.device
+        y = torch.tensor(y, dtype=self.float)
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
         return xPadded, y
 
