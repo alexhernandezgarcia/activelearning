@@ -98,7 +98,6 @@ class DataHandler:
             data[indices] = 0.0
         return data
 
-
     def initialise_dataset(self):
         # TODO: Modify to ensure validation set has equal number of points across fidelities
         """
@@ -162,7 +161,9 @@ class DataHandler:
                 fidelities = None
                 train_fidelities = None
                 test_fidelities = None
-            print("after splitting", train_states, test_states, train_scores, test_scores)
+            print(
+                "after splitting", train_states, test_states, train_scores, test_scores
+            )
 
         else:
             raise NotImplementedError(
@@ -500,7 +501,7 @@ class DataHandler:
             [],
             [],
         )
-        for (_sequence, _label) in batch:
+        for _sequence, _label in batch:
             y.append(_label)
             x.append(_sequence)
         y = torch.tensor(y, dtype=self.float)  # , device=self.device

@@ -1,6 +1,7 @@
 """
 Runnable script with hydra capabilities
 """
+
 import sys
 import os
 import random
@@ -9,6 +10,7 @@ import hydra
 from omegaconf import OmegaConf
 import torch
 from env.mfenv import MultiFidelityEnvWrapper
+
 # from utils.multifidelity_toy import make_dataset
 import matplotlib.pyplot as plt
 from regressor.dkl import Tokenizer
@@ -42,7 +44,7 @@ def main(config):
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
     N_FID = len(config._oracle_dict)
-    
+
     # check if key true_oracle is in config
     if "true_oracle" in config:
         true_oracle = hydra.utils.instantiate(

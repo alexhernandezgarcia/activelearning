@@ -69,9 +69,11 @@ class Tokenizer:
         # find the index of the first [PAD] token
         # replace that index with [EOS] token
         index = [
-            torch.where(sequence == self.padding_idx)[0][0]
-            if sequence[-1] == self.padding_idx
-            else len(sequence)
+            (
+                torch.where(sequence == self.padding_idx)[0][0]
+                if sequence[-1] == self.padding_idx
+                else len(sequence)
+            )
             for sequence in sequence_tensor
         ]
         # Padding element is added to all sequences so that [EOS] token can be added post the sequence, i.e,

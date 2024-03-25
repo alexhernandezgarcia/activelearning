@@ -219,7 +219,7 @@ class RegressiveMLP(nn.Module):
         metrics = {"loss": 0.0}
         self.eval()
         with torch.no_grad():
-            for (input_batch, target_batch) in loader:
+            for input_batch, target_batch in loader:
                 input_batch = input_batch.to("cuda")
                 target_batch = target_batch.to("cuda")
                 loss = criterion(self(input_batch), target_batch.unsqueeze(-1))

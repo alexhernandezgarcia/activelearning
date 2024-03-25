@@ -162,9 +162,9 @@ class BaseGPSurrogate(abc.ABC):
         ):
             metrics["lengthscale"] = covar_module.base_kernel.lengthscale.mean().item()
         elif hasattr(covar_module, "data_covar_module"):
-            metrics[
-                "lengthscale"
-            ] = covar_module.data_covar_module.lengthscale.mean().item()
+            metrics["lengthscale"] = (
+                covar_module.data_covar_module.lengthscale.mean().item()
+            )
         elif (
             hasattr(covar_module, "lengthscale")
             and covar_module.lengthscale is not None
@@ -874,9 +874,9 @@ class SingleTaskMultiFidelitySVGP(
         ):
             metrics["lengthscale"] = covar_module.base_kernel.lengthscale.mean().item()
         elif hasattr(covar_module, "data_covar_module"):
-            metrics[
-                "lengthscale"
-            ] = covar_module.data_covar_module.lengthscale.mean().item()
+            metrics["lengthscale"] = (
+                covar_module.data_covar_module.lengthscale.mean().item()
+            )
         elif hasattr(covar_module, "lengthscale"):
             metrics["lengthscale"] = covar_module.lengthscale.mean().item()
         else:

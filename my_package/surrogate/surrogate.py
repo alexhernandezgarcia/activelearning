@@ -9,45 +9,66 @@ from botorch.acquisition.max_value_entropy_search import (
 from botorch.models.transforms.outcome import Standardize
 from botorch.fit import fit_gpytorch_mll
 import numpy as np
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from botorch.settings import debug
 from gflownet.utils.common import set_float_precision
 
 
-class Surrogate:
-    def __init__(self, float_precision=64, device="cpu"):
+class Surrogate(ABC):
+    def __init__(self, float_precision=64, device="cpu", maximize=False):
+        self.maximize = maximize
+        self.target_factor = 1 if maximize else -1
         self.float = set_float_precision(float_precision)
         self.device = device
 
     @abstractmethod
-    def fit(self, train_X, train_y):
+    def fit(self, train_data):
+        # train_data is a pytorch dataloader
         pass
 
-    
+    # TODO: what is this method for? needed by Environment
+    def setup(self, env):
+        pass
+
+    @abstractmethod
+    def __call__(self, states):
+        pass
+
+    @abstractmethod
+    def get_acquisition_values(self, candidate_set):
+        pass
+
+
 class SingleTaskGPRegressor(Surrogate):
-    
-    def init_model(self, train_x, train_y):
+
+    def dataloader_to_data(self, train_data):
+        # TODO: check if there is a better way to use dataloaders with botorch
+        train_x = torch.Tensor()
+        train_y = torch.Tensor()
+        for state, score in train_data:
+            train_x = torch.cat((train_x, state), 0)
+            train_y = torch.cat((train_y, score), 0)
+
+        return train_x, train_y
+
+    def fit(self, train_data):
+        train_x, train_y = self.dataloader_to_data(train_data)
+        train_y = train_y.unsqueeze(-1).to(self.device).to(self.float)
+        train_x = train_x.to(self.device).to(self.float)
+
         self.model = SingleTaskGP(
             train_x,
-            train_y,
-            outcome_transform=Standardize(m=1), 
+            train_y * self.target_factor,
+            outcome_transform=Standardize(m=1),
         )
         self.mll = gpytorch.mlls.ExactMarginalLogLikelihood(
             self.model.likelihood, self.model
         )
         self.mll.to(train_x)
-
-    def fit(self, train_data):
-        train_x, train_y = train_data[:]
-        train_y = train_y.unsqueeze(-1).to(self.device).to(self.float)
-        train_x = train_x.to(self.device).to(self.float)
-
-        self.init_model(train_x, train_y)
         with debug(state=True):
             self.mll = fit_gpytorch_mll(self.mll)
 
-    
-    def get_predictions(self, states):
+    def __call__(self, states):
         """Input is states
         Proxy conversion happens within."""
         states_proxy = states.clone().to(self.device).to(self.float)
@@ -87,7 +108,6 @@ class SingleTaskGPRegressor(Surrogate):
     #         .mean()
     #     )
     #     return rmse, nll
-
 
     # def get_modes(self, states, env):
     #     num_pick = int((env.length * env.length) / 100) * 5
@@ -134,4 +154,3 @@ class SingleTaskGPRegressor(Surrogate):
     #     else:
     #         fig = None
     #     return fig, rmse, nll, mode_rmse, mode_nll
-

@@ -8,13 +8,12 @@ from abc import ABC, abstractmethod
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data=None, device="cpu", float=torch.float64):
+    def __init__(self, X_data, y_data=None, float=torch.float64):
         self.float = float
-        self.device = device
-        self.X_data = X_data.to(self.float).to(self.device)
+        self.X_data = X_data.to(self.float)
         self.y_data = None
         if y_data is not None:
-            self.y_data = y_data.to(self.float).to(self.device)
+            self.y_data = y_data.to(self.float)
 
     def __getitem__(self, index):
         x_set, y_set = self.preprocess(self.X_data, self.y_data)
@@ -28,7 +27,7 @@ class Data(Dataset):
 
     def preprocess(self, X, y):
         return X, y
-    
+
     def append(self, X, y):
         """
         append new instances to the data
@@ -40,22 +39,27 @@ class Data(Dataset):
 
 class Branin_Data(Data):
     """
-    Implements the "Data" class for Branin data. 
-    
-        X_data: array(N, 2) in the domain [0; grid_size]; states (i.e., grid positions) 
+    Implements the "Data" class for Branin data.
+
+        X_data: array(N, 2) in the domain [0; grid_size]; states (i.e., grid positions)
         y_data: array(N, 1); scores at each position
         normalize_scores: bool; maps the scores to [0; 1]
         grid_size: int; specifies the width and height of the Branin grid (grid_size x grid_size); used to normalize the state positions
-        device: pytorch device used for calculations
-
 
     """
-    def __init__(self, X_data, y_data=None, normalize_scores=True, grid_size=100, device="cpu", float=torch.float64):
-        super().__init__(X_data, y_data, float=float, device=device)
+
+    def __init__(
+        self,
+        grid_size,
+        X_data,
+        y_data=None,
+        normalize_scores=True,
+        float=torch.float64,
+    ):
+        super().__init__(X_data, y_data, float=float)
         self.normalize_scores = normalize_scores
         self.grid_size = grid_size
         self.stats = self.get_statistics(y_data)
-        
 
     def get_statistics(self, y):
         """
@@ -63,7 +67,7 @@ class Branin_Data(Data):
         """
         if y is None:
             return None
-        
+
         dict = {}
         dict["mean"] = torch.mean(y)
         dict["std"] = torch.std(y)
@@ -71,8 +75,6 @@ class Branin_Data(Data):
         dict["min"] = torch.min(y)
         return dict
 
-  
-    
     def append(self, X, y):
         """
         append new instances to the data
@@ -80,8 +82,8 @@ class Branin_Data(Data):
         # X, y = self.deprocess(X, y) # append data in raw form (i.e., not normalized)
         X *= self.grid_size
         super().append(X, y)
-        self.stats = self.get_statistics(self.y_data) # update the score statistics
-    
+        self.stats = self.get_statistics(self.y_data)  # update the score statistics
+
     def preprocess(self, X, y):
         """
         - normalizes the scores
@@ -93,7 +95,7 @@ class Branin_Data(Data):
             scores = (y - self.stats["min"]) / (self.stats["max"] - self.stats["min"])
 
         return states, scores
-    
+
     # def deprocess(self, X, y):
     #     """
     #     - denormalizes the scores
@@ -105,21 +107,20 @@ class Branin_Data(Data):
 
     #     return states, scores
 
-    
-
-
 
 class DatasetHandler(ABC):
     """
-    loads initial dataset. this contains the parameters (X), the target (y), and for multiple oracles, the oracle ID that created this datapoint. 
+    loads initial dataset. this contains the parameters (X), the target (y), and for multiple oracles, the oracle ID that created this datapoint.
     """
-    @abstractmethod 
+
+    @abstractmethod
     def __init__(self):
         pass
 
     """
     return dataset loader. a dataset with all current entries is returned in form of a pytorch dataloader.
     """
+
     @abstractmethod
     def get_dataloader(self):
         pass
@@ -127,6 +128,7 @@ class DatasetHandler(ABC):
     """
     saves/appends future results. the results created by oracles should be saved and appended to the dataset.
     """
+
     @abstractmethod
     def update_dataset(self):
         pass
@@ -143,15 +145,14 @@ class BraninDatasetHandler(DatasetHandler):
 
     def __init__(
         self,
+        grid_size,
         normalize_scores=True,
         train_fraction=0.8,
         batch_size=256,
         shuffle=True,
         train_path="storage/branin/sf/data_train.csv",
         test_path=None,
-        device="cpu",
         float_precision=64,
-        grid_size=100,
     ):
         self.normalize_scores = normalize_scores
         self.train_fraction = train_fraction
@@ -159,13 +160,11 @@ class BraninDatasetHandler(DatasetHandler):
         self.shuffle = shuffle
         self.train_path = train_path
         self.test_path = test_path
-        self.device = device
         self.float = set_float_precision(float_precision)
         self.grid_size = grid_size
 
         self.initialise_dataset()
 
-    
     def statetorch2readable(self, state, alphabet={}):
         """
         Dataset Handler in activelearning deals only in tensors. This function converts the tesnor to readble format to save the train dataset
@@ -203,10 +202,12 @@ class BraninDatasetHandler(DatasetHandler):
             train_samples_X = train["samples"].values.tolist()
             train_samples_y = train["energies"].values.tolist()
             train_scores = torch.tensor(train_samples_y)
-            train_states = torch.stack([
-                torch.tensor(self.readable2state(sample)) for sample in train_samples_X
-            ])
-
+            train_states = torch.stack(
+                [
+                    torch.tensor(self.readable2state(sample))
+                    for sample in train_samples_X
+                ]
+            )
 
         # load test data
         test_states = torch.Tensor()
@@ -216,11 +217,11 @@ class BraninDatasetHandler(DatasetHandler):
             test_samples_X = test["samples"].values.tolist()
             test_samples_y = test["energies"].values.tolist()
             test_scores = torch.tensor(test_samples_y)
-            test_states = torch.stack([
-                torch.tensor(self.readable2state(sample)) for sample in test_samples_X
-            ])
+            test_states = torch.stack(
+                [torch.tensor(self.readable2state(sample)) for sample in test_samples_X]
+            )
 
-        # if we don't have test data and we specified a train_fraction, 
+        # if we don't have test data and we specified a train_fraction,
         # use a random subsample from the train data as test data
         if len(test_states) <= 0 and self.train_fraction < 1.0:
             index = torch.randperm(len(train_states))
@@ -231,26 +232,24 @@ class BraninDatasetHandler(DatasetHandler):
             test_scores = train_scores[test_index]
             train_scores = train_scores[train_index]
 
-
         self.train_data = Branin_Data(
-            train_states, 
+            self.grid_size,
+            train_states,
             train_scores,
             normalize_scores=self.normalize_scores,
             float=self.float,
-            device=self.device
         )
 
         if len(test_states) > 0:
             self.test_data = Branin_Data(
-                test_states, 
+                self.grid_size,
+                test_states,
                 test_scores,
                 normalize_scores=self.normalize_scores,
                 float=self.float,
-                device=self.device
             )
         else:
             self.test_data = None
-
 
     def collate_batch(self, batch):
         """
@@ -260,10 +259,10 @@ class BraninDatasetHandler(DatasetHandler):
             [],
             [],
         )
-        for (_sequence, _label) in batch:
+        for _sequence, _label in batch:
             y.append(_label)
             x.append(_sequence)
-        # y = torch.tensor(y, dtype=self.float)  # , device=self.device
+        y = torch.tensor(y, dtype=self.float)
         xPadded = pad_sequence(x, batch_first=True, padding_value=0.0)
         return xPadded, y
 
@@ -295,13 +294,12 @@ class BraninDatasetHandler(DatasetHandler):
 
         return train_loader, test_loader
 
-
     def update_dataset(self, X, y):
         """
         Update the dataset with new data after AL iteration
         Saves the updated dataset if save_data=True
         Args:
-            X: array(N, 2) in the domain [0; 1]; states (i.e., grid positions) 
+            X: array(N, 2) in the domain [0; 1]; states (i.e., grid positions)
             y: array(N, 1); scores at each position
         Return:
             DataLoader
@@ -322,5 +320,3 @@ class BraninDatasetHandler(DatasetHandler):
         }
 
         return self.get_dataloader()
-
-
