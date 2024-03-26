@@ -1,10 +1,10 @@
-_target_: utils.logger.Logger
+_target_: gflownet.utils.logger.Logger
 
 do:
-  online: True
-  times: True
+  online: False
+  times: False
 
-project_name: "MF-AL-GFN"
+project_name: "GFlowNet"
 
 # Train metrics
 train:
@@ -33,26 +33,19 @@ oracle:
     - 1
     - 10
     - 100
+# Policy model checkpoints
+checkpoints:
+  period: 1000
 
-context: "0"
-notes: null # wandb run notes (e.g. "baseline")
-
-
-ckpts:
-  policy:
-   # Period (number of iterations) of saving models
-    period: 5000
-  regressor:
-    period: 10
 # Log dir
 logdir:
   root: ./logs
   ckpts: ckpts
-  data: data
   overwrite: True
-lightweight: False 
+debug: False
+lightweight: False
 progress: True
-debug: False 
-tags:
-  - branin
-  - sf
+context: "0"
+notes: null # wandb run notes (e.g. "baseline")
+tags: 
+    - gflownet

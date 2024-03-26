@@ -1,8 +1,8 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 import torch
 
 
-class Sampler:
+class Sampler(ABC):
     def __init__(self, surrogate):
         self.surrogate = surrogate
 

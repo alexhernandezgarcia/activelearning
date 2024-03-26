@@ -1,89 +1,147 @@
-# _target_: gflownet.gflownet.GFlowNetAgent
-# Random seeds
-seed: 0
-# Optimizer
-optimizer:
-  z_dim: 16
-  # Loss function
-  loss: trajectorybalance
-  # Learning rates
-  lr: 0.0001
-  lr_decay_period: 1000000
-  lr_decay_gamma: 0.5
-  lr_z_mult: 100
-  method: adam
-  # Threshold loss for early stopping
-  early_stopping: 0.0
-  # Coefficient for exponential moving average
-  ema_alpha: 0.5
-  # Optimizer: adam, sgd
-  adam_beta1: 0.9
-  adam_beta2: 0.999
-  # Momentum for SGD
-  sgd_momentum: 0.9
-  # Number of trajectories of each kind
-  batch_size:
-    # Forward on-policy (possibly tempered and/or with random actions)
-    forward: 10
-    # Backward from training set
-    backward_dataset: 0
-    # Backward from replay buffer
-    backward_replay: 0
-  # Train to sample ratio
-  train_to_sample_ratio: 1
-  # Number of training iterations
-  n_train_steps: 5000
-  # From original implementation
-  bootstrap_tau: 0.0
-  clip_grad_norm: 0.0
-# State flow modelling
-state_flow: null
-# If True, compute rewards in batches
-batch_reward: True
-# Force zero probability of sampling invalid actions
-mask_invalid_actions: True
-# Temperature for the logits /= temperature_logits
-temperature_logits: 1.0
-# Percentage of random actions
-random_action_prob: 0.0
-# Percentage of trajectories in a batch from an empirical distribution
-pct_offline: 0.0
-# Replay buffer
-replay_capacity: 0
-replay_sampling: permutation
-# Train data set backward sampling
-train_sampling: permutation
-num_empirical_loss: 200000
-oracle:
-    # Number of samples for oracle metrics
-    n: 500
-sample_only: False
-active_learning: False
+env:
+  defaults:
+    - base
 
-buffer:
-  train:
-    path: null
-    n: null
-    type: null
-    seed: null
-    output_csv: null 
-  test:
-    path: null 
-    type: all
-    output_pkl: buffer_data_test.csv
-    n: null
-    seed: null
-    output_csv: null 
+  _target_: gflownet.envs.grid.Grid
+
+  id: grid
+  func: corners
+  # Dimensions of hypergrid
+  n_dim: 2
+  # Number of cells per dimension
+  length: 3
+  # Maximum increment per each dimension that can be done by one action
+  max_increment: 1
+  # Maximum number of dimensions that can be incremented by one action
+  max_dim_per_action: 1
+  # Mapping coordinates
+  cell_min: -1
+  cell_max: 1
+  # Buffer
+  buffer:
+    data_path: null
+    train: null
+    test:
+      type: all
+      output_csv: grid_test.csv
+      output_pkl: grid_test.pkl
+  
+  # Reward function: power or boltzmann
+  # boltzmann: exp(-1.0 * reward_beta * proxy)
+  # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
+  # identity: proxy
+  reward_func: identity
+  # Minimum reward
+  reward_min: 1e-8
+  # Beta parameter of the reward function
+  reward_beta: 1.0
+  # Reward normalization for "power" reward function
+  reward_norm: 1.0
+  # If > 0, reward_norm = reward_norm_std_mult * std(energies)
+  reward_norm_std_mult: 0.0
+  proxy_state_format: oracle
+  # Check if action valid with mask before step
+  skip_mask_check: False
+  # Whether the environment has conditioning variables
+  conditional: False
+  # Whether the environment is continuous
+  continuous: False
+
+
+
+agent:
+  _target_: gflownet.gflownet.GFlowNetAgent
+  # Random seeds
+  seed: 0
+  # Optimizer
+  optimizer:
+    z_dim: 16
+    # Loss function
+    loss: trajectorybalance
+    # Learning rates
+    lr: 0.0001
+    lr_decay_period: 1000000
+    lr_decay_gamma: 0.5
+    lr_z_mult: 100
+    method: adam
+    # Threshold loss for early stopping
+    early_stopping: 0.0
+    # Coefficient for exponential moving average
+    ema_alpha: 0.5
+    # Optimizer: adam, sgd
+    adam_beta1: 0.9
+    adam_beta2: 0.999
+    # Momentum for SGD
+    sgd_momentum: 0.9
+    # Number of trajectories of each kind
+    batch_size:
+      # Forward on-policy (possibly tempered and/or with random actions)
+      forward: 10
+      # Backward from training set
+      backward_dataset: 0
+      # Backward from replay buffer
+      backward_replay: 0
+    # Train to sample ratio
+    train_to_sample_ratio: 1
+    # Number of training iterations
+    n_train_steps: 5000
+    # From original implementation
+    bootstrap_tau: 0.0
+    clip_grad_norm: 0.0
+  # If True, compute rewards in batches
+  batch_reward: True
+  # Force zero probability of sampling invalid actions
+  mask_invalid_actions: True
+  # Temperature for the logits /= temperature_logits
+  temperature_logits: 1.0
+  # Percentage of random actions
+  random_action_prob: 0.0
+  # Percentage of trajectories in a batch from an empirical distribution
+  pct_offline: 0.0
+  # Replay buffer
+  replay_capacity: 0
+  replay_sampling: permutation
+  # Train data set backward sampling
+  train_sampling: permutation
+  num_empirical_loss: 200000
+  oracle:
+      # Number of samples for oracle metrics
+      n: 500
+  sample_only: False
+  active_learning: False
+
+  buffer:
+    train:
+      path: null
+      n: null
+      type: null
+      seed: null
+      output_csv: null 
+    test:
+      path: null 
+      type: all
+      output_pkl: buffer_data_test.csv
+      n: null
+      seed: null
+      output_csv: null 
 
 policy: 
   forward:
-    type: mlp
-    n_hid: 128
-    n_layers: 2
-    checkpoint: null
-    reload_ckpt: False
-    is_model: False
+    _target_: gflownet.policy.base.Policy
+    config:
+      type: mlp
+      n_hid: 128
+      n_layers: 2
+      checkpoint: null
+      reload_ckpt: False
+      is_model: False
 
-  backward: null
+  backward: 
+    _target_: gflownet.policy.base.Policy
+    config: null
 
   shared: null
+
+
+# State flow modelling
+state_flow: null
