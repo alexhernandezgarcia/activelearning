@@ -1,4 +1,4 @@
-# _target_: gflownet.utils.logger.Logger
+_target_: utils.logger.Logger
 
 do:
   online: True

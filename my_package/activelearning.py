@@ -13,53 +13,57 @@ import numpy as np
 import hydra
 import torch
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-n_iterations = 5  # TODO: replace with budget
-grid_size = 10
-float_prec = 64
-n_samples = 3
-train_path = "./storage/branin/data_%i_train.csv" % grid_size
-maximize = False
+# device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-@hydra.main(config_path="./config", config_name="main")
+@hydra.main(config_path="./config", config_name="main", version_base="1.1")
 def main(config):
-    # define candidate set
-    xi = np.arange(0, grid_size)
-    yi = np.arange(0, grid_size)
-    grid = np.array(np.meshgrid(xi, yi))
-    grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 2)
-    candidate_set, _ = Branin_Data(grid_size, grid_flat)[:]
+
+    # init config
+    device = config.device
+    n_iterations = config.budget  # TODO: replace with budget
+    float_precision = config.float_precision
+    n_samples = config.n_samples
+    maximize = config.maximize
 
     # Dataset
-    dataset_handler = BraninDatasetHandler(
-        grid_size=grid_size,
-        train_path="./storage/branin/data_%i_train.csv" % grid_size,
-        train_fraction=1.0,
-        float_precision=float_prec,
+    dataset_handler = hydra.utils.instantiate(
+        config.dataset,
+        float_precision=config.float_precision,
     )
+    candidate_set = dataset_handler.get_candidate_set()
+
     # Oracle
-    oracle = Branin(
-        fidelity=1, do_domain_map=True, device=device, float_precision=float_prec
+    oracle = hydra.utils.instantiate(
+        config.oracle,
+        device=device,
+        float_precision=float_precision,
     )
     # Filter
-    filter = Filter()
+    filter = hydra.utils.instantiate(
+        config.filter,
+        oracle=oracle,
+    )
 
     for i in range(n_iterations):
         print("--iteration", i)
         train_data, test_data = dataset_handler.get_dataloader()
         # Surrogate (e.g., Bayesian Optimization)
         # starts with a clean slate each iteration
-        surrogate = SingleTaskGPRegressor(
-            float_precision=float_prec, device=device, maximize=maximize
+        surrogate = hydra.utils.instantiate(
+            config.surrogate,
+            device=config.device,
+            float_precision=float_precision,
+            maximize=maximize,
         )
         surrogate.fit(train_data)
 
         # Sampler (e.g., GFlowNet, or Random Sampler)
         # also starts with a clean slate; TODO: experiment with NOT training from scratch
-        # sampler = RandomSampler(surrogate)
-        sampler = GreedySampler(surrogate)
+        sampler = hydra.utils.instantiate(
+            config.sampler,
+            surrogate=surrogate,
+        )
         sampler.fit()  # only necessary for samplers that train a model
 
         samples = sampler.get_samples(

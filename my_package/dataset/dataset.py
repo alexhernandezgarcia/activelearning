@@ -113,9 +113,8 @@ class DatasetHandler(ABC):
     loads initial dataset. this contains the parameters (X), the target (y), and for multiple oracles, the oracle ID that created this datapoint.
     """
 
-    @abstractmethod
-    def __init__(self):
-        pass
+    def __init__(self, float_precision=64):
+        self.float = set_float_precision(float_precision)
 
     """
     return dataset loader. a dataset with all current entries is returned in form of a pytorch dataloader.
@@ -131,6 +130,14 @@ class DatasetHandler(ABC):
 
     @abstractmethod
     def update_dataset(self):
+        pass
+
+    """
+    returns a set of candidate data instances
+    """
+
+    @abstractmethod
+    def get_candidate_set(self):
         pass
 
 
@@ -154,13 +161,14 @@ class BraninDatasetHandler(DatasetHandler):
         test_path=None,
         float_precision=64,
     ):
+        super().__init__(float_precision=float_precision)
+
         self.normalize_scores = normalize_scores
         self.train_fraction = train_fraction
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.train_path = train_path
         self.test_path = test_path
-        self.float = set_float_precision(float_precision)
         self.grid_size = grid_size
 
         self.initialise_dataset()
@@ -320,3 +328,13 @@ class BraninDatasetHandler(DatasetHandler):
         }
 
         return self.get_dataloader()
+
+    def get_candidate_set(self):
+        import numpy as np
+        # define candidate set
+        xi = np.arange(0, self.grid_size)
+        yi = np.arange(0, self.grid_size)
+        grid = np.array(np.meshgrid(xi, yi))
+        grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 2)
+        candidate_set, _ = Branin_Data(self.grid_size, grid_flat)[:]
+        return candidate_set

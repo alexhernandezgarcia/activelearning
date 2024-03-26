@@ -1,0 +1,9 @@
+_target_: dataset.dataset.BraninDatasetHandler
+
+grid_size: 10
+normalize_scores: True
+train_fraction: 1.0
+batch_size: 16
+shuffle: True
+train_path: ~/activelearning/my_package/storage/branin/data_10_train.csv
+test_path: null

@@ -3,7 +3,7 @@ import torch
 
 class Filter:
     # Base Filter class just returns the first n samples from the candidate set
-    def __init__(self):
+    def __init__(self, **kwargs):
         pass
 
     def __call__(self, n_samples, candidate_set, maximize=False):
