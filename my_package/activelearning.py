@@ -9,10 +9,11 @@ from sampler.sampler import RandomSampler, GreedySampler
 from filter.filter import OracleFilter, Filter
 from gflownet.proxy.box.branin import Branin
 
+import numpy as np
+import hydra
 import torch
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-import numpy as np
 
 n_iterations = 5  # TODO: replace with budget
 grid_size = 10
@@ -22,7 +23,8 @@ train_path = "./storage/branin/data_%i_train.csv" % grid_size
 maximize = False
 
 
-def main():
+@hydra.main(config_path="./config", config_name="main")
+def main(config):
     # define candidate set
     xi = np.arange(0, grid_size)
     yi = np.arange(0, grid_size)
