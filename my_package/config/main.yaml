@@ -4,12 +4,12 @@ defaults:
   - oracle: branin
   - filter: filter
   - logger: wandb
-  - sampler: greedy
+  - sampler: gflownet
   - surrogate: gp
   - user: anonymous
 
-device: cuda
-float_precision: 64
+device: cpu
+float_precision: 32
 budget: 5
 n_samples: 3
 seed: 31415

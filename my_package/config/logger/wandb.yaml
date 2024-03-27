@@ -1,10 +1,10 @@
 _target_: gflownet.utils.logger.Logger
 
 do:
-  online: False
+  online: True
   times: False
 
-project_name: "GFlowNet"
+project_name: "ActiveLearningLoop_Test"
 
 # Train metrics
 train:

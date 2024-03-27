@@ -3,14 +3,13 @@ import torch
 
 
 class Sampler(ABC):
-    def __init__(self, surrogate):
+    def __init__(self, surrogate, **kwargs):
         self.surrogate = surrogate
 
     @abstractmethod
     def get_samples(self, n_samples, candidate_set):
         pass
 
-    @abstractmethod
     def fit(self):
         pass
 
@@ -45,6 +44,65 @@ class GFlowNetSampler(Sampler):
     Then it generates n samples proportionally to the reward.
     """
 
-    def get_samples(self, n_samples, candidate_set):
-        # TODO: implement
-        raise NotImplementedError
+    def __init__(self, surrogate, conf, logger, device, float_precision):
+        super().__init__(surrogate)
+        print("init")
+
+        import hydra
+
+        grid_env = hydra.utils.instantiate(
+            conf.env,
+            proxy=surrogate,
+            device=device,
+            float_precision=float_precision,
+        )
+        print("grid_env")
+
+        # The policy is used to model the probability of a forward/backward action
+        forward_policy = hydra.utils.instantiate(
+            conf.policy.forward,
+            env=grid_env,
+            device=device,
+            float_precision=float_precision,
+        )
+        print("forward_policy")
+        backward_policy = hydra.utils.instantiate(
+            conf.policy.backward,
+            env=grid_env,
+            device=device,
+            float_precision=float_precision,
+        )
+        print("backward_policy")
+
+        # State flow
+        if conf.state_flow is not None:
+            state_flow = hydra.utils.instantiate(
+                conf.state_flow,
+                env=grid_env,
+                device=device,
+                float_precision=float_precision,
+                base=forward_policy,
+            )
+        else:
+            state_flow = None
+
+        print("state_flow")
+        # GFlowNet Agent
+        self.sampler = hydra.utils.instantiate(
+            conf.agent,
+            device=device,
+            float_precision=float_precision,
+            env=grid_env,
+            forward_policy=forward_policy,
+            backward_policy=backward_policy,
+            state_flow=state_flow,
+            buffer=conf.env.buffer,
+            logger=logger,
+        )
+
+    def fit(self):
+        self.sampler.train()
+
+    def get_samples(self, n_samples, candidate_set=None):
+        batch, times = self.sampler.sample_batch(n_forward=n_samples, train=False)
+        return batch.get_terminating_states(proxy=True)

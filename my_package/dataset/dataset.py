@@ -331,10 +331,11 @@ class BraninDatasetHandler(DatasetHandler):
 
     def get_candidate_set(self):
         import numpy as np
+
         # define candidate set
         xi = np.arange(0, self.grid_size)
         yi = np.arange(0, self.grid_size)
         grid = np.array(np.meshgrid(xi, yi))
         grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 2)
         candidate_set, _ = Branin_Data(self.grid_size, grid_flat)[:]
-        return candidate_set
+        return candidate_set, xi / self.grid_size, yi / self.grid_size

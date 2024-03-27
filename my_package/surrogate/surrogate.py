@@ -16,7 +16,7 @@ from gflownet.utils.common import set_float_precision
 
 class Surrogate(ABC):
     def __init__(self, float_precision=64, device="cpu", maximize=False):
-        self.maximize = maximize
+        self.maximize = True
         self.target_factor = 1 if maximize else -1
         self.float = set_float_precision(float_precision)
         self.device = device
