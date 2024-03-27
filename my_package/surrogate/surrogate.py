@@ -31,8 +31,11 @@ class Surrogate(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, states):
+    def get_predictions(self, states):
         pass
+
+    def __call__(self, candidate_set):
+        return self.get_acquisition_values(candidate_set)
 
     @abstractmethod
     def get_acquisition_values(self, candidate_set):
@@ -68,7 +71,7 @@ class SingleTaskGPRegressor(Surrogate):
         with debug(state=True):
             self.mll = fit_gpytorch_mll(self.mll)
 
-    def __call__(self, states):
+    def get_predictions(self, states):
         """Input is states
         Proxy conversion happens within."""
         states_proxy = states.clone().to(self.device).to(self.float)
@@ -84,11 +87,12 @@ class SingleTaskGPRegressor(Surrogate):
         return y_mean, y_std
 
     def get_acquisition_values(self, candidate_set):
+        candidate_set = candidate_set.to(self.device).to(self.float)
         acqf = qLowerBoundMaxValueEntropy(
             self.model,
             candidate_set=candidate_set,
         )
-        return acqf(candidate_set.unsqueeze(1))
+        return acqf(candidate_set.unsqueeze(1)).detach()
 
     # def get_metrics(self, y_mean, y_std, env, states):
     #     state_oracle_input = states.clone()
