@@ -1,4 +1,4 @@
-_target_: dataset.dataset.BraninDatasetHandler
+_target_: dataset.grid.BraninDatasetHandler
 
 grid_size: 10
 normalize_scores: True

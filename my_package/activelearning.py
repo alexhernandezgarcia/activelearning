@@ -3,22 +3,14 @@ Runnable script for the active learning pipeline
 """
 
 import sys
-from dataset.dataset import BraninDatasetHandler, Branin_Data
-from surrogate.surrogate import SingleTaskGPRegressor
-from sampler.sampler import RandomSampler, GreedySampler
-from filter.filter import OracleFilter, Filter
-from gflownet.proxy.box.branin import Branin
 
-import numpy as np
 import hydra
-import torch
 
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 @hydra.main(config_path="./config", config_name="main", version_base="1.1")
 def main(config):
-
     # init config
     device = config.device
     n_iterations = config.budget  # TODO: replace with budget
@@ -31,7 +23,7 @@ def main(config):
         config.dataset,
         float_precision=config.float_precision,
     )
-    candidate_set = dataset_handler.get_candidate_set()
+    candidate_set, xi, yi = dataset_handler.get_candidate_set()
 
     # Oracle
     oracle = hydra.utils.instantiate(
@@ -45,6 +37,7 @@ def main(config):
         oracle=oracle,
     )
 
+    best_scores = []
     for i in range(n_iterations):
         print("--iteration", i)
         train_data, test_data = dataset_handler.get_dataloader()
@@ -63,15 +56,16 @@ def main(config):
         sampler = hydra.utils.instantiate(
             config.sampler,
             surrogate=surrogate,
+            device=device,
+            float_precision=float_precision,
+            _recursive_=False,
         )
         sampler.fit()  # only necessary for samplers that train a model
 
         samples = sampler.get_samples(
             n_samples * 3, candidate_set=candidate_set.clone().to(device)
         )
-        filtered_samples = filter(
-            n_samples=n_samples, candidate_set=samples.clone(), maximize=maximize
-        )
+        filtered_samples = filter(n_samples=n_samples, candidate_set=samples.clone())
 
         scores = oracle(filtered_samples.clone())
         dataset_handler.update_dataset(filtered_samples.cpu(), scores.cpu())
@@ -79,6 +73,9 @@ def main(config):
         print("Proposed Candidates:", filtered_samples)
         print("Oracle Scores:", scores)
         print("Best Score:", scores.min().cpu())
+        best_scores.append(scores.min().cpu())
+
+    print("Best Scores:", best_scores)
 
 
 if __name__ == "__main__":

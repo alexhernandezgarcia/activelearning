@@ -1,4 +1,4 @@
 logdir:
-  root: ~/activelearning/logs
+  root: activelearning/logs
 data:
-  root: ~/activelearning/data
+  root: activelearning/data
