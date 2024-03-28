@@ -1,0 +1,63 @@
+defaults:
+  # - _self_
+  - dataset: branin
+  - oracle: branin
+  - filter: score
+  - sampler: gflownet
+  - surrogate: gp
+  - user: anonymous
+
+
+dataset:
+  grid_size: 100
+  train_path: ~/activelearning/my_package/storage/branin/data_100_train.csv
+
+sampler: 
+  conf:
+    agent:
+      random_action_prob: 0.01
+      optimizer:
+        lr: 0.0005
+        n_train_steps: 1000
+    logger:
+      do:
+        online: True
+      project_name: "test_gflownet"
+      run_name: "power5_lr5e-4"
+    env:
+      # Number of cells per dimension
+      length: 100 
+      # Mapping coordinates
+      cell_min: 0   
+      cell_max: 0.99
+      # Reward function: power or boltzmann
+      # boltzmann: exp(-1.0 * reward_beta * proxy)
+      # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
+      # identity: proxy
+      reward_func: power
+      # Minimum reward
+      reward_min: 1e-8
+      # Beta parameter of the reward function
+      reward_beta: 5.0
+      # Reward normalization for "power" reward function
+      reward_norm: 1.0
+
+device: cpu
+float_precision: 32
+budget: 10
+n_samples: 5
+seed: 31415
+maximize: False
+
+
+# Hydra config
+hydra:
+  # See: https://hydra.cc/docs/configure_hydra/workdir/
+  run:
+    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: ${user.logdir.root}/multirun/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
+    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
+    chdir: True

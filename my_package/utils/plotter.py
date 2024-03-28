@@ -62,8 +62,7 @@ class PlotHelper:
 
     def log_figure(self, fig, key="test"):
         if self.logger:
-            figimg = self.logger.wandb.Image(fig)
-            self.logger.wandb.log({key: figimg})
+            self.logger.log_figure(fig, key)
             plt.close(fig)
         else:
             fig.show()

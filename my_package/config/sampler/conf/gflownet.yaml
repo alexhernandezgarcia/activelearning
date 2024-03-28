@@ -26,32 +26,28 @@ env:
   # Dimensions of hypergrid
   n_dim: 2
   # Number of cells per dimension
-  length: 10
+  length: 10     # <---
   # Maximum increment per each dimension that can be done by one action
   max_increment: 1
   # Maximum number of dimensions that can be incremented by one action
   max_dim_per_action: 1
   # Mapping coordinates
-  cell_min: 0
-  cell_max: 0.9
+  cell_min: 0     # <---
+  cell_max: 0.9  # <---
   # Buffer
   buffer:
-    data_path: null
     train: null
-    test:
-      type: all
-      output_csv: grid_test.csv
-      output_pkl: grid_test.pkl
+    test: null
 
   # Reward function: power or boltzmann
   # boltzmann: exp(-1.0 * reward_beta * proxy)
   # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
   # identity: proxy
-  reward_func: identity
+  reward_func: power # <---
   # Minimum reward
   reward_min: 1e-8
   # Beta parameter of the reward function
-  reward_beta: 1.0
+  reward_beta: 5.0 # <---
   # Reward normalization for "power" reward function
   reward_norm: 1.0
   # If > 0, reward_norm = reward_norm_std_mult * std(energies)
@@ -74,7 +70,7 @@ agent:
     # Loss function
     loss: trajectorybalance
     # Learning rates
-    lr: 0.0001
+    lr: 0.001 # 0.0001 # <---
     lr_decay_period: 1000000
     lr_decay_gamma: 0.5
     lr_z_mult: 100
@@ -99,7 +95,7 @@ agent:
     # Train to sample ratio
     train_to_sample_ratio: 1
     # Number of training iterations
-    n_train_steps: 500
+    n_train_steps: 500 # 5000 # <---
     # From original implementation
     bootstrap_tau: 0.0
     clip_grad_norm: 0.0
@@ -109,8 +105,8 @@ agent:
   mask_invalid_actions: True
   # Temperature for the logits /= temperature_logits
   temperature_logits: 1.0
-  # Percentage of random actions
-  random_action_prob: 0.0
+  # Percentage of random actions e.g. 0.01
+  random_action_prob: 0.0 # <---
   # Percentage of trajectories in a batch from an empirical distribution
   pct_offline: 0.0
   # Replay buffer
@@ -126,16 +122,59 @@ agent:
   active_learning: False
 
   buffer:
-    train:
-      path: null
-      n: null
-      type: null
-      seed: null
-      output_csv: null 
-    test:
-      path: null 
-      type: all
-      output_pkl: buffer_data_test.csv
-      n: null
-      seed: null
-      output_csv: null 
+    train: null
+    test: null
+
+
+logger:
+  _target_: gflownet.utils.logger.Logger
+
+  do:
+    online: False # <---
+    times: False
+
+  project_name: "test_gflownet" # <---
+
+  # Train metrics
+  train:
+    period: 1
+  # Test metrics
+  test:
+    first_it: True
+    period: 1000
+    n: 100
+    kde:
+      bandwidth: 0.1
+      kernel: gaussian
+    n_top_k: 5000
+    top_k: 100
+    top_k_period: -1
+    # Number of backward trajectories to estimate the log likelihood of each test data point
+    n_trajs_logprobs: 10
+    logprobs_batch_size: 100
+    logprobs_bootstrap_size: 10000
+    # Maximum number of test data points to compute log likelihood probs.
+    max_data_logprobs: 1e5
+  # Oracle metrics
+  oracle:
+    period: 100000
+    k:
+      - 1
+      - 10
+      - 100
+  # Policy model checkpoints
+  checkpoints:
+    period: 1000
+
+  # Log dir
+  logdir:
+    root: activelearning/gflownet/logs
+    ckpts: activelearning/gflownetckpts
+    overwrite: True
+  debug: False
+  lightweight: False
+  progress: True
+  context: "0"
+  notes: null # wandb run notes (e.g. "baseline")
+  tags: 
+      - gflownet

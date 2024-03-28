@@ -44,11 +44,15 @@ class GFlowNetSampler(Sampler):
     Then it generates n samples proportionally to the reward.
     """
 
-    def __init__(self, surrogate, conf, logger, device, float_precision):
+    def __init__(self, surrogate, conf, device, float_precision):
         super().__init__(surrogate)
-        print("init")
-
         import hydra
+
+        logger = hydra.utils.instantiate(
+            conf.logger,
+            conf,
+            _recursive_=False,
+        )
 
         grid_env = hydra.utils.instantiate(
             conf.env,
@@ -56,7 +60,6 @@ class GFlowNetSampler(Sampler):
             device=device,
             float_precision=float_precision,
         )
-        print("grid_env")
 
         # The policy is used to model the probability of a forward/backward action
         forward_policy = hydra.utils.instantiate(
@@ -65,14 +68,12 @@ class GFlowNetSampler(Sampler):
             device=device,
             float_precision=float_precision,
         )
-        print("forward_policy")
         backward_policy = hydra.utils.instantiate(
             conf.policy.backward,
             env=grid_env,
             device=device,
             float_precision=float_precision,
         )
-        print("backward_policy")
 
         # State flow
         if conf.state_flow is not None:
@@ -86,7 +87,6 @@ class GFlowNetSampler(Sampler):
         else:
             state_flow = None
 
-        print("state_flow")
         # GFlowNet Agent
         self.sampler = hydra.utils.instantiate(
             conf.agent,
@@ -102,6 +102,7 @@ class GFlowNetSampler(Sampler):
 
     def fit(self):
         self.sampler.train()
+        # self.sampler.logger.end()
 
     def get_samples(self, n_samples, candidate_set=None):
         batch, times = self.sampler.sample_batch(n_forward=n_samples, train=False)

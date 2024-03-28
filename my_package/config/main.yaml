@@ -3,8 +3,7 @@ defaults:
   - dataset: branin
   - oracle: branin
   - filter: filter
-  - logger: wandb
-  - sampler: gflownet
+  - sampler: greedy
   - surrogate: gp
   - user: anonymous
 
