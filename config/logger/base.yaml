@@ -1,4 +1,4 @@
-_target_: logger.Logger
+_target_: activelearning.logger.Logger
 
 do:
   online: False
@@ -35,4 +35,4 @@ logdir:
   overwrite: True
 lightweight: False 
 progress: True
-debug: False 
+debug: False

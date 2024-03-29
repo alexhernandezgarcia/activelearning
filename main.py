@@ -2,15 +2,33 @@
 Runnable script for the active learning pipeline
 """
 
+import os
+import random
 import sys
 
 import hydra
+
+from activelearning.utils.common import set_seeds
 
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 @hydra.main(config_path="./config", config_name="main", version_base="1.1")
 def main(config):
+
+    # Get current directory and set it as root log dir for Logger
+    cwd = os.getcwd()
+    config.logger.logdir.root = cwd
+    print(f"\nLogging directory of this run:  {cwd}\n")
+
+    # Reset seed for job-name generation in multirun jobs
+    random.seed(None)
+    # Set other random seeds
+    set_seeds(config.seed)
+
+    # Logger
+    logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
+
     # init config
     device = config.device
     n_iterations = config.budget  # TODO: replace with budget
