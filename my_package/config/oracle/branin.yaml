@@ -1,4 +1,4 @@
-_target_: gflownet.proxy.box.branin.Branin
+_target_: oracle.oracle.Branin
 
 fidelity: 1
 do_domain_map: True

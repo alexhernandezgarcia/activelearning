@@ -16,7 +16,7 @@ from gflownet.utils.common import set_float_precision
 
 class Surrogate(ABC):
     def __init__(self, float_precision=64, device="cpu", maximize=False):
-        self.maximize = maximize
+        # self.maximize = maximize
         self.target_factor = 1 if maximize else -1
         self.float = set_float_precision(float_precision)
         self.device = device
@@ -35,7 +35,9 @@ class Surrogate(ABC):
         pass
 
     def __call__(self, candidate_set):
-        return self.get_acquisition_values(candidate_set)
+        return (
+            self.get_acquisition_values(candidate_set) * self.target_factor
+        )  # TODO: remove self.target_factor; this will later be implemented directly in the gflownet environment (currently it always asumes negative values i.e. minimizing values)
 
     @abstractmethod
     def get_acquisition_values(self, candidate_set):
