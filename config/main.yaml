@@ -2,7 +2,7 @@ defaults:
   - _self_
   - dataset: branin
   - oracle: branin
-  - filter: filter
+  - selector: selector
   - sampler: greedy
   - surrogate: gp
   - user: default

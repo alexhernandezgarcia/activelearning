@@ -2,7 +2,7 @@ defaults:
   # - _self_
   - dataset: branin
   - oracle: branin
-  - filter: score
+  - selector: score
   - sampler: random
   - surrogate: gp
   - user: anonymous
