@@ -2,8 +2,8 @@ import torch
 from gflownet.utils.common import set_device, set_float_precision
 
 
-class Filter:
-    # Base Filter class just returns the first n samples from the candidate set
+class Selector:
+    # Base Selector class just returns the first n samples from the candidate set
     def __init__(self, device, float_precision, **kwargs):
         # Device
         self.device = set_device(device)
@@ -14,8 +14,9 @@ class Filter:
         return candidate_set[-n_samples:]
 
 
-class ScoreFilter(Filter):
-    # Filter that takes a score function, which is used to filter the top performing samples (e.g., acquisition function)
+class ScoreSelector(Selector):
+    # Selector that takes a score function, which is used to select the top performing
+    # samples (e.g., acquisition function)
     def __init__(self, score_fn, maximize=True):
         super().__init__()
         self.score_fn = score_fn
