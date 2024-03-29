@@ -49,6 +49,8 @@ def main(config):
     filter = hydra.utils.instantiate(
         config.filter,
         oracle=oracle,
+        device=config.device,
+        float_precision=config.float_precision,
     )
 
     best_scores = []
@@ -77,7 +79,7 @@ def main(config):
         sampler.fit()  # only necessary for samplers that train a model
 
         samples = sampler.get_samples(n_samples * 3, candidate_set=candidate_set)
-        filtered_samples = filter(n_samples=n_samples, candidate_set=samples.clone())
+        filtered_samples = filter(n_samples=n_samples, candidate_set=samples)
 
         scores = oracle(filtered_samples.clone())
         dataset_handler.update_dataset(filtered_samples.cpu(), scores.cpu())
