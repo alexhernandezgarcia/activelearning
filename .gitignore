@@ -5,3 +5,4 @@ logs
 data
 _al_logger
 wandb
+.cache

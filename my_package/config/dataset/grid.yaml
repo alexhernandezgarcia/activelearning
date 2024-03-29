@@ -1,0 +1,8 @@
+
+grid_size: 10
+normalize_scores: True
+train_fraction: 1.0
+batch_size: 16
+shuffle: True
+train_path: null
+test_path: null

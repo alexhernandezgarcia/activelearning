@@ -285,12 +285,12 @@ class HartmannDatasetHandler(GridDatasetHandler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_candidate_set(self):
+    def get_candidate_set(self, step=1):
         import numpy as np
 
         # define candidate set
-        xi = np.arange(0, self.grid_size, 2)
-        yi = np.arange(0, self.grid_size, 2)
+        xi = np.arange(0, self.grid_size, step)
+        yi = np.arange(0, self.grid_size, step)
         grid = np.array(np.meshgrid(*[xi, yi] * 3))
         grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 6)
         candidate_set, _ = GridData(self.grid_size, grid_flat)[:]

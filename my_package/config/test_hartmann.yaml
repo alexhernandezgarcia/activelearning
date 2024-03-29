@@ -1,35 +1,35 @@
 defaults:
   # - _self_
-  - dataset: branin
-  - oracle: branin
+  - dataset: hartmann
+  - oracle: hartmann
   - filter: score
-  - sampler: gflownet
+  - sampler: random
   - surrogate: gp
   - user: anonymous
 
 
 dataset:
-  grid_size: 100
+  grid_size: 10
   train_path: ~/activelearning/my_package/storage/branin/data_100_train.csv
 
 sampler: 
   conf:
     agent:
-      random_action_prob: 0.01
+      random_action_prob: 0.0 # 0.01
       optimizer:
-        lr: 0.0005
-        n_train_steps: 1000
+        lr: 5e-4
+        n_train_steps: 5000 # 10000
     logger:
       do:
         online: True
       project_name: "test_gflownet"
-      run_name: "power5_lr5e-4"
+      run_name: "identity_lr5e-4"
     env:
       # Number of cells per dimension
-      length: 100 
+      length: 10
       # Mapping coordinates
-      cell_min: 0   
-      cell_max: 0.99
+      cell_min: 0   # -1
+      cell_max: 0.99 # 1
       # Reward function: power or boltzmann
       # boltzmann: exp(-1.0 * reward_beta * proxy)
       # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
@@ -38,7 +38,7 @@ sampler:
       # Minimum reward
       reward_min: 1e-8
       # Beta parameter of the reward function
-      reward_beta: 5.0
+      reward_beta: 1.0
       # Reward normalization for "power" reward function
       reward_norm: 1.0
 

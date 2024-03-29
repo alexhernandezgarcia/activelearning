@@ -66,3 +66,49 @@ class PlotHelper:
             plt.close(fig)
         else:
             fig.show()
+
+
+class ProjectionPlotHelper(PlotHelper):
+    def __init__(self, space, logger=None):
+        self.space = space
+        super().__init__(logger)
+
+        from openTSNE import TSNE
+
+        self.proj_fn = TSNE(2, verbose=True)
+        self.embedding = self.proj_fn.fit(space)
+
+    def plot_function(
+        self,
+        fn,
+        fig=None,
+        ax=None,
+        output_index=-1,
+    ):
+        if fig is None or ax is None:
+            fig, ax = plt.subplots(nrows=1)
+
+        # fn: function to plot
+        # output_index: -1 if the output of the function is a single value; if the outputs are tuples index of the output that should be plotted
+        res = fn(self.space)
+        if output_index >= 0:
+            res = res[output_index]
+        res = res.to("cpu").detach()
+
+        cntr = ax.tricontourf(
+            self.embedding[:, 0],
+            self.embedding[:, 1],
+            res,
+            levels=50,
+        )  # , cmap="viridis_r")
+        fig.colorbar(cntr, ax=ax)
+        return fig, ax
+
+    def plot_samples(self, samples, ax=None, fig=None, c=None, label=""):
+        if fig is None or ax is None:
+            fig, ax = plt.subplots(nrows=1)
+        if c is None:
+            c = "red"
+        coords = self.embedding.transform(samples)
+        ax.scatter(x=coords[:, 0], y=coords[:, 1], c=c, marker="x", label=label)
+        return fig, ax

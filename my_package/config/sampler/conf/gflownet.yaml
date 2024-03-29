@@ -6,7 +6,7 @@ policy:
     _target_: gflownet.policy.base.Policy
     config:
       type: mlp
-      n_hid: 128
+      n_hid: 2048 #128
       n_layers: 2
       checkpoint: null
       reload_ckpt: False
@@ -45,7 +45,7 @@ env:
   # identity: proxy
   reward_func: power # <---
   # Minimum reward
-  reward_min: 1e-8
+  reward_min: 1e-15
   # Beta parameter of the reward function
   reward_beta: 5.0 # <---
   # Reward normalization for "power" reward function
@@ -73,7 +73,7 @@ agent:
     lr: 0.001 # 0.0001 # <---
     lr_decay_period: 1000000
     lr_decay_gamma: 0.5
-    lr_z_mult: 100
+    lr_z_mult: 20 # 100
     method: adam
     # Threshold loss for early stopping
     early_stopping: 0.0
@@ -87,7 +87,7 @@ agent:
     # Number of trajectories of each kind
     batch_size:
       # Forward on-policy (possibly tempered and/or with random actions)
-      forward: 10
+      forward: 16
       # Backward from training set
       backward_dataset: 0
       # Backward from replay buffer
