@@ -76,9 +76,7 @@ def main(config):
         )
         sampler.fit()  # only necessary for samplers that train a model
 
-        samples = sampler.get_samples(
-            n_samples * 3, candidate_set=candidate_set.clone().to(device)
-        )
+        samples = sampler.get_samples(n_samples * 3, candidate_set=candidate_set)
         filtered_samples = filter(n_samples=n_samples, candidate_set=samples.clone())
 
         scores = oracle(filtered_samples.clone())

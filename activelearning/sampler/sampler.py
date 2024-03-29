@@ -1,10 +1,16 @@
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
+
 import torch
+from gflownet.utils.common import set_device, set_float_precision
 
 
 class Sampler(ABC):
-    def __init__(self, surrogate, **kwargs):
+    def __init__(self, surrogate, device, float_precision, **kwargs):
         self.surrogate = surrogate
+        # Device
+        self.device = set_device(device)
+        # Float precision
+        self.float = set_float_precision(float_precision)
 
     @abstractmethod
     def get_samples(self, n_samples, candidate_set):
@@ -20,6 +26,7 @@ class GreedySampler(Sampler):
     """
 
     def get_samples(self, n_samples, candidate_set):
+        candidate_set = candidate_set.clone().to(self.device)
         acq_values = self.surrogate.get_acquisition_values(candidate_set).detach()
         idx_pick = torch.argsort(acq_values)[-n_samples:]
         return candidate_set[idx_pick]
