@@ -1,4 +1,4 @@
-_target_: dataset.grid.HartmannDatasetHandler
+_target_: activelearning.dataset.grid.HartmannDatasetHandler
 
 defaults:
   - grid

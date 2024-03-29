@@ -1,4 +1,4 @@
-_target_: dataset.grid.BraninDatasetHandler
+_target_: activelearning.dataset.grid.BraninDatasetHandler
 
 defaults:
   - grid

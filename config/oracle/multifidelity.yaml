@@ -1,4 +1,4 @@
-_target_: oracle.oracle.MultiFidelityOracle
+_target_: activelearning.oracle.oracle.MultiFidelityOracle
 
 oracles:
   - branin1:

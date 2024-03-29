@@ -1,5 +1,0 @@
-
-_target_: sampler.sampler.GFlowNetSampler
-
-defaults:
-  - conf: gflownet

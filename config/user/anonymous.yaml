@@ -1,5 +1,4 @@
 logdir:
-# Directory where experiment logs will be stored
-  root: ./logs/
-# directory pointing to initial datasets
-data_path: ./storage/
+  root: activelearning/logs
+data:
+  root: activelearning/data

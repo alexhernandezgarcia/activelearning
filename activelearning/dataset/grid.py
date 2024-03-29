@@ -1,4 +1,4 @@
-from dataset.dataset import DatasetHandler, Data
+from activelearning.dataset.dataset import DatasetHandler, Data
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 import pandas as pd
