@@ -10,8 +10,6 @@ import hydra
 
 from activelearning.utils.common import set_seeds
 
-# device = "cuda" if torch.cuda.is_available() else "cpu"
-
 
 @hydra.main(config_path="./config", config_name="main", version_base="1.1")
 def main(config):
@@ -29,10 +27,8 @@ def main(config):
     # Logger
     logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
-    # init config
-    device = config.device
-    n_iterations = config.budget  # TODO: replace with budget
-    float_precision = config.float_precision
+    # Active learning variables
+    # TODO: rethink where this configuration should go
     n_samples = config.n_samples
     maximize = config.maximize
 
@@ -46,8 +42,8 @@ def main(config):
     # Oracle
     oracle = hydra.utils.instantiate(
         config.oracle,
-        device=device,
-        float_precision=float_precision,
+        device=config.device,
+        float_precision=config.float_precision,
     )
     # Filter
     filter = hydra.utils.instantiate(
@@ -56,7 +52,7 @@ def main(config):
     )
 
     best_scores = []
-    for i in range(n_iterations):
+    for i in range(config.budget):
         print("--iteration", i)
         train_data, test_data = dataset_handler.get_dataloader()
         # Surrogate (e.g., Bayesian Optimization)
@@ -64,7 +60,7 @@ def main(config):
         surrogate = hydra.utils.instantiate(
             config.surrogate,
             device=config.device,
-            float_precision=float_precision,
+            float_precision=config.float_precision,
             maximize=maximize,
         )
         surrogate.fit(train_data)
@@ -74,8 +70,8 @@ def main(config):
         sampler = hydra.utils.instantiate(
             config.sampler,
             surrogate=surrogate,
-            device=device,
-            float_precision=float_precision,
+            device=config.device,
+            float_precision=config.float_precision,
             _recursive_=False,
         )
         sampler.fit()  # only necessary for samplers that train a model
