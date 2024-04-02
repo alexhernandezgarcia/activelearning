@@ -47,11 +47,13 @@ class RandomSampler(Sampler):
     The RandomSampler returns n random samples from a set of candidates.
     """
 
-    def __init__(self, surrogate=None):
+    def __init__(self, surrogate=None, **kwargs):
         super().__init__(surrogate)
 
     def get_samples(self, n_samples, candidate_set):
         idx_pick = torch.randint(0, len(candidate_set), size=(n_samples,))
+        if isinstance(candidate_set, torch.utils.data.dataloader.DataLoader):
+            return candidate_set.dataset[idx_pick]
         return candidate_set[idx_pick]
 
 

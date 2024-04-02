@@ -320,7 +320,7 @@ class HartmannDatasetHandler(GridDatasetHandler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_candidate_set(self, step=1, as_dataloader=False):
+    def get_candidate_set(self, step=1, as_dataloader=True):
         import numpy as np
 
         # define candidate set

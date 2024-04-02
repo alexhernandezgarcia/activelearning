@@ -69,13 +69,13 @@ class PlotHelper:
 
 
 class ProjectionPlotHelper(PlotHelper):
-    def __init__(self, space, logger=None):
+    def __init__(self, space, logger=None, verbose=False):
         self.space = space
         super().__init__(logger)
 
         from openTSNE import TSNE
 
-        self.proj_fn = TSNE(2, verbose=True)
+        self.proj_fn = TSNE(2, verbose=verbose)
         self.embedding = self.proj_fn.fit(space)
 
     def plot_function(
