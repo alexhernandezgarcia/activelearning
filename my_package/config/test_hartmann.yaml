@@ -11,6 +11,7 @@ defaults:
 dataset:
   grid_size: 10
   train_path: ~/activelearning/my_package/storage/branin/data_100_train.csv
+  batch_size: 2048
 
 sampler: 
   conf:

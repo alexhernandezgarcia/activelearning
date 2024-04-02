@@ -7,17 +7,23 @@ from abc import ABC, abstractmethod
 class Data(Dataset):
     def __init__(self, X_data, y_data=None, float=torch.float64):
         self.float = float
-        self.X_data = X_data.to(self.float)
+        self.X_data = X_data
         self.y_data = None
         if y_data is not None:
-            self.y_data = y_data.to(self.float)
+            self.y_data = y_data
+
+        self.shape = X_data.shape
 
     def __getitem__(self, index):
-        x_set, y_set = self.preprocess(self.X_data, self.y_data)
-        if y_set is not None:
-            y_set = y_set[index]
+        x_set = self.X_data[index].to(self.float)
+        y_set = None
+        if self.y_data is not None:
+            y_set = self.y_data[index].to(self.float)
+        x_set, y_set = self.preprocess(x_set, y_set)
 
-        return x_set[index], y_set
+        if y_set is None:
+            return x_set
+        return x_set, y_set
 
     def __len__(self):
         return len(self.X_data)
