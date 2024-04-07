@@ -3,5 +3,5 @@ _target_: activelearning.dataset.grid.HartmannDatasetHandler
 defaults:
   - grid
 
-train_path: ~/activelearning/my_package/storage/hartmann/data_train.csv
+train_path: ${user.data.root}/hartmann/data_train.csv
 test_path: null
