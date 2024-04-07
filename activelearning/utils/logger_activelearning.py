@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import wandb
 
 
-class AL_Logger(Logger):
+class ActiveLearningLogger(Logger):
     """
     Utils functions to compute and handle the statistics (saving them or send to
     wandb). It can be passed on to querier, gfn, proxy, ... to get the
