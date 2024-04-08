@@ -1,0 +1,4 @@
+logdir:
+  root: ./logs
+data:
+  root: ./data

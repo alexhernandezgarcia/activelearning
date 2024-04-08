@@ -1,4 +1,0 @@
-_target_: oracle.oracle.Branin
-
-fidelity: 1
-do_domain_map: True

@@ -1,3 +1,4 @@
-_target_: proxy.hartmann.SingleFidelityHartmann
-maximize: True
-cost: 1
+_target_: activelearning.oracle.oracle.Hartmann
+
+fidelity: 1
+do_domain_map: True

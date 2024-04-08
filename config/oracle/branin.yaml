@@ -1,3 +1,4 @@
-_target_: proxy.branin.SingleFidelityBranin
-maximize: False
-cost: 1
+_target_: activelearning.oracle.oracle.Branin
+
+fidelity: 1
+do_domain_map: True
