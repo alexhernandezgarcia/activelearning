@@ -10,7 +10,7 @@ class Sampler(ABC):
         # Device
         self.device = set_device(device)
         # Float precision
-        self.float = set_float_precision(float_precision)
+        self.float_precision = set_float_precision(float_precision)
 
     @abstractmethod
     def get_samples(self, n_samples, candidate_set):

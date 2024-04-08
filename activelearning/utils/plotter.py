@@ -14,7 +14,7 @@ class PlotHelper:
         yi=None,
         fig=None,
         ax=None,
-        output_index=-1,
+        output_index=None,
         size_x=None,
         size_y=None,
     ):
@@ -39,7 +39,7 @@ class PlotHelper:
         # fn: function to plot
         # output_index: -1 if the output of the function is a single value; if the outputs are tuples index of the output that should be plotted
         res = fn(space)
-        if output_index >= 0:
+        if output_index is not None:
             res = res[output_index]
         res = res.to("cpu").detach()
         # ax.matshow(res)
