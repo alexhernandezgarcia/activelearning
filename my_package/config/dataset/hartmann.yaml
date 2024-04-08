@@ -1,7 +1,0 @@
-_target_: dataset.grid.HartmannDatasetHandler
-
-defaults:
-  - grid
-
-train_path: ~/activelearning/my_package/storage/hartmann/data_train.csv
-test_path: null

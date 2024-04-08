@@ -1,9 +1,9 @@
 defaults:
   - base
 
-_target_: utils.logger.AL_Logger
+_target_: activelearning.utils.logger_activelearning.ActiveLearningLogger
 
-project_name: "ActiveLearningPipeline"
+project_name: "activelearning"
 tags: 
     - dummy1
     - dummy2
