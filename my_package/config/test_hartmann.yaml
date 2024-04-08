@@ -16,15 +16,15 @@ dataset:
 sampler: 
   conf:
     agent:
-      random_action_prob: 0.0 # 0.01 #0.001
+      random_action_prob: 0.001 # 0.01 #0.001
       optimizer:
         lr: 5e-4
-        n_train_steps: 100 # 10000
+        n_train_steps: 5000 # 10000
     logger:
       do:
         online: True
       project_name: "test_hartmann_gflownet"
-      run_name: "identity_lr5e-4"
+      run_name: "identity_lr5e-4 newdata"
     env:
       # Number of cells per dimension
       length: 10

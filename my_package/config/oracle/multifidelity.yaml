@@ -6,3 +6,13 @@ oracles:
       fidelity: 1
       do_domain_map: True
       cost: 100
+  - branin01:
+      _target_: gflownet.proxy.box.branin.Branin
+      fidelity: 0.1
+      do_domain_map: True
+      cost: 10
+  - branin001:
+      _target_: gflownet.proxy.box.branin.Branin
+      fidelity: 0.01
+      do_domain_map: True
+      cost: 1

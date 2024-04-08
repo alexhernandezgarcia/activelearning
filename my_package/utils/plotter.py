@@ -75,7 +75,7 @@ class ProjectionPlotHelper(PlotHelper):
 
         from openTSNE import TSNE
 
-        self.proj_fn = TSNE(2, verbose=verbose)
+        self.proj_fn = TSNE(2, verbose=verbose, random_state=31415)
         self.embedding = self.proj_fn.fit(space)
 
     def plot_function(
