@@ -52,7 +52,7 @@ class RandomSampler(Sampler):
     """
 
     def __init__(self, surrogate=None, **kwargs):
-        super().__init__(surrogate)
+        super().__init__(surrogate, "cpu", 64)
 
     def get_samples(self, n_samples, candidate_set):
         idx_pick = torch.randint(0, len(candidate_set), size=(n_samples,))
@@ -68,7 +68,7 @@ class GFlowNetSampler(Sampler):
     """
 
     def __init__(self, surrogate, conf, device, float_precision):
-        super().__init__(surrogate)
+        super().__init__(surrogate, device, float_precision)
         import hydra
 
         logger = hydra.utils.instantiate(

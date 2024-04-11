@@ -60,7 +60,7 @@ def main(config):
             float_precision=config.float_precision,
             maximize=maximize,
         )
-        surrogate.fit(train_data)
+        surrogate.fit_surrogate(train_data)
 
         # Sampler (e.g., GFlowNet, or Random Sampler)
         # also starts with a clean slate; TODO: experiment with NOT training from scratch

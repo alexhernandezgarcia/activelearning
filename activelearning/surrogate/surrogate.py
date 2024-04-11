@@ -29,6 +29,10 @@ class SurrogatePipeline:
         y_std = y_std.squeeze(-1)
         return y_mean, y_std
 
+    def setup(self, env):
+        # TODO: what is this needed for? has to be present for gflownet
+        pass
+
     def __call__(self, candidate_set):
         return (
             self.get_acquisition_values(candidate_set) * self.target_factor

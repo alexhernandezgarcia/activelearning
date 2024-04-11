@@ -3,7 +3,7 @@ defaults:
   - dataset: branin
   - oracle: branin
   - selector: score
-  - sampler: random
+  - sampler: gflownet
   - surrogate: surrogate
   - user: default
 

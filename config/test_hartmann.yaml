@@ -5,7 +5,7 @@ defaults:
   - selector: score
   - sampler: random
   - surrogate: surrogate
-  - user: anonymous
+  - user: default
 
 
 dataset:
