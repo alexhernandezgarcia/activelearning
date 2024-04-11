@@ -1,0 +1,6 @@
+_target_: activelearning.surrogate.surrogate.SurrogatePipeline
+
+defaults:
+  - _self_
+  - acq_fn: botorch
+  - surrogate_model: gp
