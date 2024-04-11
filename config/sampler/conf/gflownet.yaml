@@ -130,7 +130,7 @@ logger:
   _target_: gflownet.utils.logger.Logger
 
   do:
-    online: True # <---
+    online: False # <---
     times: False
 
   project_name: "test_gflownet" # <---

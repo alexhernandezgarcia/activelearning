@@ -16,7 +16,7 @@ class SurrogatePipeline:
         self.acq_fn = acq_fn
         self.surrogate_model = surrogate_model
 
-    def fit_surrogate(self, train_data):
+    def fit(self, train_data):
         self.surrogate_model.fit(train_data)
 
     def get_predictions(self, states):
@@ -49,18 +49,11 @@ class SurrogatePipeline:
 
 class SurrogateModel(ABC):
     def __init__(self, float_precision=64, device="cpu", maximize=False, **kwargs):
+        # use the kwargs for model specific configuration that is implemented in subclasses
         self.maximize = maximize
         self.target_factor = 1 if maximize else -1
         self.float = set_float_precision(float_precision)
         self.device = device
-
-        # use the kwargs for model specific configuration that is implemented in subclasses
-        self._init_model(**kwargs)
-
-    @abstractmethod
-    def _init_model(self, args):
-        # initializes the model components
-        pass
 
     @abstractmethod
     def posterior(self, states, train=False):
