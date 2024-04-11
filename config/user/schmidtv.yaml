@@ -1,0 +1,4 @@
+logdir:
+  root: /network/scratch/s/schmidtv/logs/activelearning
+data:
+  root: ./data
