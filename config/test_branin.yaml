@@ -4,8 +4,8 @@ defaults:
   - oracle: branin
   - selector: score
   - sampler: random
-  - surrogate: gp
-  - user: anonymous
+  - surrogate: surrogate
+  - user: default
 
 
 dataset:

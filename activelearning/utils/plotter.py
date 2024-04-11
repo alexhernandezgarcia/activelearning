@@ -37,7 +37,7 @@ class PlotHelper:
             fig, ax = plt.subplots(nrows=1)
 
         # fn: function to plot
-        # output_index: -1 if the output of the function is a single value; if the outputs are tuples index of the output that should be plotted
+        # output_index: None if the output of the function is a single value; if the outputs are tuples index of the output that should be plotted
         res = fn(space)
         if output_index is not None:
             res = res[output_index]

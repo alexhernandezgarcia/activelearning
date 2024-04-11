@@ -4,7 +4,7 @@ defaults:
   - oracle: branin
   - selector: selector
   - sampler: greedy
-  - surrogate: gp
+  - surrogate: surrogate
   - user: default
   - logger: wandb
 

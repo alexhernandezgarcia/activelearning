@@ -4,7 +4,7 @@ defaults:
   - oracle: hartmann
   - selector: score
   - sampler: random
-  - surrogate: gp
+  - surrogate: surrogate
   - user: anonymous
 
 
