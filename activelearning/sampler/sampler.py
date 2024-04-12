@@ -5,8 +5,8 @@ from gflownet.utils.common import set_device, set_float_precision
 
 
 class Sampler(ABC):
-    def __init__(self, surrogate, device, float_precision, **kwargs):
-        self.surrogate = surrogate
+    def __init__(self, acquisition, device, float_precision, **kwargs):
+        self.acquisition = acquisition
         # Device
         self.device = set_device(device)
         # Float precision
@@ -30,7 +30,7 @@ class GreedySampler(Sampler):
             acq_values = []
             for batch in candidate_set:
                 acq_values.append(
-                    self.surrogate.get_acquisition_values(
+                    self.acquisition.get_acquisition_values(
                         batch.to(self.device).to(self.float_precision)
                     ).detach()
                 )
@@ -39,7 +39,7 @@ class GreedySampler(Sampler):
             return candidate_set.dataset[idx_pick]
         else:
             candidate_set = candidate_set.clone().to(self.device)
-            acq_values = self.surrogate.get_acquisition_values(
+            acq_values = self.acquisition.get_acquisition_values(
                 candidate_set.to(self.device).to(self.float_precision)
             ).detach()
             idx_pick = torch.argsort(acq_values)[-n_samples:]
@@ -51,8 +51,8 @@ class RandomSampler(Sampler):
     The RandomSampler returns n random samples from a set of candidates.
     """
 
-    def __init__(self, surrogate=None, **kwargs):
-        super().__init__(surrogate, "cpu", 64)
+    def __init__(self, acquisition=None, **kwargs):
+        super().__init__(acquisition, "cpu", 64)
 
     def get_samples(self, n_samples, candidate_set):
         idx_pick = torch.randint(0, len(candidate_set), size=(n_samples,))
@@ -63,12 +63,12 @@ class RandomSampler(Sampler):
 
 class GFlowNetSampler(Sampler):
     """
-    The GFlowNetSampler trains a GFlowNet in combination with a surrogate model.
+    The GFlowNetSampler trains a GFlowNet in combination with a acquisition function.
     Then it generates n samples proportionally to the reward.
     """
 
-    def __init__(self, surrogate, conf, device, float_precision):
-        super().__init__(surrogate, device, float_precision)
+    def __init__(self, acquisition, conf, device, float_precision):
+        super().__init__(acquisition, device, float_precision)
         import hydra
 
         logger = hydra.utils.instantiate(
@@ -79,7 +79,7 @@ class GFlowNetSampler(Sampler):
 
         grid_env = hydra.utils.instantiate(
             conf.env,
-            proxy=surrogate,
+            proxy=acquisition,
             device=device,
             float_precision=float_precision,
         )

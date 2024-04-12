@@ -4,7 +4,8 @@ defaults:
   - oracle: hartmann
   - selector: score
   - sampler: random
-  - surrogate: surrogate
+  - surrogate: gp
+  - acquisition: botorch
   - user: default
 
 

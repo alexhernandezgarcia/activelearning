@@ -1,0 +1,3 @@
+_target_: activelearning.acquisition.acquisition.BOTorchAcqHandler
+
+acq_fn_class: qLowerBoundMaxValueEntropy

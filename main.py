@@ -62,11 +62,21 @@ def main(config):
         )
         surrogate.fit(train_data)
 
+        # Acquisition
+        # starts with a clean slate each iteration
+        acquisition = hydra.utils.instantiate(
+            config.acquisition,
+            device=config.device,
+            float_precision=config.float_precision,
+            maximize=maximize,
+        )
+        acquisition.fit(candidate_set)
+
         # Sampler (e.g., GFlowNet, or Random Sampler)
         # also starts with a clean slate; TODO: experiment with NOT training from scratch
         sampler = hydra.utils.instantiate(
             config.sampler,
-            surrogate=surrogate,
+            acquisition=acquisition,
             device=config.device,
             float_precision=config.float_precision,
             _recursive_=False,
@@ -78,7 +88,7 @@ def main(config):
         # Selector
         selector = hydra.utils.instantiate(
             config.selector,
-            score_fn=surrogate.get_acquisition_values,
+            score_fn=acquisition.get_acquisition_values,
             device=config.device,
             float_precision=config.float_precision,
         )

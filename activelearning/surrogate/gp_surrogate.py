@@ -6,6 +6,7 @@ from botorch.models.gp_regression_fidelity import (
 from botorch.models.transforms.outcome import Standardize
 from botorch.fit import fit_gpytorch_mll
 from botorch.settings import debug
+from botorch.models.model import Model
 
 from activelearning.surrogate.surrogate import SurrogateModel
 from activelearning.utils.helper_functions import dataloader_to_data
@@ -16,12 +17,12 @@ class GPSurrogate(SurrogateModel):
 
     def __init__(
         self,
+        float_precision,
+        device,
         model_class,
         mll_class,
         likelihood=None,
         outcome_transform=None,
-        float_precision=64,
-        device="cpu",
         maximize=False,
     ):
         super().__init__(float_precision, device, maximize)
@@ -35,21 +36,6 @@ class GPSurrogate(SurrogateModel):
         self.mll_class = mll_class
         self.likelihood = likelihood
         self.outcome_transform = outcome_transform
-
-    def posterior(self, states, train=False):
-        # returns the posterior of the surrogate model for the given states
-        model = self.model
-
-        if not train:
-            model.eval()
-            model.likelihood.eval()
-            with torch.no_grad(), gpytorch.settings.fast_pred_var():
-                posterior = model.posterior(states)
-        else:
-            model.train()
-            model.likelihood.train()
-            posterior = model.posterior(states)
-        return posterior
 
     def fit(self, train_data):
         # fit the surrogate model
@@ -68,10 +54,22 @@ class GPSurrogate(SurrogateModel):
         with debug(state=True):
             self.mll = fit_gpytorch_mll(self.mll)
 
+    def get_predictions(self, states):
+        states_proxy = states.clone().to(self.device).to(self.float)
+        self.model.eval()
+        self.model.likelihood.eval()
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            posterior = self.model.posterior(states_proxy)
+        y_mean = posterior.mean
+        y_std = posterior.variance.sqrt()
+        y_mean = y_mean.squeeze(-1)
+        y_std = y_std.squeeze(-1)
+        return y_mean, y_std
+
 
 class SingleTaskGPRegressor(GPSurrogate):
     # defines the SingleTaskGP as Surrogate
-    def __init__(self, float_precision=64, device="cpu", maximize=False):
+    def __init__(self, float_precision, device, maximize=False):
         super().__init__(
             model_class=SingleTaskGP,
             mll_class=gpytorch.mlls.ExactMarginalLogLikelihood,
