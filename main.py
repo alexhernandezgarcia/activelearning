@@ -66,11 +66,11 @@ def main(config):
         # starts with a clean slate each iteration
         acquisition = hydra.utils.instantiate(
             config.acquisition,
+            surrogate.model,
             device=config.device,
             float_precision=config.float_precision,
             maximize=maximize,
         )
-        acquisition.fit(candidate_set)
 
         # Sampler (e.g., GFlowNet, or Random Sampler)
         # also starts with a clean slate; TODO: experiment with NOT training from scratch

@@ -18,7 +18,3 @@ class SurrogateModel(ABC):
     @abstractmethod
     def get_predictions(self, states):
         pass
-
-    def setup(self, env):
-        # TODO: what is this needed for? has to be present for gflownet
-        pass
