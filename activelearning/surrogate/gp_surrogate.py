@@ -1,31 +1,35 @@
 import torch
 import gpytorch
-from botorch.models.gp_regression_fidelity import (
-    SingleTaskGP,
-)
-from botorch.models.transforms.outcome import Standardize
+from botorch.models.gp_regression_fidelity import SingleTaskGP
+from botorch.models.gpytorch import GPyTorchModel
+from botorch.models.transforms.outcome import Standardize, OutcomeTransform
 from botorch.fit import fit_gpytorch_mll
 from botorch.settings import debug
 from botorch.models.model import Model
 
-from activelearning.surrogate.surrogate import SurrogateModel
+from activelearning.surrogate.surrogate import Surrogate
 from activelearning.utils.helper_functions import dataloader_to_data
+from typing import Optional, Union
+import torch
+from functools import partial
 
 
-class GPSurrogate(SurrogateModel):
+class GPSurrogate(Surrogate):
     # Gaussian Process Surrogate Model
 
     def __init__(
         self,
-        float_precision,
-        device,
-        model_class,
-        mll_class,
-        likelihood=None,
-        outcome_transform=None,
-        maximize=False,
-        **kwargs
-    ):
+        float_precision: Union[torch.dtype, int],
+        device: Union[str, torch.device],
+        model_class: partial[GPyTorchModel],
+        mll_class: partial[gpytorch.mlls.MarginalLogLikelihood],
+        likelihood: Optional[
+            partial[gpytorch.likelihoods.likelihood._Likelihood]
+        ] = None,
+        outcome_transform: Optional[OutcomeTransform] = None,
+        maximize: bool = False,
+        **kwargs: any
+    ) -> None:
         super().__init__(float_precision, device, maximize)
         # initializes the model components for GP Surrogate Models
         # e.g.:
@@ -39,7 +43,7 @@ class GPSurrogate(SurrogateModel):
         self.outcome_transform = outcome_transform
         self.kwargs = kwargs
 
-    def fit(self, train_data):
+    def fit(self, train_data: Union[torch.Tensor, torch.utils.data.DataLoader]) -> None:
         # fit the surrogate model
         train_x, train_y = dataloader_to_data(train_data)
         train_y = train_y.to(self.device).to(self.float)
@@ -74,7 +78,7 @@ class GPSurrogate(SurrogateModel):
         #     iterator.set_postfix(loss=loss.item())
         #     optimizer.step()
 
-    def get_predictions(self, states):
+    def get_predictions(self, states: torch.Tensor) -> torch.Tensor:
         states_proxy = states.clone().to(self.device).to(self.float)
         self.model.eval()
         self.model.likelihood.eval()

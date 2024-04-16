@@ -2,16 +2,23 @@ from abc import ABC, abstractmethod
 from gflownet.proxy.box.branin import Branin
 from gflownet.proxy.box.hartmann import Hartmann
 from gflownet.utils.common import set_float_precision
+from typing import Union
+import torch
 
 
 class Oracle(ABC):
-    def __init__(self, cost, device, float_precision):
+    def __init__(
+        self,
+        cost: float,
+        device: Union[str, torch.device],
+        float_precision: Union[int, torch.dtype],
+    ):
         self.cost = cost
         self.device = device
         self.float_precision = set_float_precision(float_precision)
 
     @abstractmethod
-    def __call__(self):
+    def __call__(self, states) -> torch.Tensor:
         pass
 
 

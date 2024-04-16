@@ -2,10 +2,19 @@ from abc import ABC, abstractmethod
 
 import torch
 from gflownet.utils.common import set_device, set_float_precision
+from activelearning.acquisition.acquisition import Acquisition
+from typing import Union
+import torch
 
 
 class Sampler(ABC):
-    def __init__(self, acquisition, device, float_precision, **kwargs):
+    def __init__(
+        self,
+        acquisition: Acquisition,
+        device: Union[str, torch.device],
+        float_precision: Union[int, torch.dtype],
+        **kwargs
+    ) -> None:
         self.acquisition = acquisition
         # Device
         self.device = set_device(device)
@@ -13,10 +22,14 @@ class Sampler(ABC):
         self.float_precision = set_float_precision(float_precision)
 
     @abstractmethod
-    def get_samples(self, n_samples, candidate_set):
+    def get_samples(
+        self,
+        n_samples: int,
+        candidate_set: Union[torch.utils.data.dataloader.DataLoader, torch.Tensor],
+    ) -> torch.Tensor:
         pass
 
-    def fit(self):
+    def fit(self) -> None:
         pass
 
 

@@ -1,16 +1,23 @@
 import torch
 from gflownet.utils.common import set_device, set_float_precision
+from typing import Union
+import torch
 
 
 class Selector:
     # Base Selector class just returns the first n samples from the candidate set
-    def __init__(self, device, float_precision, **kwargs):
+    def __init__(
+        self,
+        device: Union[str, torch.device],
+        float_precision: Union[int, torch.dtype],
+        **kwargs
+    ):
         # Device
         self.device = set_device(device)
         # Float precision
         self.float = set_float_precision(float_precision)
 
-    def __call__(self, n_samples, candidate_set):
+    def __call__(self, n_samples: int, candidate_set: torch.Tensor):
         return candidate_set[-n_samples:]
 
 

@@ -1,11 +1,18 @@
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import torch
 from gflownet.utils.common import set_float_precision
 from abc import ABC, abstractmethod
+from typing import Optional, Union
+import numpy as np
 
 
 class Data(Dataset):
-    def __init__(self, X_data, y_data=None, float=torch.float64):
+    def __init__(
+        self,
+        X_data: torch.Tensor,
+        y_data: Optional[torch.Tensor] = None,
+        float: Union[torch.dtype, int] = torch.float64,
+    ) -> None:
         self.float = float
         self.X_data = X_data
         self.y_data = None
@@ -14,7 +21,9 @@ class Data(Dataset):
 
         self.shape = X_data.shape
 
-    def __getitem__(self, index):
+    def __getitem__(
+        self, index: Union[int, slice, list, np.array]
+    ) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         x_set = self.X_data[index].to(self.float)
         y_set = None
         if self.y_data is not None:
@@ -45,7 +54,7 @@ class DatasetHandler(ABC):
     loads initial dataset. this contains the parameters (X), the target (y), and for multiple oracles, the oracle ID that created this datapoint.
     """
 
-    def __init__(self, float_precision=64):
+    def __init__(self, float_precision: int = 64):
         self.float = set_float_precision(float_precision)
 
     """
@@ -53,7 +62,7 @@ class DatasetHandler(ABC):
     """
 
     @abstractmethod
-    def get_dataloader(self):
+    def get_dataloader(self) -> tuple[DataLoader, Optional[DataLoader]]:
         pass
 
     """
@@ -61,7 +70,9 @@ class DatasetHandler(ABC):
     """
 
     @abstractmethod
-    def update_dataset(self):
+    def update_dataset(
+        self, X: torch.Tensor, y: torch.tensor
+    ) -> tuple[DataLoader, Optional[DataLoader]]:
         pass
 
     """
@@ -69,5 +80,5 @@ class DatasetHandler(ABC):
     """
 
     @abstractmethod
-    def get_candidate_set(self):
+    def get_candidate_set(self) -> tuple[Union[Data, DataLoader], Optional[any]]:
         pass
