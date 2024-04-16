@@ -12,7 +12,10 @@ class SingleTaskDKLModel(SingleTaskGP):
         self, train_x, train_y, feature_extractor, likelihood, outcome_transform
     ):
         super(SingleTaskDKLModel, self).__init__(
-            train_x, train_y, likelihood=likelihood
+            train_x,
+            train_y,
+            likelihood=likelihood,
+            outcome_transform=outcome_transform,
         )
         self.feature_extractor = feature_extractor
 
