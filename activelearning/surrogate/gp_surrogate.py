@@ -22,7 +22,7 @@ class GPSurrogate(Surrogate):
         float_precision: Union[torch.dtype, int],
         device: Union[str, torch.device],
         model_class: partial[GPyTorchModel],
-        mll_class: partial[gpytorch.mlls.MarginalLogLikelihood],
+        mll_class: Optional[partial[gpytorch.mlls.MarginalLogLikelihood]] = None,
         likelihood: Optional[
             partial[gpytorch.likelihoods.likelihood._Likelihood]
         ] = None,
@@ -38,6 +38,8 @@ class GPSurrogate(Surrogate):
         #   likelihood = gpytorch.likelihoods.gaussian_likelihood.GaussianLikelihood
         #   outcome_transform = botorch.models.transforms.outcome.Standardize(m=1)
         self.model_class = model_class
+        if mll_class is None:
+            mll_class = gpytorch.mlls.ExactMarginalLogLikelihood
         self.mll_class = mll_class
         self.likelihood = likelihood
         self.outcome_transform = outcome_transform
@@ -59,7 +61,9 @@ class GPSurrogate(Surrogate):
         self.mll = self.mll_class(self.model.likelihood, self.model)
         self.mll.to(train_x)
         with debug(state=True):
-            self.mll = fit_gpytorch_mll(self.mll)
+            self.mll = fit_gpytorch_mll(
+                self.mll
+            )  # for how many epochs does this function train? what optimizer does it use?
 
         ### alternative custom training: (see: https://docs.gpytorch.ai/en/stable/examples/01_Exact_GPs/Simple_GP_Regression.html)
         # optimizer = torch.optim.Adam(...get parameters with self.model.parameters(),
