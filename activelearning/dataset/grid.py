@@ -276,7 +276,7 @@ class BraninDatasetHandler(GridDatasetHandler):
         xi = np.arange(0, self.grid_size)
         yi = np.arange(0, self.grid_size)
         grid = np.array(np.meshgrid(xi, yi))
-        grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 2)
+        grid_flat = torch.tensor(grid.T, dtype=self.float).reshape(-1, 2)
         candidate_set = GridData(self.grid_size, grid_flat)[:]
         return candidate_set, xi / self.grid_size, yi / self.grid_size
 
