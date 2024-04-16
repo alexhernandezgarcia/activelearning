@@ -1,5 +1,5 @@
 from activelearning.dataset.dataset import DatasetHandler, Data
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils.rnn import pad_sequence
 import pandas as pd
 import torch
@@ -277,21 +277,62 @@ class BraninDatasetHandler(GridDatasetHandler):
         yi = np.arange(0, self.grid_size)
         grid = np.array(np.meshgrid(xi, yi))
         grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 2)
-        candidate_set, _ = GridData(self.grid_size, grid_flat)[:]
+        candidate_set = GridData(self.grid_size, grid_flat)[:]
         return candidate_set, xi / self.grid_size, yi / self.grid_size
+
+
+class CandidateGridData(Dataset):
+    # generates grid states based on the grid size, dimension of the grid, and 1-d index of the desired state
+    # the grid has grid_size**dim states
+
+    def __init__(self, grid_size, dim, step=1):
+        self.grid_size = grid_size
+        self.dim = dim
+        self.step = step
+        self.shape = (self.__len__(), self.dim)
+
+    def __len__(self):
+        return int(self.grid_size / self.step) ** self.dim
+
+    def get_state_from_index(self, index):
+        state = []
+        for dim_i in range(self.dim):
+            div = int(self.grid_size / self.step) ** (self.dim - dim_i - 1)
+            state.append(
+                (int(index / div) % int(self.grid_size / self.step)) * self.step
+            )
+        return torch.tensor(state)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self.get_state_from_index(key)
+
+        if isinstance(key, slice):
+            start, stop, step = key.indices(len(self))
+            states = [self.get_state_from_index(i) for i in range(start, stop, step)]
+            return torch.stack(states)
+
+        states = [self.get_state_from_index(i) for i in key]
+        return torch.stack(states)
 
 
 class HartmannDatasetHandler(GridDatasetHandler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_candidate_set(self, step=1):
+    def get_candidate_set(self, step=1, as_dataloader=True):
         import numpy as np
 
         # define candidate set
         xi = np.arange(0, self.grid_size, step)
         yi = np.arange(0, self.grid_size, step)
-        grid = np.array(np.meshgrid(*[xi, yi] * 3))
-        grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 6)
-        candidate_set, _ = GridData(self.grid_size, grid_flat)[:]
+        # grid = np.array(np.meshgrid(*[xi, yi] * 3))
+        # grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 6)
+        grid_flat = CandidateGridData(self.grid_size, 6, step=step)
+        candidate_set = GridData(self.grid_size, grid_flat)
+        if as_dataloader:
+            candidate_set = DataLoader(
+                candidate_set,
+                batch_size=self.batch_size,
+            )
         return candidate_set, xi / self.grid_size, yi / self.grid_size

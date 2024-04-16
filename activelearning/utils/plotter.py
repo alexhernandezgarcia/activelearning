@@ -14,7 +14,7 @@ class PlotHelper:
         yi=None,
         fig=None,
         ax=None,
-        output_index=-1,
+        output_index=None,
         size_x=None,
         size_y=None,
     ):
@@ -37,9 +37,9 @@ class PlotHelper:
             fig, ax = plt.subplots(nrows=1)
 
         # fn: function to plot
-        # output_index: -1 if the output of the function is a single value; if the outputs are tuples index of the output that should be plotted
+        # output_index: None if the output of the function is a single value; if the outputs are tuples index of the output that should be plotted
         res = fn(space)
-        if output_index >= 0:
+        if output_index is not None:
             res = res[output_index]
         res = res.to("cpu").detach()
         # ax.matshow(res)
@@ -69,13 +69,13 @@ class PlotHelper:
 
 
 class ProjectionPlotHelper(PlotHelper):
-    def __init__(self, space, logger=None):
+    def __init__(self, space, logger=None, verbose=False):
         self.space = space
         super().__init__(logger)
 
         from openTSNE import TSNE
 
-        self.proj_fn = TSNE(2, verbose=True)
+        self.proj_fn = TSNE(2, verbose=verbose, random_state=31415)
         self.embedding = self.proj_fn.fit(space)
 
     def plot_function(

@@ -47,13 +47,6 @@ def main(config):
         device=config.device,
         float_precision=config.float_precision,
     )
-    # Selector
-    selector = hydra.utils.instantiate(
-        config.selector,
-        oracle=oracle,
-        device=config.device,
-        float_precision=config.float_precision,
-    )
 
     best_scores = []
     for i in range(config.budget):
@@ -69,11 +62,21 @@ def main(config):
         )
         surrogate.fit(train_data)
 
+        # Acquisition
+        # starts with a clean slate each iteration
+        acquisition = hydra.utils.instantiate(
+            config.acquisition,
+            surrogate.model,
+            device=config.device,
+            float_precision=config.float_precision,
+            maximize=maximize,
+        )
+
         # Sampler (e.g., GFlowNet, or Random Sampler)
         # also starts with a clean slate; TODO: experiment with NOT training from scratch
         sampler = hydra.utils.instantiate(
             config.sampler,
-            surrogate=surrogate,
+            acquisition=acquisition,
             device=config.device,
             float_precision=config.float_precision,
             _recursive_=False,
@@ -81,6 +84,14 @@ def main(config):
         sampler.fit()  # only necessary for samplers that train a model
 
         samples = sampler.get_samples(n_samples * 3, candidate_set=candidate_set)
+
+        # Selector
+        selector = hydra.utils.instantiate(
+            config.selector,
+            score_fn=acquisition.get_acquisition_values,
+            device=config.device,
+            float_precision=config.float_precision,
+        )
         samples_selected = selector(n_samples=n_samples, candidate_set=samples)
 
         scores = oracle(samples_selected.clone())

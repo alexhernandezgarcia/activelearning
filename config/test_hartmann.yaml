@@ -5,28 +5,31 @@ defaults:
   - selector: score
   - sampler: random
   - surrogate: gp
-  - user: anonymous
+  - acquisition: botorch
+  - user: default
 
 
 dataset:
   grid_size: 10
-  train_path: ~/activelearning/my_package/storage/branin/data_100_train.csv
+  train_path: ~/activelearning/my_package/storage/hartmann/data_train.csv
+  batch_size: 16384
 
 sampler: 
   conf:
     agent:
-      random_action_prob: 0.0 # 0.01
+      random_action_prob: 0.001 # 0.01 #0.001
       optimizer:
         lr: 5e-4
         n_train_steps: 5000 # 10000
     logger:
       do:
         online: True
-      project_name: "test_gflownet"
-      run_name: "identity_lr5e-4"
+      project_name: "test_hartmann_gflownet"
+      run_name: "identity_lr5e-4 newdata"
     env:
       # Number of cells per dimension
       length: 10
+      n_dim: 6
       # Mapping coordinates
       cell_min: 0   # -1
       cell_max: 0.99 # 1

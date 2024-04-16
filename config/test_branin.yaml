@@ -3,9 +3,10 @@ defaults:
   - dataset: branin
   - oracle: branin
   - selector: score
-  - sampler: random
+  - sampler: gflownet
   - surrogate: gp
-  - user: anonymous
+  - acquisition: botorch
+  - user: default
 
 
 dataset:

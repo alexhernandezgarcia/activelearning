@@ -17,8 +17,8 @@ class Selector:
 class ScoreSelector(Selector):
     # Selector that takes a score function, which is used to select the top performing
     # samples (e.g., acquisition function)
-    def __init__(self, score_fn, maximize=True):
-        super().__init__()
+    def __init__(self, score_fn, device="cpu", float_precision=64, maximize=True):
+        super().__init__(device, float_precision)
         self.score_fn = score_fn
         self.maximize = maximize
 
