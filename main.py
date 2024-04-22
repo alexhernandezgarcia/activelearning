@@ -67,6 +67,7 @@ def main(config):
         acquisition = hydra.utils.instantiate(
             config.acquisition,
             surrogate.model,
+            dataset_handler=dataset_handler,
             device=config.device,
             float_precision=config.float_precision,
             maximize=maximize,

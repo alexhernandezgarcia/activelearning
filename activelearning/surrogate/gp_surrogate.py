@@ -28,6 +28,7 @@ class GPSurrogate(Surrogate):
         ] = None,
         outcome_transform: Optional[OutcomeTransform] = None,
         maximize: bool = False,
+        mll_args: dict = {},
         **kwargs: any
     ) -> None:
         super().__init__(float_precision, device, maximize)
@@ -44,6 +45,7 @@ class GPSurrogate(Surrogate):
         self.likelihood = likelihood
         self.outcome_transform = outcome_transform
         self.kwargs = kwargs
+        self.mll_args = mll_args
 
     def fit(self, train_data: Union[torch.Tensor, torch.utils.data.DataLoader]) -> None:
         # fit the surrogate model
@@ -58,7 +60,11 @@ class GPSurrogate(Surrogate):
             likelihood=self.likelihood,
             **self.kwargs,
         )
-        self.mll = self.mll_class(self.model.likelihood, self.model)
+        self.mll = self.mll_class(
+            self.model.likelihood,
+            self.model.model,
+            **self.mll_args,
+        )
         self.mll.to(train_x)
         with debug(state=True):
             self.mll = fit_gpytorch_mll(
@@ -66,6 +72,7 @@ class GPSurrogate(Surrogate):
             )  # for how many epochs does this function train? what optimizer does it use?
 
         ### alternative custom training: (see: https://docs.gpytorch.ai/en/stable/examples/01_Exact_GPs/Simple_GP_Regression.html)
+        ### tutorial from botorch: https://botorch.org/tutorials/fit_model_with_torch_optimizer
         # optimizer = torch.optim.Adam(...get parameters with self.model.parameters(),
         #     lr=0.01,
         # )
@@ -90,9 +97,9 @@ class GPSurrogate(Surrogate):
             posterior = self.model.posterior(states_proxy)
         y_mean = posterior.mean
         y_std = posterior.variance.sqrt()
-        y_mean = y_mean.squeeze(-1)
-        y_std = y_std.squeeze(-1)
-        return y_mean, y_std
+        y_mean = y_mean.squeeze(-1).unsqueeze(0)
+        y_std = y_std.squeeze(-1).unsqueeze(0)
+        return torch.concat([y_mean, y_std], dim=0)
 
 
 class SingleTaskGPRegressor(GPSurrogate):

@@ -1,0 +1,5 @@
+_target_: activelearning.acquisition.acquisition.BOTorchMaxValueEntropyAcquisition
+
+acq_fn_class: 
+  _target_: botorch.acquisition.max_value_entropy_search.qLowerBoundMaxValueEntropy
+  _partial_: true

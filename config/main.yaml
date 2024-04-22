@@ -5,7 +5,7 @@ defaults:
   - selector: selector
   - sampler: greedy
   - surrogate: gp
-  - acquisition: botorch
+  - acquisition: botorch_mve
   - user: default
   - logger: wandb
 

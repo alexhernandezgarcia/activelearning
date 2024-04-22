@@ -58,6 +58,22 @@ class DatasetHandler(ABC):
         self.float = set_float_precision(float_precision)
 
     """
+    return the maximum target value
+    """
+
+    @abstractmethod
+    def maxY(self) -> Union[float, torch.Tensor]:
+        pass
+
+    """
+    return the minimum target value
+    """
+
+    @abstractmethod
+    def minY(self) -> Union[float, torch.Tensor]:
+        pass
+
+    """
     return dataset loader. a dataset with all current entries is returned in form of a pytorch dataloader.
     """
 

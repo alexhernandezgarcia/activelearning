@@ -5,7 +5,7 @@ defaults:
   - selector: score
   - sampler: gflownet
   - surrogate: gp
-  - acquisition: botorch
+  - acquisition: botorch_mve
   - user: default
 
 

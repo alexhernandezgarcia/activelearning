@@ -1,10 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 
 class PlotHelper:
-    def __init__(self, logger=None):
+    def __init__(self, logger=None, device="cpu"):
         self.logger = logger
+        self.device = device
 
     def plot_function(
         self,
@@ -25,7 +27,7 @@ class PlotHelper:
             size_x = len(space) / size_y
         elif size_y is None:
             size_y = len(space) / size_x
-        assert size_x * size_y == len(space)
+        # assert size_x * size_y == len(space)
 
         if xi is None:
             xi = np.arange(0, size_x)
@@ -38,10 +40,19 @@ class PlotHelper:
 
         # fn: function to plot
         # output_index: None if the output of the function is a single value; if the outputs are tuples index of the output that should be plotted
-        res = fn(space)
+
+        if isinstance(space, torch.utils.data.dataloader.DataLoader):
+            res = torch.Tensor([])
+            for batch in space:
+                batch_res = fn(batch.to(self.device)).to("cpu").detach()
+                res = torch.concat([res, batch_res], dim=-1)
+
+        else:
+            res = fn(space).to("cpu").detach()
+
         if output_index is not None:
             res = res[output_index]
-        res = res.to("cpu").detach()
+        res = res
         # ax.matshow(res)
         # https://matplotlib.org/stable/gallery/images_contours_and_fields/irregulardatagrid.html#sphx-glr-gallery-images-contours-and-fields-irregulardatagrid-py
         cntr = ax.contourf(
