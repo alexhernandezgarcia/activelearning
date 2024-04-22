@@ -60,9 +60,10 @@ class GPSurrogate(Surrogate):
             likelihood=self.likelihood,
             **self.kwargs,
         )
+        gp_model = self.model.model if hasattr(self.model, "model") else self.model
         self.mll = self.mll_class(
             self.model.likelihood,
-            self.model.model,
+            gp_model,
             **self.mll_args,
         )
         self.mll.to(train_x)
