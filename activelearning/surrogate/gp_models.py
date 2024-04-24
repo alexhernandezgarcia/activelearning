@@ -1,4 +1,9 @@
 from botorch.models.gp_regression_fidelity import SingleTaskGP
+from botorch.models.utils.gpytorch_modules import (
+    get_gaussian_likelihood_with_gamma_prior,
+    get_matern_kernel_with_gamma_prior,
+    MIN_INFERRED_NOISE_LEVEL,
+)
 
 
 class SingleTaskDKLModel(SingleTaskGP):
@@ -11,11 +16,16 @@ class SingleTaskDKLModel(SingleTaskGP):
     def __init__(
         self, train_x, train_y, feature_extractor, likelihood, outcome_transform
     ):
+        covar_module = get_matern_kernel_with_gamma_prior(
+            ard_num_dims=feature_extractor.n_output,
+            batch_shape=None,
+        )
         super(SingleTaskDKLModel, self).__init__(
             train_x,
             train_y,
             likelihood=likelihood,
             outcome_transform=outcome_transform,
+            covar_module=covar_module,
         )
         self.feature_extractor = feature_extractor
 

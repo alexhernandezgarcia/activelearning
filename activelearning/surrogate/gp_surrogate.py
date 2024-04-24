@@ -1,7 +1,7 @@
 import torch
 import gpytorch
 from botorch.models.gp_regression_fidelity import SingleTaskGP
-from botorch.models.gpytorch import GPyTorchModel
+from gpytorch.models.gp import GP
 from botorch.models.transforms.outcome import Standardize, OutcomeTransform
 from botorch.fit import fit_gpytorch_mll
 from botorch.settings import debug
@@ -21,7 +21,7 @@ class GPSurrogate(Surrogate):
         self,
         float_precision: Union[torch.dtype, int],
         device: Union[str, torch.device],
-        model_class: partial[GPyTorchModel],
+        model_class: partial[GP],
         mll_class: Optional[partial[gpytorch.mlls.MarginalLogLikelihood]] = None,
         likelihood: Optional[
             partial[gpytorch.likelihoods.likelihood._Likelihood]
@@ -60,7 +60,10 @@ class GPSurrogate(Surrogate):
             likelihood=self.likelihood,
             **self.kwargs,
         )
-        gp_model = self.model.model if hasattr(self.model, "model") else self.model
+        gp_model = (
+            self.model.model if hasattr(self.model, "model") else self.model
+        )  # model.model needed for SingleTaskVariationalGP because it is a wrapper around the actual stochastic GP
+        # gp_model = self.model
         self.mll = self.mll_class(
             self.model.likelihood,
             gp_model,

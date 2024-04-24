@@ -11,8 +11,9 @@ ACTIVATION_KEY = {
 
 
 class Identity(nn.Module):
-    def __init__(self):
+    def __init__(self, n_output):
         super(Identity, self).__init__()
+        self.n_output = n_output
 
     def get_features(self, x, **kwargs):
         return x
@@ -39,3 +40,5 @@ class MLP(torch.nn.Sequential):
             "linear_out", torch.nn.Linear(n_hidden[-1], n_output, dtype=self.float)
         )
         self.add_module("layer_norm", nn.LayerNorm(n_output))
+
+        self.n_output = n_output

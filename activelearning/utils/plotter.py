@@ -48,11 +48,11 @@ class PlotHelper:
                 res = torch.concat([res, batch_res], dim=-1)
 
         else:
-            res = fn(space).to("cpu").detach()
+            res = fn(space)
 
         if output_index is not None:
             res = res[output_index]
-        res = res
+        res = res.to("cpu").detach()
         # ax.matshow(res)
         # https://matplotlib.org/stable/gallery/images_contours_and_fields/irregulardatagrid.html#sphx-glr-gallery-images-contours-and-fields-irregulardatagrid-py
         cntr = ax.contourf(
