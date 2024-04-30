@@ -15,6 +15,7 @@ from regressor.dkl import Tokenizer
 import numpy as np
 from utils.common import get_figure_plots
 from utils.eval_al_round import evaluate
+from utils.fidelity_distribution import sample_inverse_cost
 import pickle
 
 
@@ -273,7 +274,11 @@ def main(config):
             states, times = gflownet.sample_batch(
                 env, config.n_samples * 5, train=False
             )
-            fid_chosen_at_random = np.random.randint(0, N_FID, (len(states),))
+            # fid_chosen_at_random = np.random.randint(0, N_FID, (len(states),))
+            cost_lst = list(env.fidelity_costs.values())
+            fid_chosen_from_inverse_cost_distribution = sample_inverse_cost(N_FID, cost_lst, len(states))
+            fid_chosen_at_random = fid_chosen_from_inverse_cost_distribution
+            
             for idx, state in enumerate(states):
                 state[-1] = fid_chosen_at_random[idx]
             if isinstance(states[0], list):
