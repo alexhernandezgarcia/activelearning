@@ -10,7 +10,7 @@ plot:
     bs_n: 1000
     bs_seed: 17
     plot_baseline: False
-    shade_alpha: 0.10
+    shade_alpha: 0.1
     estimator: mean
     do_markers: False
     markers:
@@ -192,3 +192,4 @@ plot:
         other: 1
     legend:
         no_cols: False
+    diversity_palette: "cividis"

@@ -9,6 +9,7 @@ from pathlib import Path
 import biotite.sequence as biotite_seq
 import biotite.sequence.align as align
 import hydra
+import matplotlib as mpl
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -124,7 +125,11 @@ def process_methods(df, config):
     # Replace by alias
     for method in config.io.do_methods:
         if "alias" in config.io.data.methods[method]:
-            df.replace(to_replace=method, value=config.io.data.methods[method].alias, inplace=True)
+            df.replace(
+                to_replace=method,
+                value=config.io.data.methods[method].alias,
+                inplace=True,
+            )
     return df
 
 
@@ -179,8 +184,18 @@ def process_highlights(df, config):
 def process_diversity(df, config):
     min_diversity = df.diversity.min()
     max_diversity = df.diversity.max()
-    df.diversity = 1.0 / df.diversity
+    df.diversity = 1.0 - df.diversity
     return df
+
+
+def get_final_diversity(df):
+    diversity_dict = {}
+    for method in df.method.unique():
+        df_method = df.loc[(df.method == method)]
+        diversity_dict.update(
+            {method: df_method.loc[df_method["round"] == df_method["round"].max(), "diversity"].values[0]}
+        )
+    return diversity_dict
 
 
 def make_maximimization(df, config):
@@ -265,6 +280,7 @@ def plot(df, config):
             hue="method",
             style="k",
             estimator=config.plot.estimator,
+            err_style="band",
             markers=config.plot.do_markers,
             palette=palette,
         )
@@ -282,10 +298,13 @@ def plot(df, config):
             estimator=config.plot.estimator,
             markers=config.plot.do_markers,
             dashes=dashes,
+            err_style="band",
+            err_kws={"alpha": config.plot.shade_alpha},
             sizes=linewidths,
             palette=palette,
             zorder=9,
         )
+        plt.setp(ax.collections[1], alpha=0.2)
         leg_handles_def, leg_labels_def = ax.get_legend_handles_labels()
 
         # Scatter plot of diversity
@@ -293,31 +312,28 @@ def plot(df, config):
             df_means = df.groupby(
                 ["round", "method", "k"], group_keys=False, as_index=False
             ).mean()
-            gray_palette = mcolors.Colormap("Grays")
+            df_means_k = df_means.loc[df_means.k == k_plot]
+            # Colorbar
+            diversity_palette = mpl.colormaps[config.plot.diversity_palette].reversed()
+            vmin = df_means_k.diversity.min()
+            vmax = df_means_k.diversity.max()
+            div_norm = Normalize(vmin=vmin, vmax=vmax)
+            sm = plt.cm.ScalarMappable(cmap=diversity_palette, norm=div_norm)
+            cbar = fig.colorbar(sm, ax=ax, location="top")
+            cbar.ax.set_xlabel("Diversity")
+            # Plot
             sns.scatterplot(
                 ax=ax,
-                data=df_means.loc[df_means.k == k_plot],
+                data=df_means_k,
                 x="cost",
                 y=config.energy,
                 hue="diversity",
-                #             sizes=(10.0, 100.0),
-                palette="cividis",
-                #                 palette="gist_gray",
+                hue_norm=(vmin, vmax),
+                palette=diversity_palette,
                 zorder=10,
                 edgecolors="none",
                 s=100,
             )
-            # Colorbar
-            vmin = df_means.diversity.min()
-            vmax = df_means.diversity.max()
-            div_norm = Normalize(vmin=vmin, vmax=vmax)
-            #             div_cmap = 'gist_gray_r'
-            div_cmap = "cividis_r"
-            sm = plt.cm.ScalarMappable(cmap=div_cmap, norm=div_norm)
-            cbar = fig.colorbar(sm, ax=ax, location="top")
-            cbar.ax.set_xlabel("Diversity")
-#             cbar.ax.tick_params(axis="both", which="both", length=0)
-#             cbar.ax.set_xticklabels([])
 
     # Change spines
     # sns.despine(ax=ax, left=True, bottom=True)
@@ -394,6 +410,10 @@ def plot(df, config):
         if config.io.task in ("amp"):
             ax.get_legend().remove()
 
+    diversity_dict = get_final_diversity(df_means_k)
+    print("Diversity")
+    print(diversity_dict)
+
     return fig
 
 
@@ -423,7 +443,7 @@ def main(config):
     df = process_cost(df, config)
     df = process_highlights(df, config)
     df = make_maximimization(df, config)
-    #     df = process_diversity(df, config)
+    df = process_diversity(df, config)
     # Plot
     fig = plot(df, config)
     # Save figure
