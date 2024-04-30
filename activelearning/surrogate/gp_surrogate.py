@@ -1,6 +1,7 @@
 import torch
 import gpytorch
 from botorch.models.gp_regression_fidelity import SingleTaskGP
+from botorch.models.approximate_gp import SingleTaskVariationalGP
 from gpytorch.models.gp import GP
 from botorch.models.transforms.outcome import Standardize, OutcomeTransform
 from botorch.fit import fit_gpytorch_mll
@@ -9,9 +10,13 @@ from botorch.models.model import Model
 
 from activelearning.surrogate.surrogate import Surrogate
 from activelearning.utils.helper_functions import dataloader_to_data
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 import torch
 from functools import partial
+
+from gpytorch.constraints import GreaterThan
+from torch.optim import SGD
+import tqdm
 
 
 class GPSurrogate(Surrogate):
@@ -29,7 +34,7 @@ class GPSurrogate(Surrogate):
         outcome_transform: Optional[OutcomeTransform] = None,
         maximize: bool = False,
         mll_args: dict = {},
-        **kwargs: any
+        **kwargs: any,
     ) -> None:
         super().__init__(float_precision, device, maximize)
         # initializes the model components for GP Surrogate Models
@@ -47,7 +52,10 @@ class GPSurrogate(Surrogate):
         self.kwargs = kwargs
         self.mll_args = mll_args
 
-    def fit(self, train_data: Union[torch.Tensor, torch.utils.data.DataLoader]) -> None:
+    def fit(
+        self,
+        train_data: Union[torch.Tensor, torch.utils.data.DataLoader],
+    ) -> None:
         # fit the surrogate model
         train_x, train_y = dataloader_to_data(train_data)
         train_y = train_y.to(self.device).to(self.float)
@@ -64,6 +72,7 @@ class GPSurrogate(Surrogate):
             self.model.model if hasattr(self.model, "model") else self.model
         )  # model.model needed for SingleTaskVariationalGP because it is a wrapper around the actual stochastic GP
         # gp_model = self.model
+
         self.mll = self.mll_class(
             self.model.likelihood,
             gp_model,
@@ -117,4 +126,131 @@ class SingleTaskGPRegressor(GPSurrogate):
             float_precision=float_precision,
             device=device,
             maximize=maximize,
+        )
+
+
+class SVGPSurrogate(GPSurrogate):
+    def __init__(
+        self,
+        float_precision,
+        device,
+        model_class=SingleTaskVariationalGP,
+        mll_class=gpytorch.mlls.VariationalELBO,
+        likelihood=None,
+        outcome_transform=Standardize(m=1),
+        maximize=False,
+        mll_args: dict = {},
+        train_epochs: int = 150,
+        lr: float = 0.1,
+        **kwargs: any,
+    ) -> None:
+        super().__init__(
+            model_class=model_class,
+            mll_class=mll_class,
+            likelihood=likelihood,
+            outcome_transform=outcome_transform,
+            float_precision=float_precision,
+            device=device,
+            maximize=maximize,
+            mll_args=mll_args,
+            **kwargs,
+        )
+        self.train_epochs = train_epochs
+        self.lr = lr
+
+    def fit(
+        self,
+        train_data: torch.utils.data.DataLoader,
+    ) -> None:
+        # fit the surrogate model
+        batch_x, batch_y = next(iter(train_data))
+        batch_x = batch_x.to(self.device).to(self.float)
+        batch_y = batch_y * self.target_factor
+        batch_y = batch_y.to(self.device).to(self.float)
+
+        self.model = self.model_class(
+            batch_x,
+            batch_y.unsqueeze(-1),
+            outcome_transform=self.outcome_transform,
+            likelihood=self.likelihood,
+            **self.kwargs,
+        )
+        self.model.likelihood.noise_covar.register_constraint(
+            "raw_noise", GreaterThan(1e-5)
+        )
+
+        gp_model = (
+            self.model.model if hasattr(self.model, "model") else self.model
+        )  # model.model needed for SingleTaskVariationalGP because it is a wrapper around the actual stochastic GP
+        # gp_model = self.model
+
+        self.mll = self.mll_class(
+            self.model.likelihood,
+            gp_model,
+            **self.mll_args,
+        )
+        self.mll.to(batch_x)
+
+        optimizer = SGD([{"params": self.model.parameters()}], lr=self.lr)
+        self.model.train()
+
+        epochs_iter = tqdm.notebook.tqdm(range(self.train_epochs), desc="Epoch")
+        for epoch in epochs_iter:
+            for x_batch, y_batch in train_data:
+                x_batch = x_batch.to(self.device).to(self.float)
+                y_batch = y_batch.to(self.device).to(self.float)
+                optimizer.zero_grad()
+                output = self.model(x_batch)
+                loss = -self.mll(output, y_batch)
+                epochs_iter.set_postfix(loss=loss.item())
+                loss.backward()
+                optimizer.step()
+
+
+from activelearning.surrogate.gp_kernels import (
+    DeepKernelConstantMean,
+    DeepKernelWrapper,
+)
+from botorch.models.utils.gpytorch_modules import (
+    get_matern_kernel_with_gamma_prior,
+)
+from functools import partial
+
+
+class DeepKernelSVGPSurrogate(SVGPSurrogate):
+    def __init__(
+        self,
+        feature_extractor,
+        float_precision,
+        device,
+        maximize=False,
+        mll_args: dict = {},
+        train_epochs: int = 150,
+        lr: float = 0.1,
+        **kwargs: any,
+    ):
+
+        covar_module = DeepKernelWrapper(
+            get_matern_kernel_with_gamma_prior(
+                ard_num_dims=feature_extractor.n_output,
+                batch_shape=torch.Size(),
+            ),
+            feature_extractor,
+        )
+        mean_module = DeepKernelConstantMean(
+            feature_extractor, batch_shape=torch.Size()
+        )
+        super().__init__(
+            model_class=partial(
+                SingleTaskVariationalGP,
+                covar_module=covar_module,
+                mean_module=mean_module,
+            ),
+            float_precision=float_precision,
+            device=device,
+            maximize=maximize,
+            mll_args=mll_args,
+            train_epochs=train_epochs,
+            lr=lr,
+            **kwargs,
         )

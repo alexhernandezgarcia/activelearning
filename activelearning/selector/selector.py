@@ -1,6 +1,6 @@
 import torch
 from gflownet.utils.common import set_device, set_float_precision
-from typing import Union
+from typing import Union, Optional
 import torch
 
 
@@ -17,8 +17,15 @@ class Selector:
         # Float precision
         self.float = set_float_precision(float_precision)
 
-    def __call__(self, n_samples: int, candidate_set: torch.Tensor):
-        return candidate_set[-n_samples:]
+    def __call__(
+        self,
+        n_samples: int,
+        candidate_set: torch.Tensor,
+        index_set: Optional[torch.Tensor] = None,
+    ):
+        if index_set is None:
+            return candidate_set[-n_samples:], None
+        return candidate_set[-n_samples:], index_set[-n_samples:]
 
 
 class ScoreSelector(Selector):
@@ -29,8 +36,10 @@ class ScoreSelector(Selector):
         self.score_fn = score_fn
         self.maximize = maximize
 
-    def __call__(self, n_samples, candidate_set):
-        candidate_set = candidate_set.clone()
+    def __call__(self, n_samples, candidate_set, index_set=None):
+        candidate_set = candidate_set.clone().to(self.device).to(self.float)
         scores = self.score_fn(candidate_set)
         idx_pick = torch.argsort(scores, descending=self.maximize)[:n_samples]
-        return candidate_set[idx_pick]
+        if index_set is None:
+            return candidate_set[idx_pick], None
+        return candidate_set[idx_pick], index_set[idx_pick]

@@ -34,14 +34,14 @@ def main(config):
     n_samples = config.n_samples
     maximize = config.maximize
 
-    # Dataset
+    # --- Dataset
     dataset_handler = hydra.utils.instantiate(
         config.dataset,
         float_precision=config.float_precision,
     )
     candidate_set, xi, yi = dataset_handler.get_candidate_set()
 
-    # Oracle
+    # --- Oracle
     oracle = hydra.utils.instantiate(
         config.oracle,
         device=config.device,
@@ -52,7 +52,7 @@ def main(config):
     for i in range(config.budget):
         print("--iteration", i)
         train_data, test_data = dataset_handler.get_dataloader()
-        # Surrogate (e.g., Bayesian Optimization)
+        # --- Surrogate (e.g., Bayesian Optimization)
         # starts with a clean slate each iteration
         surrogate = hydra.utils.instantiate(
             config.surrogate,
@@ -62,7 +62,7 @@ def main(config):
         )
         surrogate.fit(train_data)
 
-        # Acquisition
+        # --- Acquisition
         # starts with a clean slate each iteration
         acquisition = hydra.utils.instantiate(
             config.acquisition,
@@ -73,7 +73,7 @@ def main(config):
             maximize=maximize,
         )
 
-        # Sampler (e.g., GFlowNet, or Random Sampler)
+        # --- Sampler (e.g., GFlowNet, or Random Sampler)
         # also starts with a clean slate; TODO: experiment with NOT training from scratch
         sampler = hydra.utils.instantiate(
             config.sampler,
@@ -84,16 +84,20 @@ def main(config):
         )
         sampler.fit()  # only necessary for samplers that train a model
 
-        samples = sampler.get_samples(n_samples * 3, candidate_set=candidate_set)
+        samples, sample_indices = sampler.get_samples(
+            n_samples * 3, candidate_set=candidate_set
+        )
 
-        # Selector
+        # --- Selector
         selector = hydra.utils.instantiate(
             config.selector,
             score_fn=acquisition.get_acquisition_values,
             device=config.device,
             float_precision=config.float_precision,
         )
-        samples_selected = selector(n_samples=n_samples, candidate_set=samples)
+        samples_selected, selected_idcs = selector(
+            n_samples=n_samples, candidate_set=samples
+        )
 
         scores = oracle(samples_selected.clone())
         dataset_handler.update_dataset(samples_selected.cpu(), scores.cpu())

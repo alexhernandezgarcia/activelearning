@@ -96,12 +96,12 @@ class GridDatasetHandler(DatasetHandler):
         test_path=None,
         float_precision=64,
     ):
-        super().__init__(float_precision=float_precision)
+        super().__init__(
+            float_precision=float_precision, batch_size=batch_size, shuffle=shuffle
+        )
 
         self.normalize_scores = normalize_scores
         self.train_fraction = train_fraction
-        self.batch_size = batch_size
-        self.shuffle = shuffle
         self.train_path = train_path
         self.test_path = test_path
         self.grid_size = grid_size

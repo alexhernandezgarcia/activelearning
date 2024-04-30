@@ -54,8 +54,15 @@ class DatasetHandler(ABC):
     loads initial dataset. this contains the parameters (X), the target (y), and for multiple oracles, the oracle ID that created this datapoint.
     """
 
-    def __init__(self, float_precision: int = 64):
+    def __init__(
+        self,
+        float_precision: int = 64,
+        batch_size=256,
+        shuffle=True,
+    ):
         self.float = set_float_precision(float_precision)
+        self.batch_size = batch_size
+        self.shuffle = shuffle
 
     """
     return the maximum target value
@@ -98,3 +105,11 @@ class DatasetHandler(ABC):
     @abstractmethod
     def get_candidate_set(self) -> tuple[Union[Data, DataLoader], Optional[any]]:
         pass
+
+    """
+    prepares a set of sample data instances
+    only needed if there is a missmatch between the data used for the surrogate and the data for the oracle
+    """
+
+    def prepare_dataset_for_oracle(self, samples, sample_idcs):
+        return samples
