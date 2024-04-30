@@ -19,16 +19,16 @@ from botorch.acquisition.cost_aware import InverseCostWeightedUtility
 
 from gpytorch.functions import inv_quad
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from regressor.regressor import DropoutRegressor as SurrogateDropoutRegressor
-from regressor.gp import SingleFidelitySingleTaskRegressor
+from mfgfn.regressor.regressor import DropoutRegressor as SurrogateDropoutRegressor
+from mfgfn.regressor.gp import SingleFidelitySingleTaskRegressor
 
 CLAMP_LB = 1.0e-8
 from botorch.models.utils import check_no_nans
 from .botorch_models import FidelityCostModel
 from abc import abstractmethod
 import matplotlib.pyplot as plt
-from regressor.dkl import DeepKernelRegressor
-from env.grid import Grid
+from mfgfn.regressor.dkl import DeepKernelRegressor
+from mfgfn.env.grid import Grid
 
 
 class SingleFidelityMES(Proxy):

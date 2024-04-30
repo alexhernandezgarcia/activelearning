@@ -1,4 +1,4 @@
 defaults:
   - base
-_target_: proxy.kg.GaussianProcessKnowledgeGradient
+_target_: mfgfn.proxy.kg.GaussianProcessKnowledgeGradient
 cost_type: user

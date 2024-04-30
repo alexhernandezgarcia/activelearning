@@ -1,4 +1,4 @@
-_target_: regressor.dkl.DeepKernelRegressor
+_target_: mfgfn.regressor.dkl.DeepKernelRegressor
 
 checkpoint: proxy
 optim: adam

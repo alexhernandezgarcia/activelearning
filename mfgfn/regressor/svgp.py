@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
-from .dkl import DeepKernelRegressor
+from mfgfn.regressor.dkl import DeepKernelRegressor
 from gflownet.utils.common import set_device, set_float_precision
 import copy
 import hydra
 import math
 from tqdm import tqdm
-from model.shared_elements import check_early_stopping
+from mfgfn.model.shared_elements import check_early_stopping
 import wandb
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt

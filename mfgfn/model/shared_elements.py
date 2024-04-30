@@ -5,8 +5,8 @@ import typing
 import torch
 from torch import nn as nn
 
-from .lm_elements import PositionalEncoding, FunctionHead, LengthHead, LengthTransform
-from .masked_layers import Apply, mResidualBlock
+from mfgfn.model.lm_elements import PositionalEncoding, FunctionHead, LengthHead, LengthTransform
+from mfgfn.model.masked_layers import Apply, mResidualBlock
 
 
 # def gelu(x):

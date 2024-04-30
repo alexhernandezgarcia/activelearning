@@ -9,7 +9,7 @@ from gpytorch.mlls import ExactMarginalLogLikelihood, VariationalELBO
 from gpytorch.utils.memoize import clear_cache_hook
 from gpytorch import likelihoods, kernels
 
-from model.metrics import quantile_calibration
+from mfgfn.model.metrics import quantile_calibration
 
 from gpytorch.variational import IndependentMultitaskVariationalStrategy
 from gpytorch.settings import cholesky_jitter

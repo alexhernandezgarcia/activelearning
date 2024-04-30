@@ -8,10 +8,10 @@ import torch
 import matplotlib.pyplot as plt
 import itertools
 import copy
-from .grid import Grid
+from mfgfn.env.grid import Grid
 import pandas as pd
 import time
-from proxy.mol_oracles.mol_oracle import MoleculeOracle
+from mfgfn.proxy.mol_oracles.mol_oracle import MoleculeOracle
 
 
 class MultiFidelityEnvWrapper(GFlowNetEnv):

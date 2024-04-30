@@ -11,7 +11,7 @@ from gflownet.utils.common import set_device, set_float_precision
 from torch.nn.utils.rnn import pad_sequence
 from torchtyping import TensorType
 from typing import List
-from utils.common import get_figure_plots
+from mfgfn.utils.common import get_figure_plots
 
 
 class Data(Dataset):

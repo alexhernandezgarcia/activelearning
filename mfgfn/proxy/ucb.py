@@ -6,8 +6,8 @@ from botorch.acquisition.monte_carlo import (
 from botorch.sampling import SobolQMCNormalSampler
 from .dropout_regressor import DropoutRegressor
 import numpy as np
-from regressor.dkl import DeepKernelRegressor
-from regressor.regressor import DropoutRegressor as SurrogateDropoutRegressor
+from mfgfn.regressor.dkl import DeepKernelRegressor
+from mfgfn.regressor.regressor import DropoutRegressor as SurrogateDropoutRegressor
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 

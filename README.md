@@ -39,24 +39,31 @@ used to evaluate them.
 
 ![Results on AMP, DNA and Molecules (IP)](https://github.com/nikita-0209/mf-al-gfn/blob/main/assets/figs/key_results.png)
 
-## Setup
+## Installation
 
-1. Install the GFlowNet codebase compatible with this implementation from [alexhernandezgarcia/gflownet](https://github.com/alexhernandezgarcia/gflownet/tree/mfgfn-v1.0).
-``` 
-python -m pip install --upgrade https://github.com/alexhernandezgarcia/gflownet/archive/cont_mf.zip 
++ This code **requires** `python 3.10` and `CUDA 11.7`.
++ Clone the repository.
++ If you are installing this in a compute cluster (for example, Mila's), you can load the required modules by running `source ./prereq_cluster_cpu.sh`.
++ Setup is currently only supported on Ubuntu. It should also work on OSX, but you will need to handle the package dependencies.
++ The recommended installation is as follows:
+
+```bash
+python3.10 -m venv ~/venvs/mfgfn  # Initalize your virtual env.
+source ~/envs/mfgfn/bin/activate  # Activate your environment.
+./prereq_python.sh  # Updates pip and forces the installation of potentially problematic libraries
+python -m pip install .[all]  # Install the remaining dependencies of this package.
 ```
-2.  Clone this repository and install other dependencies by running ```pip install -r requirements.txt``` where this repository is cloned.
-3. Set up the AMP oracles (optional, required only if you wish to run experiments with the anti-microbial peptide environment). Install the clamp-common-eval library from [MJ10/clamp-gen-data](https://github.com/MJ10/clamp-gen-data/tree/mfgfn-v1.0) by cloning the repo and then running the following where the repository is cloned: 
-```
-pip install -r requirements.txt && pip install -e .
-``` 
-4. Rename the log directory and data directory arguments (if necessary) in `config/user/anonymous.yaml` 
+
+Optionally, you may want to set up the AMP oracles (required only if you wish to run experiments with the anti-microbial peptide environment). Install the clamp-common-eval library from [MJ10/clamp-gen-data](https://github.com/MJ10/clamp-gen-data/tree/mfgfn-v1.0) by cloning the repo and then running the following where the repository is cloned: 
+
+Finally, consider renaming the log directory and data directory arguments (if necessary) in `config/user/anonymous.yaml` 
 
 ## Usage
+
 The project uses [Hydra](https://hydra.cc/) for configuration and [Weights and Biases](https://docs.wandb.ai/) for logging.
 For reproducing the results, configuration files with the default settings for experiments with the synthetic and benchmark tasks have been created in `config/`. Run
 ```
-python activelearning.py --config_name=<config-filename>
+python activelearning.py --config-name=<config-filename>
 ```
 
 ### Default Config Options

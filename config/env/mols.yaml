@@ -2,7 +2,7 @@ defaults:
   - base
 
 # _target_: gflownet.envs.amp.AMP
-_target_: env.mols.MolSelfies
+_target_: mfgfn.env.mols.MolSelfies
 
 id: mols
 # Minimum and maximum length for the sequences

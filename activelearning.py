@@ -8,15 +8,14 @@ from typing import List
 import hydra
 from omegaconf import OmegaConf
 import torch
-from env.mfenv import MultiFidelityEnvWrapper
-from utils.multifidelity_toy import make_dataset
+from mfgfn.env.mfenv import MultiFidelityEnvWrapper
 import matplotlib.pyplot as plt
-from regressor.dkl import Tokenizer
+from mfgfn.regressor.dkl import Tokenizer
 import numpy as np
-from utils.common import get_figure_plots
-from utils.eval_al_round import evaluate
+from mfgfn.utils.common import get_figure_plots
+from mfgfn.utils.eval_al_round import evaluate
 import pickle
-from proxy.mol_oracles.mol_oracle import MoleculeOracle
+from mfgfn.proxy.mol_oracles.mol_oracle import MoleculeOracle
 
 
 @hydra.main(config_path="./config", config_name="default")

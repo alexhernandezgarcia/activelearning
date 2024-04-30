@@ -1,5 +1,5 @@
 import torch.nn as nn
-from .mlp import ACTIVATION_KEY
+from mfgfn.model.mlp import ACTIVATION_KEY
 import torch
 import torch.nn.functional as F
 

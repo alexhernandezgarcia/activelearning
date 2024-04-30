@@ -2,7 +2,7 @@ import re, os, shutil, traceback, math
 import numpy as np
 import subprocess
 
-from proxy.mol_oracles.mol_to_coord import MolToCoord
+from mfgfn.proxy.mol_oracles.mol_to_coord import MolToCoord
 
 
 def hartree2ev(hartree):

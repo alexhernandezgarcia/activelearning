@@ -1,4 +1,4 @@
-_target_: proxy.mol_oracles.mol_oracle.MoleculeOracle
+_target_: mfgfn.proxy.mol_oracles.mol_oracle.MoleculeOracle
 task: ip
 oracle_config: 
   # log_dir: ${hydra.run.dir}

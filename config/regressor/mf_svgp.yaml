@@ -1,4 +1,4 @@
-_target_: regressor.svgp.SingleTaskMultiFidelitySVGP
+_target_: mfgfn.regressor.svgp.SingleTaskMultiFidelitySVGP
 
 checkpoint: proxy
 optim: adam

@@ -2,7 +2,7 @@ from gflownet.envs.aptamers import Aptamers as GflowNetAptamers
 import torch
 from torchtyping import TensorType
 from typing import List, Tuple
-from .base import GFlowNetEnv
+from mfgfn.env.base import GFlowNetEnv
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd

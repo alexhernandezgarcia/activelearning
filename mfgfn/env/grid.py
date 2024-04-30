@@ -2,12 +2,12 @@ from gflownet.envs.grid import Grid as GflowNetGrid
 import torch
 from torchtyping import TensorType
 from typing import List, Tuple
-from .base import GFlowNetEnv
+from mfgfn.env.base import GFlowNetEnv
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pandas as pd
-from proxy.branin import MultiFidelityBranin, SingleFidelityBranin
+from mfgfn.proxy.branin import MultiFidelityBranin, SingleFidelityBranin
 import random
 
 

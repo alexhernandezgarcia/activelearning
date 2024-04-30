@@ -2,7 +2,7 @@ import torch
 import gpytorch
 import hydra
 from gflownet.utils.common import set_device, set_float_precision
-from utils.dkl_utils import batched_call
+from mfgfn.utils.dkl_utils import batched_call
 from gpytorch.settings import cholesky_jitter
 from gpytorch.lazy import ConstantDiagLazyTensor
 import math
@@ -10,18 +10,18 @@ from torch import LongTensor
 from gpytorch import lazify
 import numpy as np
 from torch.nn import functional as F
-from model.mlm import sample_mask
+from mfgfn.model.mlm import sample_mask
 from gpytorch.variational import IndependentMultitaskVariationalStrategy
 from gpytorch.mlls import ExactMarginalLogLikelihood, VariationalELBO
-from model.mlm import mlm_eval_epoch as mlm_eval_epoch_lm
-from model.shared_elements import check_early_stopping
+from mfgfn.model.mlm import mlm_eval_epoch as mlm_eval_epoch_lm
+from mfgfn.model.shared_elements import check_early_stopping
 import copy
 from torch.nn.utils.rnn import pad_sequence
 import os
 from tqdm import tqdm
 import wandb
-from model.regressive import RegressiveMLP
-from model.mlp import MLP
+from mfgfn.model.regressive import RegressiveMLP
+from mfgfn.model.mlp import MLP
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 from torch.optim.lr_scheduler import MultiStepLR

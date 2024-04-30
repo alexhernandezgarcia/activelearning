@@ -2,7 +2,7 @@ import os, random, shutil, string, traceback
 from rdkit import Chem
 import selfies as sf
 
-from proxy.mol_oracles.geom_opt import get_rdkit_ff_coordinates, run_gfn_xtb
+from mfgfn.proxy.mol_oracles.geom_opt import get_rdkit_ff_coordinates, run_gfn_xtb
 
 
 class MolToCoord:
