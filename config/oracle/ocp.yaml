@@ -1,0 +1,4 @@
+_target_: activelearning.oracle.ocp.OCPOracle
+
+checkpoint_path: ${dataset.checkpoint_path}
+cost: 100

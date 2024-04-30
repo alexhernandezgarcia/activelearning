@@ -16,7 +16,7 @@ from functools import partial
 
 from gpytorch.constraints import GreaterThan
 from torch.optim import SGD
-import tqdm
+from tqdm import tqdm
 
 
 class GPSurrogate(Surrogate):
@@ -194,7 +194,7 @@ class SVGPSurrogate(GPSurrogate):
         optimizer = SGD([{"params": self.model.parameters()}], lr=self.lr)
         self.model.train()
 
-        epochs_iter = tqdm.notebook.tqdm(range(self.train_epochs), desc="Epoch")
+        epochs_iter = tqdm(range(self.train_epochs), desc="Epoch")
         for epoch in epochs_iter:
             for x_batch, y_batch in train_data:
                 x_batch = x_batch.to(self.device).to(self.float)
@@ -229,7 +229,6 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
         lr: float = 0.1,
         **kwargs: any,
     ):
-
         covar_module = DeepKernelWrapper(
             get_matern_kernel_with_gamma_prior(
                 ard_num_dims=feature_extractor.n_output,

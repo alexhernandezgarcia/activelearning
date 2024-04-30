@@ -39,7 +39,7 @@ def main(config):
         config.dataset,
         float_precision=config.float_precision,
     )
-    candidate_set, xi, yi = dataset_handler.get_candidate_set()
+    candidate_set, _, _ = dataset_handler.get_candidate_set()
 
     # --- Oracle
     oracle = hydra.utils.instantiate(
@@ -85,7 +85,7 @@ def main(config):
         sampler.fit()  # only necessary for samplers that train a model
 
         samples, sample_indices = sampler.get_samples(
-            n_samples * 3, candidate_set=candidate_set
+            n_samples * 5, candidate_set=candidate_set
         )
 
         # --- Selector
@@ -96,10 +96,13 @@ def main(config):
             float_precision=config.float_precision,
         )
         samples_selected, selected_idcs = selector(
-            n_samples=n_samples, candidate_set=samples
+            n_samples=n_samples, candidate_set=samples, index_set=sample_indices
         )
 
-        scores = oracle(samples_selected.clone())
+        oracle_samples = dataset_handler.prepare_dataset_for_oracle(
+            samples_selected, selected_idcs
+        )
+        scores = oracle(oracle_samples)
         dataset_handler.update_dataset(samples_selected.cpu(), scores.cpu())
 
         print("Proposed Candidates:", samples_selected)

@@ -14,6 +14,7 @@ from activelearning.dataset.dataset import DatasetHandler
 from typing import Union
 import torch
 from botorch.models.gpytorch import GPyTorchModel
+from functools import partial
 
 
 class Acquisition(ABC):
@@ -84,7 +85,10 @@ class BOTorchMonteCarloAcquisition(Acquisition):
         super().__init__(
             surrogate_model, dataset_handler, device, float_precision, maximize
         )
-        if issubclass(acq_fn_class, CachedCholeskyMCSamplerMixin):
+        base_class = (
+            acq_fn_class.func if isinstance(acq_fn_class, partial) else acq_fn_class
+        )
+        if issubclass(base_class, CachedCholeskyMCSamplerMixin):
             train_X, _ = dataset_handler.train_data[:]
             self.acq_fn = acq_fn_class(surrogate_model, train_X)
         else:

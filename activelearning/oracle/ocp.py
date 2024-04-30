@@ -5,9 +5,7 @@ from activelearning.utils.ocp import load_ocp_trainer
 
 
 class OCPOracle(Oracle):
-    def __init__(
-        self, checkpoint_path, cost=1, fidelity=1, device="cpu", float_precision=64
-    ):
+    def __init__(self, checkpoint_path, cost=1, device="cpu", float_precision=64):
         Oracle.__init__(
             self,
             cost,
