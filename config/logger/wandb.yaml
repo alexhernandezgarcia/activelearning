@@ -1,9 +1,10 @@
 defaults:
   - base
 
-_target_: activelearning.utils.logger_activelearning.ActiveLearningLogger
+_target_: activelearning.utils.logger.WandBLogger
 
-project_name: "activelearning"
-tags: 
-    - dummy1
-    - dummy2
+project_name: activelearning
+run_name: null
+# tags: 
+#     - dummy1
+#     - dummy2

@@ -9,21 +9,28 @@ defaults:
   - user: default
   - logger: wandb
 
+logger:
+  project_name: test_ocp_training
+  run_name: null
+
 dataset:
   checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
+  # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
+  train_fraction: 0.1
 
 surrogate:
   mll_args: 
-    num_data: 40593 # number of training data instances
+    # number of training data instances
+    num_data: 40593 
   feature_extractor:
     n_input: 352
     n_output: 7
-  train_epochs: 1
+  train_epochs: 10
   lr: 0.1
 
 device: cuda
-float_precision: 32
-budget: 1 # so far, we don't have an update strategy for ocp (i.e., we need to get data from some oracle and add it to the existing database)
+float_precision: 64
+budget: 10
 n_samples: 20
 seed: 31415
 maximize: False
@@ -38,4 +45,5 @@ hydra:
   job:
     # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
     # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
-    chdir: False #True # need to have active learning directory for ocp config loading
+    # need to have active learning directory for ocp config loading
+    chdir: False #True
