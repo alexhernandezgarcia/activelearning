@@ -22,6 +22,20 @@ The above steps install PyTorch for CPU only. In order to install a cuda-enabled
 python -m pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cu118
 ```
 
+Use the following commands to install FAENet:
+
+```bash
+pip install git+https://github.com/RolnickLab/ocp.git@uncertainty-depfaenet
+```
+
+For development you can use a local installation of the package:
+
+```bash
+git clone https://github.com/RolnickLab/ocp.git
+cd ocp
+pip install -e .
+```
+
 ## Citation
 If you use this code for your own work, please consider citing our published work:
 ```

@@ -1,11 +1,11 @@
 defaults:
-  # - _self_
+  # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: hartmann
   - oracle: hartmann
   - selector: score
   - sampler: random
   - surrogate: gp
-  - acquisition: botorch
+  - acquisition: botorch_mve
   - user: default
 
 

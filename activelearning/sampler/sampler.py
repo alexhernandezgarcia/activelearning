@@ -2,10 +2,19 @@ from abc import ABC, abstractmethod
 
 import torch
 from gflownet.utils.common import set_device, set_float_precision
+from activelearning.acquisition.acquisition import Acquisition
+from typing import Union, Tuple
+import torch
 
 
 class Sampler(ABC):
-    def __init__(self, acquisition, device, float_precision, **kwargs):
+    def __init__(
+        self,
+        acquisition: Acquisition,
+        device: Union[str, torch.device],
+        float_precision: Union[int, torch.dtype],
+        **kwargs
+    ) -> None:
         self.acquisition = acquisition
         # Device
         self.device = set_device(device)
@@ -13,10 +22,14 @@ class Sampler(ABC):
         self.float_precision = set_float_precision(float_precision)
 
     @abstractmethod
-    def get_samples(self, n_samples, candidate_set):
+    def get_samples(
+        self,
+        n_samples: int,
+        candidate_set: Union[torch.utils.data.dataloader.DataLoader, torch.Tensor],
+    ) -> Tuple[str, torch.Tensor]:
         pass
 
-    def fit(self):
+    def fit(self) -> None:
         pass
 
 
@@ -36,14 +49,14 @@ class GreedySampler(Sampler):
                 )
             acq_values = torch.cat(acq_values)
             idx_pick = torch.argsort(acq_values)[-n_samples:]
-            return candidate_set.dataset[idx_pick]
+            return (candidate_set.dataset[idx_pick], idx_pick)
         else:
             candidate_set = candidate_set.clone().to(self.device)
             acq_values = self.acquisition.get_acquisition_values(
                 candidate_set.to(self.device).to(self.float_precision)
             ).detach()
             idx_pick = torch.argsort(acq_values)[-n_samples:]
-            return candidate_set[idx_pick]
+            return (candidate_set[idx_pick], idx_pick)
 
 
 class RandomSampler(Sampler):
@@ -51,14 +64,19 @@ class RandomSampler(Sampler):
     The RandomSampler returns n random samples from a set of candidates.
     """
 
-    def __init__(self, acquisition=None, **kwargs):
-        super().__init__(acquisition, "cpu", 64)
+    def __init__(self, acquisition=None, device="cpu", float_precision=32, **kwargs):
+        super().__init__(acquisition, device, float_precision)
 
     def get_samples(self, n_samples, candidate_set):
-        idx_pick = torch.randint(0, len(candidate_set), size=(n_samples,))
         if isinstance(candidate_set, torch.utils.data.dataloader.DataLoader):
-            return candidate_set.dataset[idx_pick]
-        return candidate_set[idx_pick]
+            idx_pick = torch.randint(
+                0, len(candidate_set.dataset), size=(n_samples,), device=self.device
+            )
+            return (candidate_set.dataset[idx_pick], idx_pick)
+        idx_pick = torch.randint(
+            0, len(candidate_set), size=(n_samples,), device=self.device
+        )
+        return (candidate_set[idx_pick], idx_pick)
 
 
 class GFlowNetSampler(Sampler):
@@ -129,4 +147,4 @@ class GFlowNetSampler(Sampler):
 
     def get_samples(self, n_samples, candidate_set=None):
         batch, times = self.sampler.sample_batch(n_forward=n_samples, train=False)
-        return batch.get_terminating_states(proxy=True)
+        return (batch.get_terminating_states(proxy=True), None)

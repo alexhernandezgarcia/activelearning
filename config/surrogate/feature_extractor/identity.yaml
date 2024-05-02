@@ -1,0 +1,2 @@
+_target_: activelearning.surrogate.feature_extractor.mlp.Identity
+n_output: 2

@@ -1,1 +1,1 @@
-_target_: activelearning.filter.filter.ScoreFilter
+_target_: activelearning.selector.selector.ScoreSelector

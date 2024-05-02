@@ -1,0 +1,15 @@
+_target_: activelearning.surrogate.gp_surrogate.GPSurrogate
+
+model_class: 
+    _target_: activelearning.surrogate.gp_models.SingleTaskDKLModel
+    _partial_: true
+mll_class: 
+    _target_: gpytorch.mlls.ExactMarginalLogLikelihood
+    _partial_: true
+likelihood: 
+    _target_: gpytorch.likelihoods.GaussianLikelihood
+outcome_transform: 
+    _target_: botorch.models.transforms.outcome.Standardize
+    m: 1
+feature_extractor: mlp
+    

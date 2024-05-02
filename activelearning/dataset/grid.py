@@ -96,12 +96,12 @@ class GridDatasetHandler(DatasetHandler):
         test_path=None,
         float_precision=64,
     ):
-        super().__init__(float_precision=float_precision)
+        super().__init__(
+            float_precision=float_precision, batch_size=batch_size, shuffle=shuffle
+        )
 
         self.normalize_scores = normalize_scores
         self.train_fraction = train_fraction
-        self.batch_size = batch_size
-        self.shuffle = shuffle
         self.train_path = train_path
         self.test_path = test_path
         self.grid_size = grid_size
@@ -129,7 +129,20 @@ class GridDatasetHandler(DatasetHandler):
         Converts a state (a list of positions) into a human-readable string
         representing a state.
         """
-        return str(state).replace("(", "[").replace(")", "]").replace(",", "")
+        return (
+            str(state.to(torch.int16).tolist())
+            .replace("(", "[")
+            .replace(")", "]")
+            .replace(",", "")
+        )
+
+    def maxY(self):
+        _, train_y = self.train_data[:]
+        return train_y.max()
+
+    def minY(self):
+        _, train_y = self.train_data[:]
+        return train_y.min()
 
     def initialise_dataset(self):
         """
@@ -237,7 +250,7 @@ class GridDatasetHandler(DatasetHandler):
 
         return train_loader, test_loader
 
-    def update_dataset(self, X, y):
+    def update_dataset(self, X, y, save_path=None):
         """
         Update the dataset with new data after AL iteration
         Saves the updated dataset if save_data=True
@@ -255,12 +268,16 @@ class GridDatasetHandler(DatasetHandler):
         # TODO: also save a fraction to test_data?
         self.train_data.append(states, energies)
 
-        # TODO: save the new datapoints in a new csv file
-        readable_states = [self.state2readable(state) for state in states]
-        readable_dataset = {
-            "samples": readable_states,
-            "energies": energies.tolist(),
-        }
+        if save_path is not None:
+            readable_states = [self.state2readable(state) for state in states]
+            readable_dataset = {
+                "samples": readable_states,
+                "energies": energies.tolist(),
+            }
+            import pandas as pd
+
+            df = pd.DataFrame(readable_dataset)
+            df.to_csv(save_path)
 
         return self.get_dataloader()
 
@@ -269,15 +286,20 @@ class BraninDatasetHandler(GridDatasetHandler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def get_candidate_set(self):
+    def get_candidate_set(self, as_dataloader=False):
         import numpy as np
 
         # define candidate set
         xi = np.arange(0, self.grid_size)
         yi = np.arange(0, self.grid_size)
         grid = np.array(np.meshgrid(xi, yi))
-        grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 2)
+        grid_flat = torch.tensor(grid.T, dtype=self.float).reshape(-1, 2)
         candidate_set = GridData(self.grid_size, grid_flat)[:]
+        if as_dataloader:
+            candidate_set = DataLoader(
+                candidate_set,
+                batch_size=self.batch_size,
+            )
         return candidate_set, xi / self.grid_size, yi / self.grid_size
 
 
