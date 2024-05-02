@@ -17,6 +17,7 @@ from functools import partial
 from gpytorch.constraints import GreaterThan
 from torch.optim import SGD
 from tqdm import tqdm
+from activelearning.utils.logger import Logger
 
 
 class GPSurrogate(Surrogate):
@@ -53,8 +54,7 @@ class GPSurrogate(Surrogate):
         self.mll_args = mll_args
 
     def fit(
-        self,
-        train_data: Union[torch.Tensor, torch.utils.data.DataLoader],
+        self, train_data: Union[torch.Tensor, torch.utils.data.DataLoader], step=None
     ) -> None:
         # fit the surrogate model
         train_x, train_y = dataloader_to_data(train_data)
@@ -142,6 +142,7 @@ class SVGPSurrogate(GPSurrogate):
         mll_args: dict = {},
         train_epochs: int = 150,
         lr: float = 0.1,
+        logger: Logger = None,
         **kwargs: any,
     ) -> None:
         super().__init__(
@@ -157,11 +158,9 @@ class SVGPSurrogate(GPSurrogate):
         )
         self.train_epochs = train_epochs
         self.lr = lr
+        self.logger = logger
 
-    def fit(
-        self,
-        train_data: torch.utils.data.DataLoader,
-    ) -> None:
+    def fit(self, train_data: torch.utils.data.DataLoader, step: int = None) -> None:
         # fit the surrogate model
         batch_x, batch_y = next(iter(train_data))
         batch_x = batch_x.to(self.device).to(self.float)
@@ -196,6 +195,7 @@ class SVGPSurrogate(GPSurrogate):
 
         epochs_iter = tqdm(range(self.train_epochs), desc="Epoch")
         for epoch in epochs_iter:
+            batch_losses = []
             for x_batch, y_batch in train_data:
                 x_batch = x_batch.to(self.device).to(self.float)
                 y_batch = y_batch.to(self.device).to(self.float)
@@ -203,8 +203,14 @@ class SVGPSurrogate(GPSurrogate):
                 output = self.model(x_batch)
                 loss = -self.mll(output, y_batch)
                 epochs_iter.set_postfix(loss=loss.item())
+                batch_losses.append(loss.item())
                 loss.backward()
                 optimizer.step()
+
+            if self.logger is not None:
+                self.logger.log_metric(
+                    sum(batch_losses) / len(batch_losses), "avg_loss", step
+                )
 
 
 from activelearning.surrogate.gp_kernels import (
@@ -227,6 +233,7 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
         mll_args: dict = {},
         train_epochs: int = 150,
         lr: float = 0.1,
+        logger: Logger = None,
         **kwargs: any,
     ):
         covar_module = DeepKernelWrapper(
@@ -251,5 +258,6 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
             mll_args=mll_args,
             train_epochs=train_epochs,
             lr=lr,
+            logger=logger,
             **kwargs,
         )

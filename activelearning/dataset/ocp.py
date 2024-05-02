@@ -2,23 +2,35 @@ from activelearning.dataset.dataset import DatasetHandler, Data
 from torch.utils.data import DataLoader
 import torch
 from activelearning.utils.ocp import load_ocp_trainer
+from torch_geometric.data import Batch
 
 
 class OCPData(Data):
     def __init__(
         self,
         data,
+        subset_idcs: torch.Tensor = None,
         float=torch.float64,
         return_target=True,
     ):
+        """
+        subset_idcs: specifies which subset of the data will be used (useful, if we want to have subsets for training and testing)
+        """
+        if subset_idcs is None:
+            subset_idcs = torch.arange(len(data))
+
+        self.subset_idcs = subset_idcs
         self.float = float
         self.data = data
+        self.appended_data = []
         self.return_target = return_target
 
-        self.shape = torch.Size([len(data), data[0].deup_q.shape[-1]])
+    @property
+    def shape(self):
+        return torch.Size([self.__len__(), self.data[0].deup_q.shape[-1]])
 
     def get_item_from_index(self, index):
-        datapoint = self.data[index]
+        datapoint = self.get_raw_item(index)
         hidden_states = datapoint.deup_q
         # state_idcs = datapoint.batch
         # since we only use one datapoint, we can just sum over this one, without the use of scatter
@@ -52,15 +64,29 @@ class OCPData(Data):
         else:
             return x
 
+    def get_raw_item(self, index):
+        if index < len(self.subset_idcs):
+            # map to actual index of original dataset
+            index = self.subset_idcs[index]
+            return self.data[index]
+        else:
+            # if the index is higher than the subset_idcs length, the datapoint is located in the appended_data list
+            index = index - len(self.subset_idcs)
+            return self.appended_data[index]
+
     def __len__(self):
-        return len(self.data)
+        return len(self.subset_idcs) + len(self.appended_data)
 
     def preprocess(self, X, y):
         return X, y
 
-    def append(self, X, y):
-        # TODO: do we need this for ocp?
-        pass
+    def append(self, X: Batch, y: torch.Tensor):
+        data_to_append = X.to_data_list()
+        for i in range(len(data_to_append)):
+            # overwriting the target value with the oracle value
+            data_to_append[i].y_relaxed = y[i]
+
+        self.appended_data.extend(data_to_append)
 
 
 class OCPDatasetHandler(DatasetHandler):
@@ -68,6 +94,7 @@ class OCPDatasetHandler(DatasetHandler):
     def __init__(
         self,
         checkpoint_path,
+        train_fraction=1.0,
         batch_size=256,
         shuffle=True,
         float_precision: int = 64,
@@ -76,13 +103,33 @@ class OCPDatasetHandler(DatasetHandler):
             float_precision=float_precision, batch_size=batch_size, shuffle=shuffle
         )
 
+        self.train_fraction = train_fraction
         self.trainer = load_ocp_trainer(checkpoint_path)
 
-        self.train_data = OCPData(self.trainer.datasets["deup-train-val_id"])
-        self.test_data = OCPData(self.trainer.datasets["deup-val_ood_cat-val_ood_ads"])
-        self.candidate_data = OCPData(
-            self.trainer.datasets["deup-val_ood_cat-val_ood_ads"], return_target=False
-        )
+        ocp_train_data = self.trainer.datasets["deup-train-val_id"]
+        # if we specified a train_fraction, use a random subsample from the train data
+        # as test data and don't use the test set at all
+        if self.train_fraction < 1.0:
+            index = torch.randperm(len(ocp_train_data))
+            train_idcs = index[: int(len(ocp_train_data) * self.train_fraction)]
+            test_idcs = index[int(len(ocp_train_data) * self.train_fraction) :]
+            self.train_data = OCPData(ocp_train_data, train_idcs)
+            self.test_data = OCPData(ocp_train_data, test_idcs)
+            self.candidate_data = OCPData(
+                ocp_train_data,
+                # using all data instances as candidates in this case (uncomment, if we only want to use test set)
+                # test_idcs,
+                return_target=False,
+            )
+        else:
+            self.train_data = OCPData(self.trainer.datasets["deup-train-val_id"])
+            self.test_data = OCPData(
+                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"]
+            )
+            self.candidate_data = OCPData(
+                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
+                return_target=False,
+            )
 
     def maxY(self):
         return 10  # -> TODO: what are the actual bounds?
@@ -126,8 +173,17 @@ class OCPDatasetHandler(DatasetHandler):
 
         return train_loader, test_loader
 
-    def update_dataset(self, X, y):
-        print("for ocp there is no update strategy yet")
+    def update_dataset(self, X: Batch, y: torch.Tensor, save_path=None):
+
+        # append to in-memory dataset
+        self.train_data.append(X, y)
+
+        if save_path is not None:
+            # see https://github.com/RolnickLab/ocp/blob/main/ocpmodels/datasets/deup_dataset_creator.py#L371
+            # for saving lmdb datasets
+            print("TODO: save dataset to file system")
+
+        return self.get_dataloader()
 
     def get_candidate_set(self):
         test_loader = DataLoader(
@@ -145,7 +201,8 @@ class OCPDatasetHandler(DatasetHandler):
 
         samples = []
         for idx in sample_idcs:
-            samples.append(self.trainer.datasets["deup-val_ood_cat-val_ood_ads"][idx])
+            samples.append(self.candidate_data.get_raw_item(idx))
+            # samples.append(self.trainer.datasets["deup-val_ood_cat-val_ood_ads"][idx])
 
         oracle_loader = DataLoader(
             samples,

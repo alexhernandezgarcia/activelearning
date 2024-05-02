@@ -9,6 +9,7 @@ import sys
 import hydra
 
 from activelearning.utils.common import set_seeds
+import torch
 
 
 @hydra.main(config_path="./config", config_name="main", version_base="1.1")
@@ -27,7 +28,8 @@ def main(config):
     set_seeds(config.seed)
 
     # Logger
-    logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
+    # logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
+    logger = hydra.utils.instantiate(config.logger)
 
     # Active learning variables
     # TODO: rethink where this configuration should go
@@ -59,8 +61,9 @@ def main(config):
             device=config.device,
             float_precision=config.float_precision,
             maximize=maximize,
+            logger=logger,
         )
-        surrogate.fit(train_data)
+        surrogate.fit(train_data, step=i)
 
         # --- Acquisition
         # starts with a clean slate each iteration
@@ -102,13 +105,19 @@ def main(config):
         oracle_samples = dataset_handler.prepare_dataset_for_oracle(
             samples_selected, selected_idcs
         )
-        scores = oracle(oracle_samples)
-        dataset_handler.update_dataset(samples_selected.cpu(), scores.cpu())
+        scores = oracle(oracle_samples).cpu()
+        dataset_handler.update_dataset(oracle_samples.cpu(), scores)
 
         print("Proposed Candidates:", samples_selected)
         print("Oracle Scores:", scores)
         print("Best Score:", scores.min().cpu())
         best_scores.append(scores.min().cpu())
+        if logger is not None:
+            logger.log_metric(scores.min(), "best_score", step=i)
+            logger.log_metric(torch.median(scores), "median_score", step=i)
+            logger.log_metric(torch.mean(scores), "mean_score", step=i)
+            logger.log_metric(scores.max(), "worst_score", step=i)
+            logger.log_metric(scores, "scores", step=i)
 
     print("Best Scores:", best_scores)
 

@@ -20,7 +20,7 @@ class Surrogate(ABC):
         self.device = device
 
     @abstractmethod
-    def fit(self, train_data: Union[torch.Tensor, DataLoader]) -> None:
+    def fit(self, train_data: Union[torch.Tensor, DataLoader], step=None) -> None:
         # fit the surrogate model: self.model
         pass
 

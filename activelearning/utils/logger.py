@@ -28,6 +28,17 @@ class Logger(ABC):
         pass
 
 
+class ConsoleLogger(Logger):
+    def log_figure(self, figure, key):
+        figure.show()
+
+    def log_metric(self, value, key):
+        print(key + ": " + value)
+
+    def end(self):
+        return
+
+
 # class LocalLogger(Logger):
 #     def __init__(self, project_name, run_name=None, log_dir=""):
 #         super().__init__(project_name, run_name)
@@ -45,12 +56,12 @@ class WandBLogger(Logger):
         self.wandb = wandb
         self.run = self.wandb.init(project=project_name, name=run_name)
 
-    def log_figure(self, figure, key):
+    def log_figure(self, figure, key, step=None):
         figimg = self.wandb.Image(figure)
-        self.run.log({key: figimg})
+        self.run.log({key: figimg}, step=step)
 
-    def log_metric(self, value, key):
-        self.run.log({key: value})
+    def log_metric(self, value, key, step=None):
+        self.run.log({key: value}, step=step)
 
     def end(self):
         self.run.finish()

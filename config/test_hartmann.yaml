@@ -6,7 +6,7 @@ defaults:
   - sampler: random
   - surrogate: gp
   - acquisition: botorch_mve
-  - user: default
+  - logger: base
 
 
 dataset:
