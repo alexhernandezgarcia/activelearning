@@ -10,6 +10,7 @@ class OCPData(Data):
     def __init__(
         self,
         data,
+        target_normalizer,
         subset_idcs: torch.Tensor = None,
         float=torch.float64,
         return_target=True,
@@ -26,14 +27,7 @@ class OCPData(Data):
         self.appended_data = []
         self.return_target = return_target
 
-        # https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/trainers/base_trainer.py#L361
-        # https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/configs/models/tasks/is2re.yaml#L25
-        # https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/modules/normalizer.py#L11
-        self.target_normalizer = Normalizer(
-            mean=-1.525913953781128,
-            std=2.279365062713623,
-            device="cpu",
-        )
+        self.target_normalizer = target_normalizer
 
     @property
     def shape(self):
@@ -107,6 +101,9 @@ class OCPDatasetHandler(DatasetHandler):
         self,
         checkpoint_path,
         data_path,
+        normalize_labels=True,
+        target_mean=-1.525913953781128,
+        target_std=2.279365062713623,
         train_fraction=1.0,
         batch_size=256,
         shuffle=True,
@@ -127,7 +124,12 @@ class OCPDatasetHandler(DatasetHandler):
                 "deup_dataset.create": False,
                 "dataset": {
                     "default_val": "deup-val_ood_cat-val_ood_ads",
-                    "deup-train-val_id": {"src": data_path},
+                    "deup-train-val_id": {
+                        "src": data_path,
+                        "normalize_labels": normalize_labels,
+                        "target_mean": target_mean,
+                        "target_std": target_std,
+                    },
                     "deup-val_ood_cat-val_ood_ads": {"src": data_path},
                 },
             },
@@ -142,22 +144,36 @@ class OCPDatasetHandler(DatasetHandler):
             index = torch.randperm(len(ocp_train_data))
             train_idcs = index[: int(len(ocp_train_data) * self.train_fraction)]
             test_idcs = index[int(len(ocp_train_data) * self.train_fraction) :]
-            self.train_data = OCPData(ocp_train_data, train_idcs)
-            self.test_data = OCPData(ocp_train_data, test_idcs)
+            self.train_data = OCPData(
+                ocp_train_data,
+                train_idcs,
+                target_normalizer=self.trainer.normalizers["target"],
+            )
+            self.test_data = OCPData(
+                ocp_train_data,
+                test_idcs,
+                target_normalizer=self.trainer.normalizers["target"],
+            )
             self.candidate_data = OCPData(
                 ocp_train_data,
                 # using all data instances as candidates in this case (uncomment, if we only want to use test set)
                 # test_idcs,
                 return_target=False,
+                target_normalizer=self.trainer.normalizers["target"],
             )
         else:
-            self.train_data = OCPData(self.trainer.datasets["deup-train-val_id"])
+            self.train_data = OCPData(
+                self.trainer.datasets["deup-train-val_id"],
+                target_normalizer=self.trainer.normalizers["target"],
+            )
             self.test_data = OCPData(
-                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"]
+                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
+                target_normalizer=self.trainer.normalizers["target"],
             )
             self.candidate_data = OCPData(
                 self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
                 return_target=False,
+                target_normalizer=self.trainer.normalizers["target"],
             )
 
     def maxY(self):

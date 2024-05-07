@@ -53,8 +53,8 @@ def main(config):
     best_scores = []
     all_scores = {}
     for i in range(config.budget):
-        print("--iteration", i)
         train_data, test_data = dataset_handler.get_dataloader()
+        print("--iteration", i, "- training on", len(train_data.dataset), "instances")
         # --- Surrogate (e.g., Bayesian Optimization)
         # starts with a clean slate each iteration
         surrogate = hydra.utils.instantiate(

@@ -1,6 +1,13 @@
 _target_: activelearning.dataset.ocp.OCPDatasetHandler
 checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
 data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
+normalize_labels: True
+# Target Normalization:
+# https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/trainers/base_trainer.py#L361
+# https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/configs/models/tasks/is2re.yaml#L25
+# https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/modules/normalizer.py#L11
+target_mean: -1.525913953781128
+target_std: 2.279365062713623
 batch_size: 256
 train_fraction: 1.0
 shuffle: True
