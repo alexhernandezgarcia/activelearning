@@ -146,18 +146,18 @@ class OCPDatasetHandler(DatasetHandler):
             test_idcs = index[int(len(ocp_train_data) * self.train_fraction) :]
             self.train_data = OCPData(
                 ocp_train_data,
-                train_idcs,
+                subset_idcs=train_idcs,
                 target_normalizer=self.trainer.normalizers["target"],
             )
             self.test_data = OCPData(
                 ocp_train_data,
-                test_idcs,
+                subset_idcs=test_idcs,
                 target_normalizer=self.trainer.normalizers["target"],
             )
             self.candidate_data = OCPData(
                 ocp_train_data,
                 # using all data instances as candidates in this case (uncomment, if we only want to use test set)
-                # test_idcs,
+                # subset_idcs=test_idcs,
                 return_target=False,
                 target_normalizer=self.trainer.normalizers["target"],
             )
