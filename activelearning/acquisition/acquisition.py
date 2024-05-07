@@ -90,7 +90,9 @@ class BOTorchMonteCarloAcquisition(Acquisition):
         )
         if issubclass(base_class, CachedCholeskyMCSamplerMixin):
             train_X, _ = dataset_handler.train_data[:]
-            self.acq_fn = acq_fn_class(surrogate_model, train_X)
+            self.acq_fn = acq_fn_class(
+                surrogate_model, train_X.to(self.device).to(self.float)
+            )
         else:
             best_f = dataset_handler.maxY() if self.maximize else dataset_handler.minY()
             self.acq_fn = acq_fn_class(surrogate_model, best_f * self.target_factor)

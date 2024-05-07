@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 
 class Logger(ABC):
@@ -24,6 +25,14 @@ class Logger(ABC):
         pass
 
     @abstractmethod
+    def log_time_series(self, time_series: list, key):
+        pass
+
+    @abstractmethod
+    def log_step(self, step):
+        pass
+
+    @abstractmethod
     def end(self):
         pass
 
@@ -34,6 +43,12 @@ class ConsoleLogger(Logger):
 
     def log_metric(self, value, key):
         print(key + ": " + value)
+
+    def log_time_series(self, time_series: list, key):
+        self.log_metric(time_series, key)
+
+    def log_step(self, step):
+        print("current step:", step)
 
     def end(self):
         return
@@ -49,19 +64,45 @@ class ConsoleLogger(Logger):
 
 class WandBLogger(Logger):
     # TODO: this screws with other wandb runs...
-    def __init__(self, project_name, run_name=None):
+    def __init__(self, project_name, run_name=None, conf=None):
         super().__init__(project_name, run_name)
         import wandb
 
         self.wandb = wandb
-        self.run = self.wandb.init(project=project_name, name=run_name)
+
+        from omegaconf import OmegaConf
+
+        wandb_config = None
+        if conf is not None:
+            wandb_config = OmegaConf.to_container(
+                conf, resolve=True, throw_on_missing=True
+            )
+        self.run = self.wandb.init(
+            project=project_name, name=run_name, config=wandb_config
+        )
+        self.log_dict = {}
 
     def log_figure(self, figure, key, step=None):
-        figimg = self.wandb.Image(figure)
-        self.run.log({key: figimg}, step=step)
+        # figimg = self.wandb.Image(figure)
+        self.log_dict[key] = figure  # figimg
+        # self.run.log({key: figimg})
 
-    def log_metric(self, value, key, step=None):
-        self.run.log({key: value}, step=step)
+    def log_metric(self, value, key):
+        self.log_dict[key] = value
+        # self.run.log({key: value}, step=step)
+
+    def log_time_series(self, time_series: list, key):
+        plt.plot(time_series)
+        plt.ylabel("value")
+        plt.xlabel("timestep")
+        self.log_dict[key] = plt
+        # data = [[x, i] for i, x in enumerate(time_series)]
+        # table = self.wandb.Table(data=data, columns=[key, "time_step"])
+        # self.log_dict[key] = self.wandb.plot.line(table, key, "time_step", title=key)
+
+    def log_step(self, step):
+        self.run.log(self.log_dict, step)
+        self.log_dict = {}
 
     def end(self):
         self.run.finish()

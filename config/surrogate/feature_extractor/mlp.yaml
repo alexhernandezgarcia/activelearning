@@ -2,3 +2,4 @@ _target_: activelearning.surrogate.feature_extractor.mlp.MLP
 n_input: 2
 n_hidden: [1000,500,50]
 n_output: 2
+float_precision: ${float_precision}

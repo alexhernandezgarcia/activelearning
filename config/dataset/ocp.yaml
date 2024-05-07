@@ -1,5 +1,6 @@
 _target_: activelearning.dataset.ocp.OCPDatasetHandler
 checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
+data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
 batch_size: 256
 train_fraction: 1.0
 shuffle: True

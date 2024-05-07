@@ -1,8 +1,9 @@
 from activelearning.dataset.dataset import DatasetHandler, Data
 from torch.utils.data import DataLoader
 import torch
-from activelearning.utils.ocp import load_ocp_trainer
 from torch_geometric.data import Batch
+from ocpmodels.modules.normalizer import Normalizer
+from ocpmodels.common.utils import make_trainer_from_dir
 
 
 class OCPData(Data):
@@ -24,6 +25,15 @@ class OCPData(Data):
         self.data = data
         self.appended_data = []
         self.return_target = return_target
+
+        # https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/trainers/base_trainer.py#L361
+        # https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/configs/models/tasks/is2re.yaml#L25
+        # https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/modules/normalizer.py#L11
+        self.target_normalizer = Normalizer(
+            mean=-1.525913953781128,
+            std=2.279365062713623,
+            device="cpu",
+        )
 
     @property
     def shape(self):
@@ -78,10 +88,12 @@ class OCPData(Data):
         return len(self.subset_idcs) + len(self.appended_data)
 
     def preprocess(self, X, y):
-        return X, y
+        return X, self.target_normalizer.norm(y)
 
     def append(self, X: Batch, y: torch.Tensor):
+        y = self.target_normalizer.denorm(y)
         data_to_append = X.to_data_list()
+        # TODO: we should overwrite the target value with the oracle value, but the oracle value is off
         for i in range(len(data_to_append)):
             # overwriting the target value with the oracle value
             data_to_append[i].y_relaxed = y[i]
@@ -94,6 +106,7 @@ class OCPDatasetHandler(DatasetHandler):
     def __init__(
         self,
         checkpoint_path,
+        data_path,
         train_fraction=1.0,
         batch_size=256,
         shuffle=True,
@@ -104,7 +117,23 @@ class OCPDatasetHandler(DatasetHandler):
         )
 
         self.train_fraction = train_fraction
-        self.trainer = load_ocp_trainer(checkpoint_path)
+        self.trainer = make_trainer_from_dir(
+            checkpoint_path,
+            mode="continue",
+            overrides={
+                "is_debug": True,
+                "silent": True,
+                "cp_data_to_tmpdir": False,
+                "deup_dataset.create": False,
+                "dataset": {
+                    "default_val": "deup-val_ood_cat-val_ood_ads",
+                    "deup-train-val_id": {"src": data_path},
+                    "deup-val_ood_cat-val_ood_ads": {"src": data_path},
+                },
+            },
+            skip_imports=["qm7x", "gemnet", "spherenet", "painn", "comenet"],
+            silent=True,
+        )
 
         ocp_train_data = self.trainer.datasets["deup-train-val_id"]
         # if we specified a train_fraction, use a random subsample from the train data
@@ -132,7 +161,8 @@ class OCPDatasetHandler(DatasetHandler):
             )
 
     def maxY(self):
-        return 10  # -> TODO: what are the actual bounds?
+        # return 10  # -> TODO: what are the actual bounds?
+        return 5  # when target is standard normalized
         # ... this takes too long
         # train_loader, _ = self.get_dataloader()
         # max_y = -torch.inf
@@ -143,7 +173,8 @@ class OCPDatasetHandler(DatasetHandler):
         # return max_y
 
     def minY(self):
-        return -10  # -> TODO: what are the actual bounds?
+        # return -10  # -> TODO: what are the actual bounds?
+        return 5  # when target is standard normalized
         # ... this takes too long
         # train_loader, _ = self.get_dataloader()
         # min_y = torch.inf

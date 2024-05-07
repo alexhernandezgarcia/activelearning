@@ -29,7 +29,7 @@ def main(config):
 
     # Logger
     # logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
-    logger = hydra.utils.instantiate(config.logger)
+    logger = hydra.utils.instantiate(config.logger, conf=config, _recursive_=False)
 
     # Active learning variables
     # TODO: rethink where this configuration should go
@@ -51,6 +51,7 @@ def main(config):
     )
 
     best_scores = []
+    all_scores = {}
     for i in range(config.budget):
         print("--iteration", i)
         train_data, test_data = dataset_handler.get_dataloader()
@@ -63,7 +64,7 @@ def main(config):
             maximize=maximize,
             logger=logger,
         )
-        surrogate.fit(train_data, step=i)
+        surrogate.fit(train_data)
 
         # --- Acquisition
         # starts with a clean slate each iteration
@@ -112,13 +113,22 @@ def main(config):
         print("Oracle Scores:", scores)
         print("Best Score:", scores.min().cpu())
         best_scores.append(scores.min().cpu())
+        all_scores[i] = scores.tolist()
         if logger is not None:
-            logger.log_metric(scores.min(), "best_score", step=i)
-            logger.log_metric(torch.median(scores), "median_score", step=i)
-            logger.log_metric(torch.mean(scores), "mean_score", step=i)
-            logger.log_metric(scores.max(), "worst_score", step=i)
-            logger.log_metric(scores, "scores", step=i)
+            logger.log_metric(scores.min(), "best_score")
+            logger.log_metric(torch.median(scores), "median_score")
+            logger.log_metric(torch.mean(scores), "mean_score")
+            logger.log_metric(scores.max(), "worst_score")
+            logger.log_metric(scores, "scores")
 
+            logger.log_step(i)
+
+    if logger is not None:
+        import matplotlib.pyplot as plt
+
+        plt.boxplot(all_scores.values(), labels=all_scores.keys())
+        plt.ylim(top=50, bottom=-50)
+        logger.log_figure(plt, "all_scores")
     print("Best Scores:", best_scores)
 
 
