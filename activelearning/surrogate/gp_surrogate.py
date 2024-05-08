@@ -15,7 +15,7 @@ import torch
 from functools import partial
 
 from gpytorch.constraints import GreaterThan
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from tqdm import tqdm
 from activelearning.utils.logger import Logger
 
@@ -53,9 +53,7 @@ class GPSurrogate(Surrogate):
         self.kwargs = kwargs
         self.mll_args = mll_args
 
-    def fit(
-        self, train_data: Union[torch.Tensor, torch.utils.data.DataLoader], step=None
-    ) -> None:
+    def fit(self, train_data: Union[torch.Tensor, torch.utils.data.DataLoader]) -> None:
         # fit the surrogate model
         train_x, train_y = dataloader_to_data(train_data)
         train_y = train_y.to(self.device).to(self.float)
@@ -160,7 +158,7 @@ class SVGPSurrogate(GPSurrogate):
         self.lr = lr
         self.logger = logger
 
-    def fit(self, train_data: torch.utils.data.DataLoader, step: int = None) -> None:
+    def fit(self, train_data: torch.utils.data.DataLoader) -> None:
         # fit the surrogate model
         batch_x, batch_y = next(iter(train_data))
         batch_x = batch_x.to(self.device).to(self.float)
@@ -190,10 +188,11 @@ class SVGPSurrogate(GPSurrogate):
         )
         self.mll.to(batch_x)
 
-        optimizer = SGD([{"params": self.model.parameters()}], lr=self.lr)
+        optimizer = Adam([{"params": self.model.parameters()}], lr=self.lr)
         self.model.train()
 
         epochs_iter = tqdm(range(self.train_epochs), desc="Epoch")
+        avg_losses = []
         for epoch in epochs_iter:
             batch_losses = []
             for x_batch, y_batch in train_data:
@@ -207,10 +206,10 @@ class SVGPSurrogate(GPSurrogate):
                 loss.backward()
                 optimizer.step()
 
-            if self.logger is not None:
-                self.logger.log_metric(
-                    sum(batch_losses) / len(batch_losses), "avg_loss", step
-                )
+            avg_losses.append(sum(batch_losses) / len(batch_losses))
+
+        if self.logger is not None:
+            self.logger.log_time_series(avg_losses, "avg_loss_surrogate")
 
 
 from activelearning.surrogate.gp_kernels import (

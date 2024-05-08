@@ -19,12 +19,12 @@ default:
   adsorbates: all   # {"*O", "*OH", "*OH2", "*H"}
   adsorbates_ref_dir: /network/scratch/s/schmidtv/ocp/datasets/ocp/per_ads
   dataset:
-    # default_val: val_id
-    default_val: deup-val_ood_cat-val_ood_ads,
-    deup-train-val_id: 
-      src: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
-    deup-val_ood_cat-val_ood_ads: 
-      src: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
+    default_val: val_id
+    # default_val: deup-val_ood_cat-val_ood_ads,
+    # deup-train-val_id: 
+    #   src: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
+    # deup-val_ood_cat-val_ood_ads: 
+    #   src: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
     train:
       src: /network/scratch/s/schmidtv/ocp/datasets/ocp/is2re/all/train/
       normalize_labels: True

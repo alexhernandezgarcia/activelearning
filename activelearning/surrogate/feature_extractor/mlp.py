@@ -30,17 +30,20 @@ class MLP(torch.nn.Sequential):
             "linear1", torch.nn.Linear(n_input, n_hidden[0], dtype=self.float)
         )
         self.add_module("relu1", torch.nn.ReLU())
-        self.add_module("norm1", torch.nn.LayerNorm(n_hidden[0]))
+        self.add_module("norm1", torch.nn.LayerNorm(n_hidden[0], dtype=self.float))
         for i in range(len(n_hidden) - 1):
             self.add_module(
                 "linear%i" % (i + 2),
                 torch.nn.Linear(n_hidden[i], n_hidden[i + 1], dtype=self.float),
             )
             self.add_module("relu%i" % (i + 2), torch.nn.ReLU())
-            self.add_module("norm%i" % (i + 2), torch.nn.LayerNorm(n_hidden[i + 1]))
+            self.add_module(
+                "norm%i" % (i + 2),
+                torch.nn.LayerNorm(n_hidden[i + 1], dtype=self.float),
+            )
         self.add_module(
             "linear_out", torch.nn.Linear(n_hidden[-1], n_output, dtype=self.float)
         )
-        self.add_module("norm_out", nn.LayerNorm(n_output))
+        self.add_module("norm_out", nn.LayerNorm(n_output, dtype=self.float))
 
         self.n_output = n_output

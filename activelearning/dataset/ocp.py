@@ -1,14 +1,16 @@
 from activelearning.dataset.dataset import DatasetHandler, Data
 from torch.utils.data import DataLoader
 import torch
-from activelearning.utils.ocp import load_ocp_trainer
 from torch_geometric.data import Batch
+from ocpmodels.modules.normalizer import Normalizer
+from ocpmodels.common.utils import make_trainer_from_dir
 
 
 class OCPData(Data):
     def __init__(
         self,
         data,
+        target_normalizer,
         subset_idcs: torch.Tensor = None,
         float=torch.float64,
         return_target=True,
@@ -24,6 +26,8 @@ class OCPData(Data):
         self.data = data
         self.appended_data = []
         self.return_target = return_target
+
+        self.target_normalizer = target_normalizer
 
     @property
     def shape(self):
@@ -78,10 +82,12 @@ class OCPData(Data):
         return len(self.subset_idcs) + len(self.appended_data)
 
     def preprocess(self, X, y):
-        return X, y
+        return X, self.target_normalizer.norm(y)
 
     def append(self, X: Batch, y: torch.Tensor):
+        y = self.target_normalizer.denorm(y)
         data_to_append = X.to_data_list()
+        # TODO: we should overwrite the target value with the oracle value, but the oracle value is off
         for i in range(len(data_to_append)):
             # overwriting the target value with the oracle value
             data_to_append[i].y_relaxed = y[i]
@@ -94,6 +100,10 @@ class OCPDatasetHandler(DatasetHandler):
     def __init__(
         self,
         checkpoint_path,
+        data_path,
+        normalize_labels=True,
+        target_mean=-1.525913953781128,
+        target_std=2.279365062713623,
         train_fraction=1.0,
         batch_size=256,
         shuffle=True,
@@ -104,7 +114,28 @@ class OCPDatasetHandler(DatasetHandler):
         )
 
         self.train_fraction = train_fraction
-        self.trainer = load_ocp_trainer(checkpoint_path)
+        self.trainer = make_trainer_from_dir(
+            checkpoint_path,
+            mode="continue",
+            overrides={
+                "is_debug": True,
+                "silent": True,
+                "cp_data_to_tmpdir": False,
+                "deup_dataset.create": False,
+                "dataset": {
+                    "default_val": "deup-val_ood_cat-val_ood_ads",
+                    "deup-train-val_id": {
+                        "src": data_path,
+                        "normalize_labels": normalize_labels,
+                        "target_mean": target_mean,
+                        "target_std": target_std,
+                    },
+                    "deup-val_ood_cat-val_ood_ads": {"src": data_path},
+                },
+            },
+            skip_imports=["qm7x", "gemnet", "spherenet", "painn", "comenet"],
+            silent=True,
+        )
 
         ocp_train_data = self.trainer.datasets["deup-train-val_id"]
         # if we specified a train_fraction, use a random subsample from the train data
@@ -113,26 +144,41 @@ class OCPDatasetHandler(DatasetHandler):
             index = torch.randperm(len(ocp_train_data))
             train_idcs = index[: int(len(ocp_train_data) * self.train_fraction)]
             test_idcs = index[int(len(ocp_train_data) * self.train_fraction) :]
-            self.train_data = OCPData(ocp_train_data, train_idcs)
-            self.test_data = OCPData(ocp_train_data, test_idcs)
+            self.train_data = OCPData(
+                ocp_train_data,
+                subset_idcs=train_idcs,
+                target_normalizer=self.trainer.normalizers["target"],
+            )
+            self.test_data = OCPData(
+                ocp_train_data,
+                subset_idcs=test_idcs,
+                target_normalizer=self.trainer.normalizers["target"],
+            )
             self.candidate_data = OCPData(
                 ocp_train_data,
                 # using all data instances as candidates in this case (uncomment, if we only want to use test set)
-                # test_idcs,
+                # subset_idcs=test_idcs,
                 return_target=False,
+                target_normalizer=self.trainer.normalizers["target"],
             )
         else:
-            self.train_data = OCPData(self.trainer.datasets["deup-train-val_id"])
+            self.train_data = OCPData(
+                self.trainer.datasets["deup-train-val_id"],
+                target_normalizer=self.trainer.normalizers["target"],
+            )
             self.test_data = OCPData(
-                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"]
+                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
+                target_normalizer=self.trainer.normalizers["target"],
             )
             self.candidate_data = OCPData(
                 self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
                 return_target=False,
+                target_normalizer=self.trainer.normalizers["target"],
             )
 
     def maxY(self):
-        return 10  # -> TODO: what are the actual bounds?
+        # return 10  # -> TODO: what are the actual bounds?
+        return 5  # when target is standard normalized
         # ... this takes too long
         # train_loader, _ = self.get_dataloader()
         # max_y = -torch.inf
@@ -143,7 +189,8 @@ class OCPDatasetHandler(DatasetHandler):
         # return max_y
 
     def minY(self):
-        return -10  # -> TODO: what are the actual bounds?
+        # return -10  # -> TODO: what are the actual bounds?
+        return 5  # when target is standard normalized
         # ... this takes too long
         # train_loader, _ = self.get_dataloader()
         # min_y = torch.inf
