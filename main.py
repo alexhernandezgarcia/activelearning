@@ -34,7 +34,6 @@ def main(config):
     # Active learning variables
     # TODO: rethink where this configuration should go
     n_samples = config.n_samples
-    maximize = config.maximize
 
     # --- Dataset
     dataset_handler = hydra.utils.instantiate(
@@ -61,7 +60,6 @@ def main(config):
             config.surrogate,
             device=config.device,
             float_precision=config.float_precision,
-            maximize=maximize,
             logger=logger,
         )
         surrogate.fit(train_data)
@@ -74,7 +72,6 @@ def main(config):
             dataset_handler=dataset_handler,
             device=config.device,
             float_precision=config.float_precision,
-            maximize=maximize,
         )
 
         # --- Sampler (e.g., GFlowNet, or Random Sampler)
@@ -109,7 +106,7 @@ def main(config):
         scores = oracle(oracle_samples).cpu()
         dataset_handler.update_dataset(oracle_samples.cpu(), scores)
 
-        print("Proposed Candidates:", samples_selected)
+        print("Proposed Candidates:", oracle_samples)
         print("Oracle Scores:", scores)
         print("Best Score:", scores.min().cpu())
         best_scores.append(scores.min().cpu())

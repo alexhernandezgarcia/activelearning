@@ -1,4 +1,4 @@
-_target_: activelearning.oracle.oracle.Hartmann
+_target_: activelearning.oracle.oracle.HartmannOracle
 
 fidelity: 1
 do_domain_map: True

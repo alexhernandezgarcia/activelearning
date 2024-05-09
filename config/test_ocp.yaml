@@ -30,11 +30,11 @@ surrogate:
   train_epochs: 20
   lr: 0.01
 
-device: cuda
+device: cpu
 float_precision: 64
 budget: 20
 n_samples: 100
-seed: 123456 #31415
+seed: 31415
 maximize: False
 
 # Hydra config

@@ -2,8 +2,8 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: branin
   - oracle: branin
-  - selector: score
   - sampler: gflownet
+  - selector: score
   - surrogate: gp
   - acquisition: botorch_mve
   - user: default
@@ -12,7 +12,7 @@ defaults:
 
 dataset:
   grid_size: 100
-  train_path: ~/activelearning/my_package/storage/branin/data_100_train.csv
+  train_path: ~/activelearning/data/branin/data_100_train.csv
 
 sampler: 
   conf:
