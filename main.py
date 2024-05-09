@@ -92,9 +92,10 @@ def main(config):
         # --- Selector
         selector = hydra.utils.instantiate(
             config.selector,
-            score_fn=acquisition.get_acquisition_values,
+            score_fn=acquisition,
             device=config.device,
             float_precision=config.float_precision,
+            maximize=False,
         )
         samples_selected, selected_idcs = selector(
             n_samples=n_samples, candidate_set=samples, index_set=sample_indices
