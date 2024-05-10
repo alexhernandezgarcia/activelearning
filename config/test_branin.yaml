@@ -2,13 +2,16 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: branin
   - oracle: branin
-  - sampler: gflownet
-  - selector: score
+  - sampler: greedy #gflownet
+  - selector: selector #score
   - surrogate: gp
   - acquisition: botorch_mve
   - user: default
-  - logger: base
+  - logger: wandb
 
+logger:
+  project_name: test_branin
+  run_name: 100_greedy_gp_mve
 
 dataset:
   grid_size: 100

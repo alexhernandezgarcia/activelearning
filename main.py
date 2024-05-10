@@ -56,6 +56,11 @@ def main(config):
         print("--iteration", i, "- training on", len(train_data.dataset), "instances")
         # --- Surrogate (e.g., Bayesian Optimization)
         # starts with a clean slate each iteration
+        if (
+            config.surrogate.get("mll_args") is not None
+            and config.surrogate.mll_args.get("num_data") is not None
+        ):
+            config.surrogate.mll_args.num_data = len(train_data.dataset)
         surrogate = hydra.utils.instantiate(
             config.surrogate,
             device=config.device,
@@ -109,10 +114,17 @@ def main(config):
 
         print("Proposed Candidates:", oracle_samples)
         print("Oracle Scores:", scores)
-        print("Best Score:", scores.min().cpu())
-        best_scores.append(scores.min().cpu())
-        all_scores[i] = scores.tolist()
+        print("Best Score:", scores.min())
+        best_scores.append(scores.min())
+        all_scores[i] = scores
         if logger is not None:
+            mean_top_k = (
+                torch.stack(list(all_scores.values()))
+                .flatten()
+                .topk(n_samples, largest=False)
+                .values.mean()
+            )
+            logger.log_metric(mean_top_k, "mean_topk_score")
             logger.log_metric(scores.min(), "best_score")
             logger.log_metric(torch.median(scores), "median_score")
             logger.log_metric(torch.mean(scores), "mean_score")
@@ -127,6 +139,8 @@ def main(config):
         plt.boxplot(all_scores.values(), labels=all_scores.keys())
         plt.ylim(top=50, bottom=-50)
         logger.log_figure(plt, "all_scores")
+        logger.log_step(i+1)
+        logger.end()
     print("Best Scores:", best_scores)
 
 

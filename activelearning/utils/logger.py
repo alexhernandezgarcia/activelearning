@@ -97,10 +97,12 @@ class WandBLogger(Logger):
         # self.run.log({key: value}, step=step)
 
     def log_time_series(self, time_series: list, key):
-        plt.plot(time_series)
-        plt.ylabel("value")
-        plt.xlabel("timestep")
-        self.log_dict[key] = plt
+        fig, ax = plt.subplots(nrows=1)
+        ax.plot(time_series)
+        ax.set_ylabel("value")
+        ax.set_xlabel("timestep")
+        self.log_figure(ax, key)
+        # self.log_dict[key] = plt
         # data = [[x, i] for i, x in enumerate(time_series)]
         # table = self.wandb.Table(data=data, columns=[key, "time_step"])
         # self.log_dict[key] = self.wandb.plot.line(table, key, "time_step", title=key)

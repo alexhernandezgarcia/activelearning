@@ -11,7 +11,7 @@ defaults:
 
 logger:
   project_name: test_ocp_training
-  run_name: greedy_epochs-20_samples-100_mve
+  run_name: greedy_epochs-20_samples-100_mve_12345
 
 dataset:
   checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
@@ -30,11 +30,11 @@ surrogate:
   train_epochs: 20
   lr: 0.01
 
-device: cpu
+device: cuda
 float_precision: 64
-budget: 20
+budget: 10
 n_samples: 100
-seed: 31415
+seed: 12345
 maximize: False
 
 # Hydra config
