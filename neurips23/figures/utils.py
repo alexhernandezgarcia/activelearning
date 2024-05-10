@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import selfies as sf
-import torch
 import wandb
 import yaml
 from diameter_clustering import LeaderClustering
