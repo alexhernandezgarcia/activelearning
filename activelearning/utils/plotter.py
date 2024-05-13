@@ -64,11 +64,17 @@ class PlotHelper:
         fig.colorbar(cntr, ax=ax)
         return fig, ax
 
-    def plot_samples(self, samples, ax=None, fig=None):
+    def plot_samples(self, samples, ax=None, fig=None, targets=None):
         if fig is None or ax is None:
             fig, ax = plt.subplots(nrows=1)
-
-        ax.scatter(x=samples[:, 1], y=samples[:, 0], c="red", marker="x")
+        c = "red"
+        if targets is not None:
+            c = targets
+        scatter = ax.scatter(
+            x=samples[:, 1], y=samples[:, 0], c=c, marker="x", cmap="Reds"
+        )
+        if targets is not None:
+            fig.colorbar(scatter, ax=ax)
         return fig, ax
 
     def log_figure(self, fig, key="test"):

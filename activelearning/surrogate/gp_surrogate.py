@@ -33,11 +33,10 @@ class GPSurrogate(Surrogate):
             partial[gpytorch.likelihoods.likelihood._Likelihood]
         ] = None,
         outcome_transform: Optional[OutcomeTransform] = None,
-        maximize: bool = False,
         mll_args: dict = {},
         **kwargs: any,
     ) -> None:
-        super().__init__(float_precision, device, maximize)
+        super().__init__(float_precision, device)
         # initializes the model components for GP Surrogate Models
         # e.g.:
         #   model_class = botorch.models.gp_regression_fidelity.SingleTaskGP
@@ -61,7 +60,7 @@ class GPSurrogate(Surrogate):
 
         self.model = self.model_class(
             train_x,
-            train_y.unsqueeze(-1) * self.target_factor,
+            train_y.unsqueeze(-1) * -1,  # turn into maximization problem
             outcome_transform=self.outcome_transform,
             likelihood=self.likelihood,
             **self.kwargs,
@@ -115,7 +114,7 @@ class GPSurrogate(Surrogate):
 
 class SingleTaskGPRegressor(GPSurrogate):
     # defines the SingleTaskGP as Surrogate
-    def __init__(self, float_precision, device, maximize=False):
+    def __init__(self, float_precision, device, **kwargs):
         super().__init__(
             model_class=SingleTaskGP,
             mll_class=gpytorch.mlls.ExactMarginalLogLikelihood,
@@ -123,7 +122,6 @@ class SingleTaskGPRegressor(GPSurrogate):
             outcome_transform=Standardize(m=1),
             float_precision=float_precision,
             device=device,
-            maximize=maximize,
         )
 
 
@@ -136,7 +134,6 @@ class SVGPSurrogate(GPSurrogate):
         mll_class=gpytorch.mlls.VariationalELBO,
         likelihood=None,
         outcome_transform=Standardize(m=1),
-        maximize=False,
         mll_args: dict = {},
         train_epochs: int = 150,
         lr: float = 0.1,
@@ -150,7 +147,6 @@ class SVGPSurrogate(GPSurrogate):
             outcome_transform=outcome_transform,
             float_precision=float_precision,
             device=device,
-            maximize=maximize,
             mll_args=mll_args,
             **kwargs,
         )
@@ -162,8 +158,10 @@ class SVGPSurrogate(GPSurrogate):
         # fit the surrogate model
         batch_x, batch_y = next(iter(train_data))
         batch_x = batch_x.to(self.device).to(self.float)
-        batch_y = batch_y * self.target_factor
-        batch_y = batch_y.to(self.device).to(self.float)
+        batch_y = batch_y
+        batch_y = (
+            batch_y.to(self.device).to(self.float) * -1
+        )  # turn into maximization problem
 
         self.model = self.model_class(
             batch_x,
@@ -197,7 +195,9 @@ class SVGPSurrogate(GPSurrogate):
             batch_losses = []
             for x_batch, y_batch in train_data:
                 x_batch = x_batch.to(self.device).to(self.float)
-                y_batch = y_batch.to(self.device).to(self.float)
+                y_batch = (
+                    y_batch.to(self.device).to(self.float) * -1
+                )  # turn into maximization problem
                 optimizer.zero_grad()
                 output = self.model(x_batch)
                 loss = -self.mll(output, y_batch)
@@ -228,7 +228,6 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
         feature_extractor,
         float_precision,
         device,
-        maximize=False,
         mll_args: dict = {},
         train_epochs: int = 150,
         lr: float = 0.1,
@@ -253,7 +252,6 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
             ),
             float_precision=float_precision,
             device=device,
-            maximize=maximize,
             mll_args=mll_args,
             train_epochs=train_epochs,
             lr=lr,

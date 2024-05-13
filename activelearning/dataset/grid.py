@@ -261,8 +261,8 @@ class GridDatasetHandler(DatasetHandler):
             DataLoader
         """
 
-        states = X
-        energies = y
+        states = X.clone()
+        energies = y.clone()
 
         # append to in-memory dataset
         # TODO: also save a fraction to test_data?

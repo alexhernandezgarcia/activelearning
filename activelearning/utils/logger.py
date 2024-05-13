@@ -9,7 +9,7 @@ class Logger(ABC):
     wandb).
     """
 
-    def __init__(self, project_name, run_name=None):
+    def __init__(self, project_name, run_name=None, **kwargs):
         self.project_name = project_name
         if run_name is None:
             date_time = datetime.today().strftime("%d/%m-%H:%M:%S")
@@ -38,14 +38,19 @@ class Logger(ABC):
 
 
 class ConsoleLogger(Logger):
-    def log_figure(self, figure, key):
+    def log_figure(self, figure, key, **kwargs):
         figure.show()
 
     def log_metric(self, value, key):
-        print(key + ": " + value)
+        print("%s: " % (key) + str(value))
 
     def log_time_series(self, time_series: list, key):
-        self.log_metric(time_series, key)
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(nrows=1)
+        ax.plot(time_series)
+        self.log_figure(fig, key)
+        # self.log_metric(time_series, key)
 
     def log_step(self, step):
         print("current step:", step)
@@ -83,8 +88,8 @@ class WandBLogger(Logger):
         self.log_dict = {}
 
     def log_figure(self, figure, key, step=None):
-        # figimg = self.wandb.Image(figure)
-        self.log_dict[key] = figure  # figimg
+        figimg = self.wandb.Image(figure)
+        self.log_dict[key] = figimg
         # self.run.log({key: figimg})
 
     def log_metric(self, value, key):
@@ -92,10 +97,12 @@ class WandBLogger(Logger):
         # self.run.log({key: value}, step=step)
 
     def log_time_series(self, time_series: list, key):
-        plt.plot(time_series)
-        plt.ylabel("value")
-        plt.xlabel("timestep")
-        self.log_dict[key] = plt
+        fig, ax = plt.subplots(nrows=1)
+        ax.plot(time_series)
+        ax.set_ylabel("value")
+        ax.set_xlabel("timestep")
+        self.log_figure(ax, key)
+        # self.log_dict[key] = plt
         # data = [[x, i] for i, x in enumerate(time_series)]
         # table = self.wandb.Table(data=data, columns=[key, "time_step"])
         # self.log_dict[key] = self.wandb.plot.line(table, key, "time_step", title=key)

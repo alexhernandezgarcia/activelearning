@@ -82,10 +82,10 @@ class OCPData(Data):
         return len(self.subset_idcs) + len(self.appended_data)
 
     def preprocess(self, X, y):
-        return X, self.target_normalizer.norm(y)
+        return X, self.target_normalizer.norm(y).cpu()
 
     def append(self, X: Batch, y: torch.Tensor):
-        y = self.target_normalizer.denorm(y)
+        y = self.target_normalizer.denorm(y).cpu()
         data_to_append = X.to_data_list()
         # TODO: we should overwrite the target value with the oracle value, but the oracle value is off
         for i in range(len(data_to_append)):
@@ -108,6 +108,7 @@ class OCPDatasetHandler(DatasetHandler):
         batch_size=256,
         shuffle=True,
         float_precision: int = 64,
+        # device="cpu",
     ):
         super().__init__(
             float_precision=float_precision, batch_size=batch_size, shuffle=shuffle
@@ -132,6 +133,7 @@ class OCPDatasetHandler(DatasetHandler):
                     },
                     "deup-val_ood_cat-val_ood_ads": {"src": data_path},
                 },
+                "cpu": True,  # device == "cpu",
             },
             skip_imports=["qm7x", "gemnet", "spherenet", "painn", "comenet"],
             silent=True,
@@ -223,7 +225,7 @@ class OCPDatasetHandler(DatasetHandler):
     def update_dataset(self, X: Batch, y: torch.Tensor, save_path=None):
 
         # append to in-memory dataset
-        self.train_data.append(X, y)
+        self.train_data.append(X, y.clone())
 
         if save_path is not None:
             # see https://github.com/RolnickLab/ocp/blob/main/ocpmodels/datasets/deup_dataset_creator.py#L371

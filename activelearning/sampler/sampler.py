@@ -43,19 +43,19 @@ class GreedySampler(Sampler):
             acq_values = []
             for batch in candidate_set:
                 acq_values.append(
-                    self.acquisition.get_acquisition_values(
+                    self.acquisition(
                         batch.to(self.device).to(self.float_precision)
                     ).detach()
                 )
             acq_values = torch.cat(acq_values)
-            idx_pick = torch.argsort(acq_values)[-n_samples:]
+            idx_pick = torch.argsort(acq_values, descending=False)[:n_samples]
             return (candidate_set.dataset[idx_pick], idx_pick)
         else:
             candidate_set = candidate_set.clone().to(self.device)
-            acq_values = self.acquisition.get_acquisition_values(
+            acq_values = self.acquisition(
                 candidate_set.to(self.device).to(self.float_precision)
             ).detach()
-            idx_pick = torch.argsort(acq_values)[-n_samples:]
+            idx_pick = torch.argsort(acq_values, descending=False)[:n_samples]
             return (candidate_set[idx_pick], idx_pick)
 
 
