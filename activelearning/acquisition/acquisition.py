@@ -31,9 +31,13 @@ class Acquisition(ABC):
         self.surrogate_model = surrogate_model
 
     def __call__(self, candidate_set: torch.Tensor) -> torch.Tensor:
-        # sampler (GFlowNet) expects minimization problem, but acquisition function return maximization problem -> always invert
-        # all samplers are fixed to minimize
-        # TODO: remove -1; this will later be implemented directly in the gflownet environment (currently it always asumes negative values i.e. minimizing values)
+"""
+Evaluates the acquisition function on a set of candidates.
+
+Note that the sampler (GFlowNet) operates as in a minimization problem, but the acquisition function is to be maximized. Therefore, the outputs are inverted.
+
+TODO: remove -1; this will later be implemented directly in the gflownet environment (currently it always assumes negative values i.e. minimizing values)
+"""
         return (
             self.get_acquisition_values(candidate_set) * -1
         ) 
