@@ -10,12 +10,9 @@ class Surrogate(ABC):
         self,
         float_precision: Optional[Union[torch.dtype, int]] = 64,
         device: Optional[Union[str, torch.device]] = "cpu",
-        maximize: bool = False,
         **kwargs
     ) -> None:
         # use the kwargs for model specific configuration that is implemented in subclasses
-        self.maximize = maximize
-        self.target_factor = 1 if maximize else -1
         self.float = set_float_precision(float_precision)
         self.device = device
 

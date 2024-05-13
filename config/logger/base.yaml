@@ -1,1 +1,3 @@
-_target_: activelearning.utils.ConsoleLogger
+_target_: activelearning.utils.logger.ConsoleLogger
+project_name: activelearning
+run_name: null

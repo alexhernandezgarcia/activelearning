@@ -29,6 +29,7 @@ class OCPOracle(Oracle):
                 "model": {
                     "dropout_lin": 0.0
                 },  # for inference, we don't want to have dropout
+                "cpu": device == "cpu",
             },
             skip_imports=["qm7x", "gemnet", "spherenet", "painn", "comenet"],
             silent=True,

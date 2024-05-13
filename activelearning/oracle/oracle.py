@@ -41,7 +41,7 @@ class BraninOracle(Oracle, Branin):
         )
 
     def __call__(self, states):
-        return Branin.__call__(self, states)
+        return Branin.__call__(self, states.clone())
 
 
 class HartmannOracle(Oracle, Hartmann):
@@ -60,7 +60,7 @@ class HartmannOracle(Oracle, Hartmann):
         )
 
     def __call__(self, states):
-        return Hartmann.__call__(self, states)
+        return Hartmann.__call__(self, states.clone())
 
 
 # class MultiFidelityOracle(Oracle):
