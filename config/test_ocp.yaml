@@ -11,7 +11,7 @@ defaults:
 
 logger:
   project_name: test_ocp_training
-  run_name: greedy_epochs-20_samples-100_mve_12345
+  run_name: greedy_epochs-20_samples-100_mve_${seed}
 
 dataset:
   checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt

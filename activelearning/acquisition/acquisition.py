@@ -31,16 +31,14 @@ class Acquisition(ABC):
         self.surrogate_model = surrogate_model
 
     def __call__(self, candidate_set: torch.Tensor) -> torch.Tensor:
-"""
-Evaluates the acquisition function on a set of candidates.
+        """
+        Evaluates the acquisition function on a set of candidates.
 
-Note that the sampler (GFlowNet) operates as in a minimization problem, but the acquisition function is to be maximized. Therefore, the outputs are inverted.
+        Note that the sampler (GFlowNet) operates as in a minimization problem, but the acquisition function is to be maximized. Therefore, the outputs are inverted.
 
-TODO: remove -1; this will later be implemented directly in the gflownet environment (currently it always assumes negative values i.e. minimizing values)
-"""
-        return (
-            self.get_acquisition_values(candidate_set) * -1
-        ) 
+        TODO: remove -1; this will later be implemented directly in the gflownet environment (currently it always assumes negative values i.e. minimizing values)
+        """
+        return self.get_acquisition_values(candidate_set) * -1
 
     @abstractmethod
     def get_acquisition_values(self, candidate_set: torch.Tensor) -> torch.Tensor:
@@ -58,7 +56,7 @@ class BOTorchMaxValueEntropyAcquisition(Acquisition):
         acq_fn_class: DiscreteMaxValueBase = qLowerBoundMaxValueEntropy,
         dataset_handler=None,
         device="cpu",
-        float_precision=64
+        float_precision=64,
     ):
         super().__init__(surrogate_model, dataset_handler, device, float_precision)
         self.acq_fn_class = acq_fn_class
@@ -82,9 +80,7 @@ class BOTorchMonteCarloAcquisition(Acquisition):
         device="cpu",
         float_precision=64,
     ):
-        super().__init__(
-            surrogate_model, dataset_handler, device, float_precision
-        )
+        super().__init__(surrogate_model, dataset_handler, device, float_precision)
         base_class = (
             acq_fn_class.func if isinstance(acq_fn_class, partial) else acq_fn_class
         )
@@ -95,7 +91,9 @@ class BOTorchMonteCarloAcquisition(Acquisition):
                 train_X.to(self.device).to(self.float),
             )
         else:
-            best_f = dataset_handler.minY() * -1 # -1 because the data is a minimization problem, but the surrogate maximizes by multiplying by -1
+            best_f = (
+                dataset_handler.minY() * -1
+            )  # -1 because the data is a minimization problem, but the surrogate maximizes by multiplying by -1
             self.acq_fn = acq_fn_class(
                 surrogate_model,
                 best_f,
