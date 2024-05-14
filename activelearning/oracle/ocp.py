@@ -2,6 +2,7 @@ from activelearning.oracle.oracle import Oracle
 from ocpmodels.common.gfn import FAENetWrapper
 from ocpmodels.datasets.data_transforms import get_transforms
 from ocpmodels.common.utils import make_trainer_from_dir
+import torch
 
 
 class OCPOracle(Oracle):
@@ -46,8 +47,22 @@ class OCPOracle(Oracle):
         self.model = wrapper
 
     def __call__(self, states):
-        states = states.clone()
-        return self.model(states, retrieve_hidden=False)
+        if isinstance(states, torch.utils.data.dataloader.DataLoader):
+            values = torch.Tensor([])
+            for batch in states:
+                values = torch.concat(
+                    [
+                        values,
+                        self.model(
+                            batch[0],
+                            retrieve_hidden=False,
+                        ).cpu(),
+                    ]
+                )
+            return values
+        else:
+            states = states.clone()
+            return self.model(states, retrieve_hidden=False)
 
 
 # class GroundTruthOracle(OCPOracle):

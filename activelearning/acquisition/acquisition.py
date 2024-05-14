@@ -38,7 +38,18 @@ class Acquisition(ABC):
 
         TODO: remove -1; this will later be implemented directly in the gflownet environment (currently it always assumes negative values i.e. minimizing values)
         """
-        return self.get_acquisition_values(candidate_set) * -1
+        if isinstance(candidate_set, torch.utils.data.dataloader.DataLoader):
+            values = torch.Tensor([])
+            for batch in candidate_set:
+                values = torch.concat(
+                    [
+                        values,
+                        self.get_acquisition_values(batch).cpu(),
+                    ]
+                )
+            return values * -1
+        else:
+            return self.get_acquisition_values(candidate_set) * -1
 
     @abstractmethod
     def get_acquisition_values(self, candidate_set: torch.Tensor) -> torch.Tensor:

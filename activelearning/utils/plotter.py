@@ -158,13 +158,9 @@ class CIME4RExportHelper(PlotHelper):
 
         if isinstance(space, torch.utils.data.dataloader.DataLoader):
             assert len(space.dataset) == len(self.cime4r_df)
-            res = torch.Tensor([])
-            for batch in space:
-                batch_res = fn(batch.to(self.device)).to("cpu").detach()
-                res = torch.concat([res, batch_res], dim=-1)
         else:
             assert len(space) == len(self.cime4r_df)
-            res = fn(space.to(self.device))
+        res = fn(space)
 
         if output_index is not None:
             res = res[output_index]

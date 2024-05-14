@@ -1,4 +1,5 @@
 import torch
+from torch.utils.data import DataLoader
 import gpytorch
 from botorch.models.gp_regression_fidelity import SingleTaskGP
 from botorch.models.approximate_gp import SingleTaskVariationalGP
@@ -99,17 +100,38 @@ class GPSurrogate(Surrogate):
         #     iterator.set_postfix(loss=loss.item())
         #     optimizer.step()
 
-    def get_predictions(self, states: torch.Tensor) -> torch.Tensor:
-        states_proxy = states.clone().to(self.device).to(self.float)
+    def get_predictions(self, states: Union[torch.Tensor, DataLoader]) -> torch.Tensor:
         self.model.eval()
         self.model.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            posterior = self.model.posterior(states_proxy)
-        y_mean = posterior.mean
-        y_std = posterior.variance.sqrt()
-        y_mean = y_mean.squeeze(-1).unsqueeze(0)
-        y_std = y_std.squeeze(-1).unsqueeze(0)
-        return torch.concat([y_mean, y_std], dim=0)
+            if isinstance(states, torch.utils.data.dataloader.DataLoader):
+                y_mean = torch.Tensor([])
+                y_std = torch.Tensor([])
+                for batch in states:
+                    posterior = self.model.posterior(
+                        batch.to(self.device).to(self.float)
+                    )
+                    y_mean = torch.concat(
+                        [
+                            y_mean,
+                            posterior.mean.cpu().squeeze(-1),
+                        ]
+                    )
+                    y_std = torch.concat(
+                        [
+                            y_std,
+                            posterior.variance.cpu().sqrt().squeeze(-1),
+                        ]
+                    )
+                return torch.concat([y_mean.unsqueeze(0), y_std.unsqueeze(0)], dim=0)
+            else:
+                states_proxy = states.clone().to(self.device).to(self.float)
+                posterior = self.model.posterior(states_proxy)
+                y_mean = posterior.mean
+                y_std = posterior.variance.sqrt()
+                y_mean = y_mean.squeeze(-1).unsqueeze(0)
+                y_std = y_std.squeeze(-1).unsqueeze(0)
+                return torch.concat([y_mean, y_std], dim=0)
 
 
 class SingleTaskGPRegressor(GPSurrogate):

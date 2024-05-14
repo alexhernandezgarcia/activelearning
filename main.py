@@ -154,12 +154,9 @@ def main(config):
         best_scores.append(scores.min())
         all_scores[i] = scores
         if logger is not None:
-            mean_top_k = (
-                torch.stack(list(all_scores.values()))
-                .flatten()
-                .topk(n_samples, largest=False)
-                .values.mean()
-            )
+            scores_flat = torch.stack(list(all_scores.values())).flatten()
+            logger.log_metric(scores_flat.min(), "top_score")
+            mean_top_k = scores_flat.topk(n_samples, largest=False).values.mean()
             logger.log_metric(mean_top_k, "mean_topk_score")
             logger.log_metric(scores.min(), "best_score")
             logger.log_metric(torch.median(scores), "median_score")
