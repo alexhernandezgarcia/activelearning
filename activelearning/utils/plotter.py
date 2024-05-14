@@ -79,10 +79,10 @@ class PlotHelper:
             fig.colorbar(scatter, ax=ax)
         return fig, ax
 
-    def plot_scores(self, *kwargs):
+    def plot_scores(self, **kwargs):
         pass
 
-    def end(self, *kwargs):
+    def end(self, **kwargs):
         pass
 
 

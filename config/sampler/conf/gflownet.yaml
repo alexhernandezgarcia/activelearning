@@ -1,3 +1,6 @@
+defaults:
+  - env: grid #grid #ccube
+
 # State flow modelling
 state_flow: null
 
@@ -18,47 +21,6 @@ policy:
 
   shared: null
 
-env:
-  _target_: gflownet.envs.grid.Grid
-
-  id: grid
-  func: corners
-  # Dimensions of hypergrid
-  n_dim: 2
-  # Number of cells per dimension
-  length: 10     # <---
-  # Maximum increment per each dimension that can be done by one action
-  max_increment: 1
-  # Maximum number of dimensions that can be incremented by one action
-  max_dim_per_action: 1
-  # Mapping coordinates
-  cell_min: 0     # <---
-  cell_max: 0.9  # <---
-  # Buffer
-  buffer:
-    train: null
-    test: null
-
-  # Reward function: power or boltzmann
-  # boltzmann: exp(-1.0 * reward_beta * proxy)
-  # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
-  # identity: proxy
-  reward_func: power # <---
-  # Minimum reward
-  reward_min: 1e-15
-  # Beta parameter of the reward function
-  reward_beta: 5.0 # <---
-  # Reward normalization for "power" reward function
-  reward_norm: 1.0
-  # If > 0, reward_norm = reward_norm_std_mult * std(energies)
-  reward_norm_std_mult: 0.0
-  proxy_state_format: oracle
-  # Check if action valid with mask before step
-  skip_mask_check: False
-  # Whether the environment has conditioning variables
-  conditional: False
-  # Whether the environment is continuous
-  continuous: False
 
 agent: 
   _target_: gflownet.gflownet.GFlowNetAgent
