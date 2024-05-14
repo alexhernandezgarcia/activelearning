@@ -2,16 +2,17 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: ocp
   - oracle: ocp
-  - sampler: random # greedy # random
-  - selector: score # selector # score
+  - sampler: greedy # greedy # random
+  - selector: selector # selector # score
   - surrogate: svdkl_kernel_wrapper
-  - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
+  - acquisition: botorch_nei #botorch_mve #botorch_ei #botorch_nei
   - user: default
   - logger: wandb
+  - plotter: cime4r_ocp
 
 logger:
   project_name: test_ocp_training
-  run_name: random_epochs-20_samples-100_mve_${seed}
+  run_name: greedy_epochs-20_samples-100_nei_${seed}
 
 dataset:
   checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
@@ -34,7 +35,7 @@ device: cuda
 float_precision: 64
 budget: 10
 n_samples: 100
-seed: null
+seed: 98765
 maximize: False
 
 # Hydra config

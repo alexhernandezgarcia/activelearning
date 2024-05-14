@@ -25,7 +25,7 @@ python -m pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/
 Use the following commands to install FAENet:
 
 ```bash
-pip install git+https://github.com/RolnickLab/ocp.git@uncertainty-depfaenet
+pip install git+https://github.com/RolnickLab/ocp.git@uncertainty
 ```
 
 For development you can use a local installation of the package:

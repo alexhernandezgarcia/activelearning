@@ -40,6 +40,13 @@ def main(config):
         config.dataset,
         float_precision=config.float_precision,
     )
+
+    plotter = None
+    if "plotter" in config:
+        plotter = hydra.utils.instantiate(
+            config.plotter, dataset_handler=dataset_handler, device=config.device
+        )
+
     candidate_set, _, _ = dataset_handler.get_candidate_set()
 
     # --- Oracle
@@ -69,6 +76,26 @@ def main(config):
         )
         surrogate.fit(train_data)
 
+        if plotter is not None:
+            plotter.plot_function(
+                surrogate.get_predictions,
+                candidate_set,
+                output_index=0,
+                fig="",
+                ax="",
+                label="pred_target_mean",
+                iteration=i,
+            )
+            plotter.plot_function(
+                surrogate.get_predictions,
+                candidate_set,
+                output_index=1,
+                fig="",
+                ax="",
+                label="pred_target_var",
+                iteration=i,
+            )
+
         # --- Acquisition
         # starts with a clean slate each iteration
         acquisition = hydra.utils.instantiate(
@@ -78,6 +105,15 @@ def main(config):
             device=config.device,
             float_precision=config.float_precision,
         )
+        if plotter is not None:
+            plotter.plot_function(
+                acquisition,
+                candidate_set,
+                fig="",
+                ax="",
+                label="acq",
+                iteration=i,
+            )
 
         # --- Sampler (e.g., GFlowNet, or Random Sampler)
         # also starts with a clean slate; TODO: experiment with NOT training from scratch
@@ -133,14 +169,20 @@ def main(config):
 
             logger.log_step(i)
 
+        if plotter is not None:
+            plotter.plot_scores(selected_idcs, scores, i)
+
     if logger is not None:
         import matplotlib.pyplot as plt
 
         plt.boxplot(all_scores.values(), labels=all_scores.keys())
         plt.ylim(top=50, bottom=-50)
         logger.log_figure(plt, "all_scores")
-        logger.log_step(i+1)
+        logger.log_step(i + 1)
         logger.end()
+
+    if plotter is not None:
+        plotter.end(filename=logger.run_name + ".csv")
     print("Best Scores:", best_scores)
 
 

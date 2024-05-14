@@ -127,11 +127,12 @@ class ProjectionPlotHelper(PlotHelper):
 
 
 class CIME4RExportHelper(PlotHelper):
-    def __init__(self, dataset_handler, device="cpu"):
+    def __init__(self, dataset_handler, device="cpu", logdir="logs/cime4r/"):
         super().__init__(device)
 
         self.dataset_handler = dataset_handler
         self.cime4r_df = pd.DataFrame()
+        self.logdir = logdir
         self.init_dataframe()
 
     @abstractmethod
@@ -191,7 +192,12 @@ class CIME4RExportHelper(PlotHelper):
         self.cime4r_df.loc[selected_idcs.tolist(), "experiment_cycle"] = i
 
     def end(self, filename):
-        self.cime4r_df.to_csv("logs/cime4r/" + filename, index=False)
+        from pathlib import Path
+
+        path = Path(self.logdir + "/cime4r/").resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        self.cime4r_df.to_csv(path / filename, index=False)
+        print("saved as", path / filename)
 
 
 class BraninCIME4RExportHelper(CIME4RExportHelper):
