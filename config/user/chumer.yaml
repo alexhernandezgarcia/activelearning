@@ -1,0 +1,4 @@
+logdir:
+  root: /network/scratch/c/christina.humer/logs/activelearning
+data:
+  root: ./data
