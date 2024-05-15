@@ -8,6 +8,8 @@ defaults:
   - acquisition: botorch_nei #botorch_mve #botorch_ei #botorch_nei
   - user: default
   - logger: wandb
+  # cime4r export significantly increases runtime --> only use when really needed; 
+  # note: does not work when using gflownet yet, because gflownet produces new samples --> TODO
   - plotter: cime4r_ocp
 
 logger:

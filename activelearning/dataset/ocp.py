@@ -260,7 +260,10 @@ class OCPDatasetHandler(DatasetHandler):
 
         return self.get_dataloader()
 
-    def get_candidate_set(self, return_index=False):
+    def get_candidate_set(self, return_index=False, as_dataloader=True):
+        if not as_dataloader:
+            return self.candidate_data, None, None
+
         self.candidate_data.return_index = return_index
         test_loader = DataLoader(
             self.candidate_data,

@@ -56,6 +56,17 @@ def main(config):
         float_precision=config.float_precision,
     )
 
+    if plotter is not None:
+        plot_set, _, _ = dataset_handler.get_candidate_set(as_dataloader=False)
+        oracle_dataloader = dataset_handler.prepare_oracle_dataloader(plot_set)
+        plotter.plot_function(
+            oracle,
+            oracle_dataloader,
+            label="oraclefn",
+            fig="",
+            ax="",
+        )
+
     best_scores = []
     all_scores = {}
     for i in range(config.budget):
@@ -166,7 +177,7 @@ def main(config):
 
             logger.log_step(i)
 
-        if plotter is not None:
+        if plotter is not None and selected_idcs is not None:
             plotter.plot_scores(selected_idcs, scores, i)
 
     if logger is not None:
