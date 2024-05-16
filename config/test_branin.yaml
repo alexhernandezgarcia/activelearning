@@ -8,7 +8,7 @@ defaults:
   - acquisition: botorch_mve
   - user: default
   - logger: base #wandb
-  - plotter: cime4r_branin
+  - plotter: null #cime4r_branin
 
 logger:
   project_name: test_branin
