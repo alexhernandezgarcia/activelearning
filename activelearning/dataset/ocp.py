@@ -14,6 +14,7 @@ class OCPData(Data):
         subset_idcs: torch.Tensor = None,
         float=torch.float64,
         return_target=True,
+        return_index=False,
     ):
         """
         subset_idcs: specifies which subset of the data will be used (useful, if we want to have subsets for training and testing)
@@ -26,6 +27,7 @@ class OCPData(Data):
         self.data = data
         self.appended_data = []
         self.return_target = return_target
+        self.return_index = return_index
 
         self.target_normalizer = target_normalizer
 
@@ -41,31 +43,41 @@ class OCPData(Data):
         # return scatter(hidden_states, state_idcs, dim=0, reduce="add"), torch.Tensor(
         #     [datapoint.y_relaxed]
         # )
-        return hidden_states.mean(0).unsqueeze(0), torch.Tensor([datapoint.y_relaxed])
+        return (
+            hidden_states.mean(0).unsqueeze(0),
+            torch.Tensor([datapoint.y_relaxed]),
+            torch.Tensor([datapoint.idx_in_dataset]),
+        )
 
     def __getitem__(self, key):
         if isinstance(key, int):
-            x, y = self.get_item_from_index(key)
+            x, y, idcs_in_dataset = self.get_item_from_index(key)
         elif isinstance(key, slice):
             start, stop, step = key.indices(len(self))
             x = torch.Tensor([])
             y = torch.Tensor([])
+            idcs_in_dataset = torch.Tensor([])
             for i in range(start, stop, step):
-                x_i, y_i = self.get_item_from_index(i)
+                x_i, y_i, idx_in_dataset = self.get_item_from_index(i)
                 x = torch.concat([x, x_i])
                 y = torch.concat([y, y_i])
+                idcs_in_dataset = torch.concat([idcs_in_dataset, idx_in_dataset])
         else:
             x = torch.Tensor([])
             y = torch.Tensor([])
+            idcs_in_dataset = torch.Tensor([])
             for i in key:
-                x_i, y_i = self.get_item_from_index(i)
+                x_i, y_i, idx_in_dataset = self.get_item_from_index(i)
                 x = torch.concat([x, x_i])
                 y = torch.concat([y, y_i])
+                idcs_in_dataset = torch.concat([idcs_in_dataset, idx_in_dataset])
 
         x, y = self.preprocess(x.to(self.float).squeeze(), y.to(self.float).squeeze())
         if self.return_target:
             return x, y
         else:
+            if self.return_index:
+                return x, idcs_in_dataset
             return x
 
     def get_raw_item(self, index):
@@ -234,7 +246,8 @@ class OCPDatasetHandler(DatasetHandler):
 
         return self.get_dataloader()
 
-    def get_candidate_set(self):
+    def get_candidate_set(self, return_index=False):
+        self.candidate_data.return_index = return_index
         test_loader = DataLoader(
             self.candidate_data,
             batch_size=self.batch_size,

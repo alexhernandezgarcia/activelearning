@@ -8,4 +8,4 @@
 module load anaconda/3 # replace: load anaconda module
 conda activate al_new  # replace: conda env name
 cd /home/mila/c/christina.humer/activelearning # replace: location of the code
-python main.py --config-name test_branin
+python main.py --config-name test_branin user=$USER
