@@ -24,8 +24,8 @@ class Selector:
         index_set: Optional[torch.Tensor] = None,
     ):
         if index_set is None:
-            return candidate_set[-n_samples:], None
-        return candidate_set[-n_samples:], index_set[-n_samples:]
+            return candidate_set[:n_samples], None
+        return candidate_set[:n_samples], index_set[:n_samples]
 
 
 class ScoreSelector(Selector):

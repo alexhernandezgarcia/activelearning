@@ -2,10 +2,10 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: ocp
   - oracle: ocp
-  - sampler: greedy # greedy # random
+  - sampler: crystal_gflownet # greedy # random
   - selector: selector # selector # score
   - surrogate: svdkl_kernel_wrapper
-  - acquisition: botorch_nei #botorch_mve #botorch_ei #botorch_nei
+  - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
   - user: default
   - logger: wandb
   # cime4r export significantly increases runtime --> only use when really needed; 
@@ -14,7 +14,7 @@ defaults:
 
 logger:
   project_name: test_ocp_training
-  run_name: greedy_epochs-20_samples-100_nei_${seed}
+  run_name: greedy_epochs-20_samples-100_mve_${seed}
 
 dataset:
   checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt

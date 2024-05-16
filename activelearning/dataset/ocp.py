@@ -278,22 +278,22 @@ class OCPDatasetHandler(DatasetHandler):
         if sample_idcs is None:
             return samples
 
-        return self.prepare_oracle_dataloader(self.candidate_data, sample_idcs)
-        # samples = []
-        # for idx in sample_idcs:
-        #     samples.append(self.candidate_data.get_raw_item(idx))
-        #     # samples.append(self.trainer.datasets["deup-val_ood_cat-val_ood_ads"][idx])
+        # return self.prepare_oracle_dataloader(self.candidate_data, sample_idcs)
+        samples = []
+        for idx in sample_idcs:
+            samples.append(self.candidate_data.get_raw_item(idx))
+            # samples.append(self.trainer.datasets["deup-val_ood_cat-val_ood_ads"][idx])
 
-        # oracle_loader = DataLoader(
-        #     samples,
-        #     collate_fn=self.trainer.parallel_collater,
-        #     num_workers=1,  # trainer.config["optim"]["num_workers"], # there ocurs a "AssertionError: can only test a child process" error when using several workers with cuda
-        #     pin_memory=True,
-        #     # batch_sampler=trainer.samplers["deup-train-val_id"],
-        #     # batch_size=self.batch_size
-        #     batch_size=len(samples),
-        # )
-        # return next(iter(oracle_loader))[0]
+        oracle_loader = DataLoader(
+            samples,
+            collate_fn=self.trainer.parallel_collater,
+            num_workers=1,  # trainer.config["optim"]["num_workers"], # there ocurs a "AssertionError: can only test a child process" error when using several workers with cuda
+            pin_memory=True,
+            # batch_sampler=trainer.samplers["deup-train-val_id"],
+            # batch_size=self.batch_size
+            batch_size=len(samples),
+        )
+        return next(iter(oracle_loader))[0]
 
     def prepare_oracle_dataloader(self, dataset: OCPData, sample_idcs=None):
         raw_candidate_set = OCPRawDataMapper(dataset, sample_idcs)
