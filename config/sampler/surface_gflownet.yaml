@@ -2,4 +2,4 @@
 _target_: activelearning.sampler.sampler.GFlowNetSampler
 
 defaults:
-  - conf: crystal_gflownet
+  - conf: surface_gflownet
