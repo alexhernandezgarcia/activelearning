@@ -113,3 +113,6 @@ class DatasetHandler(ABC):
 
     def prepare_dataset_for_oracle(self, samples, sample_idcs):
         return samples
+
+    def prepare_oracle_dataloader(self, dataset: Data, sample_idcs=None):
+        return dataset

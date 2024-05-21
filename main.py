@@ -56,6 +56,17 @@ def main(config):
         float_precision=config.float_precision,
     )
 
+    if plotter is not None:
+        plot_set, _, _ = dataset_handler.get_candidate_set(as_dataloader=False)
+        oracle_dataloader = dataset_handler.prepare_oracle_dataloader(plot_set)
+        plotter.plot_function(
+            oracle,
+            oracle_dataloader,
+            label="oraclefn",
+            fig="",
+            ax="",
+        )
+
     best_scores = []
     all_scores = {}
     for i in range(config.budget):
@@ -154,12 +165,9 @@ def main(config):
         best_scores.append(scores.min())
         all_scores[i] = scores
         if logger is not None:
-            mean_top_k = (
-                torch.stack(list(all_scores.values()))
-                .flatten()
-                .topk(n_samples, largest=False)
-                .values.mean()
-            )
+            scores_flat = torch.stack(list(all_scores.values())).flatten()
+            logger.log_metric(scores_flat.min(), "top_score")
+            mean_top_k = scores_flat.topk(n_samples, largest=False).values.mean()
             logger.log_metric(mean_top_k, "mean_topk_score")
             logger.log_metric(scores.min(), "best_score")
             logger.log_metric(torch.median(scores), "median_score")
@@ -169,7 +177,7 @@ def main(config):
 
             logger.log_step(i)
 
-        if plotter is not None:
+        if plotter is not None and selected_idcs is not None:
             plotter.plot_scores(selected_idcs, scores, i)
 
     if logger is not None:

@@ -2,13 +2,13 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: branin
   - oracle: branin
-  - sampler: greedy #gflownet
-  - selector: selector #score
+  - sampler: greedy #greedy #gflownet
+  - selector: score #selector #score
   - surrogate: gp
   - acquisition: botorch_mve
   - user: default
   - logger: base #wandb
-  - plotter: null #cime4r_branin
+  - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
 
 logger:
   project_name: test_branin
@@ -24,7 +24,7 @@ sampler:
       random_action_prob: 0.0 # 0.01
       optimizer:
         lr: 5e-4
-        n_train_steps: 5000 # 10000
+        n_train_steps: 100 #5000 # 10000
     logger:
       do:
         online: True

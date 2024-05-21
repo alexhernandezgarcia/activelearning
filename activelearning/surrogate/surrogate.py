@@ -22,5 +22,5 @@ class Surrogate(ABC):
         pass
 
     @abstractmethod
-    def get_predictions(self, states: torch.Tensor) -> torch.Tensor:
+    def get_predictions(self, states: Union[torch.Tensor, DataLoader]) -> torch.Tensor:
         pass

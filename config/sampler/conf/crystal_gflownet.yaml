@@ -1,5 +1,5 @@
 defaults:
-  - env: grid #grid #ccube
+  - env: crystal_surface
 
 # State flow modelling
 state_flow: null

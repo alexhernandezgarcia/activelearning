@@ -1,5 +1,5 @@
 from activelearning.dataset.dataset import DatasetHandler, Data
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 import torch
 from torch_geometric.data import Batch
 from ocpmodels.modules.normalizer import Normalizer
@@ -105,6 +105,20 @@ class OCPData(Data):
             data_to_append[i].y_relaxed = y[i]
 
         self.appended_data.extend(data_to_append)
+
+
+class OCPRawDataMapper(Dataset):
+    def __init__(self, candidate_data: OCPData, subset_idcs: torch.Tensor):
+        if subset_idcs is None:
+            subset_idcs = torch.arange(len(candidate_data))
+        self.subset_idcs = subset_idcs
+        self.candidate_data = candidate_data
+
+    def __len__(self):
+        return len(self.subset_idcs)
+
+    def __getitem__(self, key):
+        return self.candidate_data.get_raw_item(self.subset_idcs[key])
 
 
 class OCPDatasetHandler(DatasetHandler):
@@ -246,7 +260,10 @@ class OCPDatasetHandler(DatasetHandler):
 
         return self.get_dataloader()
 
-    def get_candidate_set(self, return_index=False):
+    def get_candidate_set(self, return_index=False, as_dataloader=True):
+        if not as_dataloader:
+            return self.candidate_data, None, None
+
         self.candidate_data.return_index = return_index
         test_loader = DataLoader(
             self.candidate_data,
@@ -261,6 +278,7 @@ class OCPDatasetHandler(DatasetHandler):
         if sample_idcs is None:
             return samples
 
+        # return self.prepare_oracle_dataloader(self.candidate_data, sample_idcs)
         samples = []
         for idx in sample_idcs:
             samples.append(self.candidate_data.get_raw_item(idx))
@@ -276,3 +294,15 @@ class OCPDatasetHandler(DatasetHandler):
             batch_size=len(samples),
         )
         return next(iter(oracle_loader))[0]
+
+    def prepare_oracle_dataloader(self, dataset: OCPData, sample_idcs=None):
+        raw_candidate_set = OCPRawDataMapper(dataset, sample_idcs)
+        raw_loader = DataLoader(
+            raw_candidate_set,
+            collate_fn=self.trainer.parallel_collater,
+            num_workers=1,  # trainer.config["optim"]["num_workers"], # there ocurs a "AssertionError: can only test a child process" error when using several workers with cuda
+            pin_memory=True,
+            # batch_sampler=trainer.samplers["deup-train-val_id"],
+            batch_size=self.batch_size,
+        )
+        return raw_loader
