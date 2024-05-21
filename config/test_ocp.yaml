@@ -2,7 +2,7 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: ocp
   - oracle: ocp
-  - sampler: greedy # crystal_gflownet # greedy # random
+  - sampler: surface_gflownet # surface_gflownet # greedy # random
   - selector: selector # selector # score
   - surrogate: svdkl_kernel_wrapper
   - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei

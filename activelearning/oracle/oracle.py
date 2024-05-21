@@ -1,6 +1,4 @@
 from abc import ABC, abstractmethod
-from gflownet.proxy.box.branin import Branin
-from gflownet.proxy.box.hartmann import Hartmann
 from gflownet.utils.common import set_float_precision
 from typing import Union
 import torch
@@ -22,45 +20,62 @@ class Oracle(ABC):
         pass
 
 
-class BraninOracle(Oracle, Branin):
-    def __init__(
-        self, cost=1, fidelity=1, do_domain_map=True, device="cpu", float_precision=64
-    ):
-        Oracle.__init__(
-            self,
-            cost,
-            device,
-            float_precision,
-        )
-        Branin.__init__(
-            self,
-            fidelity=fidelity,
-            do_domain_map=do_domain_map,
-            device=self.device,
-            float_precision=self.float_precision,
-        )
+try:
+    from gflownet.proxy.box.branin import Branin
 
-    def __call__(self, states):
-        return Branin.__call__(self, states.clone())
-
-
-class HartmannOracle(Oracle, Hartmann):
-    def __init__(self, cost=1, fidelity=1, device="cpu", float_precision=64):
-        Oracle.__init__(
+    class BraninOracle(Oracle, Branin):
+        def __init__(
             self,
-            cost,
-            device,
-            float_precision,
-        )
-        Hartmann.__init__(
-            self,
-            fidelity=fidelity,
-            device=self.device,
-            float_precision=self.float_precision,
-        )
+            cost=1,
+            fidelity=1,
+            do_domain_map=True,
+            device="cpu",
+            float_precision=64,
+        ):
+            Oracle.__init__(
+                self,
+                cost,
+                device,
+                float_precision,
+            )
+            Branin.__init__(
+                self,
+                fidelity=fidelity,
+                do_domain_map=do_domain_map,
+                device=self.device,
+                float_precision=self.float_precision,
+            )
 
-    def __call__(self, states):
-        return Hartmann.__call__(self, states.clone())
+        def __call__(self, states):
+            return Branin.__call__(self, states.clone())
+
+except ImportError:
+    print("please install gflownet to use the branin proxy")
+
+
+try:
+    from gflownet.proxy.box.hartmann import Hartmann
+
+    class HartmannOracle(Oracle, Hartmann):
+        def __init__(self, cost=1, fidelity=1, device="cpu", float_precision=64):
+            Oracle.__init__(
+                self,
+                cost,
+                device,
+                float_precision,
+            )
+            Hartmann.__init__(
+                self,
+                fidelity=fidelity,
+                device=self.device,
+                float_precision=self.float_precision,
+            )
+
+        def __call__(self, states):
+            return Hartmann.__call__(self, states.clone())
+
+except ImportError:
+    print("please install gflownet to use the hartmann proxy")
 
 
 # class MultiFidelityOracle(Oracle):
