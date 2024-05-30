@@ -61,7 +61,7 @@ class GPSurrogate(Surrogate):
 
         self.model = self.model_class(
             train_x,
-            train_y.unsqueeze(-1) * -1,  # turn into maximization problem
+            train_y.unsqueeze(-1),
             outcome_transform=self.outcome_transform,
             likelihood=self.likelihood,
             **self.kwargs,
@@ -181,8 +181,8 @@ class SVGPSurrogate(GPSurrogate):
         batch_x, batch_y = next(iter(train_data))
         batch_x = batch_x.to(self.device).to(self.float)
         batch_y = batch_y
-        batch_y = (
-            batch_y.to(self.device).to(self.float) * -1
+        batch_y = batch_y.to(self.device).to(
+            self.float
         )  # turn into maximization problem
 
         self.model = self.model_class(
@@ -217,8 +217,8 @@ class SVGPSurrogate(GPSurrogate):
             batch_losses = []
             for x_batch, y_batch in train_data:
                 x_batch = x_batch.to(self.device).to(self.float)
-                y_batch = (
-                    y_batch.to(self.device).to(self.float) * -1
+                y_batch = y_batch.to(self.device).to(
+                    self.float
                 )  # turn into maximization problem
                 optimizer.zero_grad()
                 output = self.model(x_batch)

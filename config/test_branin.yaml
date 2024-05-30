@@ -34,19 +34,19 @@ sampler:
       # Number of cells per dimension
       length: 100 
       # Mapping coordinates
-      cell_min: -1 # 0   # -1
-      cell_max: 1 # 0.99 # 1
+      cell_min: -1
+      cell_max: 1
     proxy:
       # Reward function: power or boltzmann
-      # boltzmann: exp(-1.0 * reward_beta * proxy)
-      # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
+      # boltzmann: exp(1.0 * reward_beta * proxy)
+      # power: (1.0 * proxy / reward_norm) ** self.reward_beta
       # identity: proxy
       reward_function: power
       # Minimum reward
       reward_min: 1e-8
       reward_function_kwargs: 
         # Beta parameter of the reward function
-        beta: -1.0
+        beta: 1.0
         # Reward normalization for "power" reward function
         # norm: 1.0
       

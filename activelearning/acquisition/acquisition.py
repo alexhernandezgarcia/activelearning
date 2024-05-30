@@ -33,10 +33,6 @@ class Acquisition(ABC):
     def __call__(self, candidate_set: torch.Tensor) -> torch.Tensor:
         """
         Evaluates the acquisition function on a set of candidates.
-
-        Note that the sampler (GFlowNet) operates as in a minimization problem, but the acquisition function is to be maximized. Therefore, the outputs are inverted.
-
-        TODO: remove -1; this will later be implemented directly in the gflownet environment (currently it always assumes negative values i.e. minimizing values)
         """
         if isinstance(candidate_set, torch.utils.data.dataloader.DataLoader):
             values = torch.Tensor([])
@@ -47,9 +43,9 @@ class Acquisition(ABC):
                         self.get_acquisition_values(batch).cpu(),
                     ]
                 )
-            return values * -1
+            return values
         else:
-            return self.get_acquisition_values(candidate_set) * -1
+            return self.get_acquisition_values(candidate_set)
 
     @abstractmethod
     def get_acquisition_values(self, candidate_set: torch.Tensor) -> torch.Tensor:
@@ -102,9 +98,7 @@ class BOTorchMonteCarloAcquisition(Acquisition):
                 train_X.to(self.device).to(self.float),
             )
         else:
-            best_f = (
-                dataset_handler.minY() * -1
-            )  # -1 because the data is a minimization problem, but the surrogate maximizes by multiplying by -1
+            best_f = dataset_handler.maxY()
             self.acq_fn = acq_fn_class(
                 surrogate_model,
                 best_f,

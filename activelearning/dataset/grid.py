@@ -48,7 +48,7 @@ class GridData(Data):
         append new instances to the data
         """
         # X, y = self.deprocess(X, y) # append data in raw form (i.e., not normalized)
-        X *= self.grid_size
+        X = (X+1) * self.grid_size / 2 # denormalize from the range [-1; 1]
         super().append(X, y)
         self.stats = self.get_statistics(self.y_data)  # update the score statistics
 

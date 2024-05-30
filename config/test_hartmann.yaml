@@ -31,8 +31,8 @@ sampler:
       length: 10
       n_dim: 6
       # Mapping coordinates
-      cell_min: 0   # -1
-      cell_max: 0.99 # 1
+      cell_min: -1
+      cell_max: 1
     proxy:
       # Reward function: power or boltzmann
       # boltzmann: exp(-1.0 * reward_beta * proxy)
