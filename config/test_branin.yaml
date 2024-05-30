@@ -41,13 +41,15 @@ sampler:
       # boltzmann: exp(-1.0 * reward_beta * proxy)
       # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
       # identity: proxy
-      reward_func: power
+      reward_function: power
       # Minimum reward
       reward_min: 1e-8
-      # Beta parameter of the reward function
-      reward_beta: 1.0
-      # Reward normalization for "power" reward function
-      reward_norm: 1.0
+      reward_function_kwargs: 
+        # Beta parameter of the reward function
+        beta: -1.0
+        # Reward normalization for "power" reward function
+        # norm: 1.0
+      
 
 device: cpu
 float_precision: 32
