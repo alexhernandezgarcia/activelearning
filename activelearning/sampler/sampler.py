@@ -95,23 +95,24 @@ class GFlowNetSampler(Sampler):
             _recursive_=False,
         )
 
-        grid_env = hydra.utils.instantiate(
+        env_maker = hydra.utils.instantiate(
             conf.env,
-            proxy=acquisition,
             device=device,
             float_precision=float_precision,
+            _partial_=True,
         )
+        env = env_maker()
 
         # The policy is used to model the probability of a forward/backward action
         forward_policy = hydra.utils.instantiate(
             conf.policy.forward,
-            env=grid_env,
+            env=env,
             device=device,
             float_precision=float_precision,
         )
         backward_policy = hydra.utils.instantiate(
             conf.policy.backward,
-            env=grid_env,
+            env=env,
             device=device,
             float_precision=float_precision,
         )
@@ -120,7 +121,7 @@ class GFlowNetSampler(Sampler):
         if conf.state_flow is not None:
             state_flow = hydra.utils.instantiate(
                 conf.state_flow,
-                env=grid_env,
+                env=env,
                 device=device,
                 float_precision=float_precision,
                 base=forward_policy,
@@ -128,12 +129,20 @@ class GFlowNetSampler(Sampler):
         else:
             state_flow = None
 
+        reward = hydra.utils.instantiate(
+            conf.proxy,
+            device=device,
+            float_precision=float_precision,
+            acquisition=acquisition,
+        )
+
         # GFlowNet Agent
         self.sampler = hydra.utils.instantiate(
             conf.agent,
             device=device,
             float_precision=float_precision,
-            env=grid_env,
+            env_maker=env_maker,
+            proxy=reward,
             forward_policy=forward_policy,
             backward_policy=backward_policy,
             state_flow=state_flow,

@@ -57,7 +57,7 @@ class GridData(Data):
         - normalizes the scores
         - normalizes the states
         """
-        states = X / self.grid_size
+        states = X / self.grid_size * 2 - 1  # normalize to [-1; 1]
         scores = None
         if self.normalize_scores and y is not None:
             scores = (y - self.stats["min"]) / (self.stats["max"] - self.stats["min"])
@@ -300,7 +300,11 @@ class BraninDatasetHandler(GridDatasetHandler):
                 candidate_set,
                 batch_size=self.batch_size,
             )
-        return candidate_set, xi / self.grid_size, yi / self.grid_size
+        return (
+            candidate_set,
+            xi / self.grid_size * 2 - 1,
+            yi / self.grid_size * 2 - 1,
+        )  # scale to [-1; 2]
 
 
 class CandidateGridData(Dataset):
