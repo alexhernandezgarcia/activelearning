@@ -74,7 +74,7 @@ class OCPData(Data):
 
         x, y = self.preprocess(x.to(self.float).squeeze(), y.to(self.float).squeeze())
         if self.return_target:
-            return x, y
+            return x, y * -1  # turn into maximization problem
         else:
             if self.return_index:
                 return x, idcs_in_dataset
@@ -258,7 +258,9 @@ class OCPDatasetHandler(DatasetHandler):
             # for saving lmdb datasets
             print("TODO: save dataset to file system")
 
-        return self.get_dataloader()
+        return (
+            y * -1
+        )  # turn into maximization problem because the oracle returns minimization...
 
     def get_candidate_set(self, return_index=False, as_dataloader=True):
         if not as_dataloader:

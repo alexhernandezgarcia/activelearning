@@ -93,9 +93,7 @@ class DatasetHandler(ABC):
     """
 
     @abstractmethod
-    def update_dataset(
-        self, X: torch.Tensor, y: torch.tensor
-    ) -> tuple[DataLoader, Optional[DataLoader]]:
+    def update_dataset(self, X: torch.Tensor, y: torch.tensor) -> torch.tensor:
         pass
 
     """

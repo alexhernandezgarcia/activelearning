@@ -2,8 +2,8 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: ocp
   - oracle: ocp
-  - sampler: surface_gflownet # surface_gflownet # greedy # random
-  - selector: selector # selector # score
+  - sampler: random # surface_gflownet # greedy # random
+  - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
   - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
   - user: default
@@ -14,7 +14,7 @@ defaults:
 
 logger:
   project_name: test_ocp_training
-  run_name: greedy_epochs-20_samples-100_mve_${seed}
+  run_name: random_epochs-20_samples-100_mve_${seed}_max
 
 dataset:
   checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
