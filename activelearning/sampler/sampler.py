@@ -157,3 +157,25 @@ class GFlowNetSampler(Sampler):
     def get_samples(self, n_samples, candidate_set=None):
         batch, times = self.sampler.sample_batch(n_forward=n_samples, train=False)
         return (batch.get_terminating_states(proxy=True), None)
+
+
+class RandomGFlowNetSampler(Sampler):
+    def __init__(self, acquisition, conf, device, float_precision):
+        super().__init__(acquisition, device, float_precision)
+        import hydra
+
+        env_maker = hydra.utils.instantiate(
+            conf.env,
+            device=device,
+            float_precision=float_precision,
+            _partial_=True,
+        )
+        self.env = env_maker()
+
+    def get_samples(self, n_samples, candidate_set=None):
+        if hasattr(self.env, "get_uniform_terminating_states"):
+            samples = torch.Tensor(self.env.get_uniform_terminating_states(n_samples))
+        else:
+            samples = torch.Tensor(self.env.get_random_terminating_states(n_samples))
+
+        return self.env.states2proxy(samples), None
