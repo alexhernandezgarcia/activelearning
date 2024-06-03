@@ -7,6 +7,20 @@ from ocpmodels.common.utils import make_trainer_from_dir
 
 
 class OCPData(Data):
+    """
+    Implements the "Data" class for OCP data.
+
+        data: DeupDataset - https://github.com/RolnickLab/ocp/blob/6a7ad7e41e6be6db9164586e4e944d72eeca9160/ocpmodels/datasets/lmdb_dataset.py#L254
+            the target is given in the property "y_relaxed" and is a minimization task (smaller is better);
+            when an item is returned, the target will be multiplied by -1 to turn it into a maximization task;
+        target_normalizer: mean and std normalizer - https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/modules/normalizer.py#L11
+        subset_idcs: specifies which subset of the data will be used (useful, if we want to have subsets for training and testing)
+        return_target: specifies whether the target should be returned;
+            if True, the target will be returned along the feature vector;
+            the target will be turned into a maximization task by multiplying by -1;
+        return_index: if True, the original index of an item will be returned along with the feature vector;
+    """
+
     def __init__(
         self,
         data,
@@ -16,9 +30,6 @@ class OCPData(Data):
         return_target=True,
         return_index=False,
     ):
-        """
-        subset_idcs: specifies which subset of the data will be used (useful, if we want to have subsets for training and testing)
-        """
         if subset_idcs is None:
             subset_idcs = torch.arange(len(data))
 

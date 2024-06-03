@@ -304,7 +304,7 @@ class BraninDatasetHandler(GridDatasetHandler):
             candidate_set,
             xi / self.grid_size * 2 - 1,
             yi / self.grid_size * 2 - 1,
-        )  # scale to [-1; 2]
+        )  # scale to [-1; 1]
 
 
 class CandidateGridData(Dataset):
