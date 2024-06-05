@@ -164,13 +164,11 @@ class RandomGFlowNetSampler(Sampler):
         super().__init__(acquisition, device, float_precision)
         import hydra
 
-        env_maker = hydra.utils.instantiate(
+        self.env = hydra.utils.instantiate(
             conf.env,
             device=device,
             float_precision=float_precision,
-            _partial_=True,
         )
-        self.env = env_maker()
 
     def get_samples(self, n_samples, candidate_set=None):
         if hasattr(self.env, "get_uniform_terminating_states"):
