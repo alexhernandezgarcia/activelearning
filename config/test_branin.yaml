@@ -2,7 +2,7 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: branin
   - oracle: branin
-  - sampler: gflownet #greedy #gflownet #random
+  - sampler: random_gflownet #greedy #gflownet #random
   - selector: score #selector #score
   - surrogate: gp
   - acquisition: botorch_mve
