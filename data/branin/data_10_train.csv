@@ -1,3 +1,5 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:22afe3fcefb1b815ffa224b5a5ca02568cfdfb427a3db81b1d1bae9873469539
-size 85
+,samples,energies
+0,[0 0],0.8709
+11,[0 4],171.1192
+18,[4 0],273.2218
+3,[8 8],174.8875
