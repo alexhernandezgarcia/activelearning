@@ -172,8 +172,8 @@ class RandomGFlowNetSampler(Sampler):
 
     def get_samples(self, n_samples, candidate_set=None):
         if hasattr(self.env, "get_uniform_terminating_states"):
-            samples = torch.Tensor(self.env.get_uniform_terminating_states(n_samples))
+            samples = self.env.get_uniform_terminating_states(n_samples)
         else:
-            samples = torch.Tensor(self.env.get_random_terminating_states(n_samples))
+            samples = self.env.get_random_terminating_states(n_samples)
 
         return self.env.states2proxy(samples), None
