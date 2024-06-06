@@ -178,7 +178,7 @@ def main(config):
             logger.log_step(i)
 
         if plotter is not None and selected_idcs is not None:
-            plotter.plot_scores(selected_idcs, scores, i)
+            plotter.plot_scores(selected_idcs, scores, i + 1)
 
     if logger is not None:
         import matplotlib.pyplot as plt

@@ -281,7 +281,9 @@ class OCPDatasetHandler(DatasetHandler):
         # return self.prepare_oracle_dataloader(self.candidate_data, sample_idcs)
         samples = []
         for idx in sample_idcs:
-            samples.append(self.candidate_data.get_raw_item(idx))
+            item = self.candidate_data.get_raw_item(idx)
+            item.pos = item.pos.to(self.float)
+            samples.append(item)
             # samples.append(self.trainer.datasets["deup-val_ood_cat-val_ood_ads"][idx])
 
         oracle_loader = DataLoader(
