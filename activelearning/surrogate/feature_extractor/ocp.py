@@ -61,6 +61,9 @@ class FAENetFeatureExtractor(nn.Module):
         # if we get a graph instance, we need to extract the hidden states with faenet; otherwise, x is assumed to contain hidden states
         if isinstance(x, torch_geometric.data.batch.Batch):
             hidden_states = self.faenet(x, retrieve_hidden=True)["hidden_state"]
+            assert (
+                len(x.batch) == hidden_states.shape[0]
+            ), "The output of the hidden state must be in graph format. To use an already scattered hidden state, the following line must be changed."
             x = scatter(hidden_states, x.batch.to(self.device), dim=0, reduce="mean")
         return self.mlp(x)
 
