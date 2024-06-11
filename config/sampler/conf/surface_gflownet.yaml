@@ -1,5 +1,4 @@
 defaults:
-  - env: crystal_surface
   - policy: base
   - agent: base
   - logger: base

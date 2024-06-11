@@ -5,6 +5,8 @@ from torch_geometric.data import Batch
 from ocpmodels.modules.normalizer import Normalizer
 from ocpmodels.common.utils import make_trainer_from_dir
 
+# from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
+
 
 class OCPData(Data):
     """
@@ -136,6 +138,7 @@ class OCPDatasetHandler(DatasetHandler):
 
     def __init__(
         self,
+        # env: CrystalSurfaceEnv,
         checkpoint_path,
         data_path,
         normalize_labels=True,
@@ -148,7 +151,10 @@ class OCPDatasetHandler(DatasetHandler):
         # device="cpu",
     ):
         super().__init__(
-            float_precision=float_precision, batch_size=batch_size, shuffle=shuffle
+            env=None,
+            float_precision=float_precision,
+            batch_size=batch_size,
+            shuffle=shuffle,
         )
 
         self.train_fraction = train_fraction

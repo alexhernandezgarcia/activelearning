@@ -85,7 +85,7 @@ class GFlowNetSampler(Sampler):
     Then it generates n samples proportionally to the reward.
     """
 
-    def __init__(self, acquisition, conf, device, float_precision):
+    def __init__(self, env_maker, acquisition, conf, device, float_precision):
         super().__init__(acquisition, device, float_precision)
         import hydra
 
@@ -95,12 +95,6 @@ class GFlowNetSampler(Sampler):
             _recursive_=False,
         )
 
-        env_maker = hydra.utils.instantiate(
-            conf.env,
-            device=device,
-            float_precision=float_precision,
-            _partial_=True,
-        )
         env = env_maker()
 
         # The policy is used to model the probability of a forward/backward action
@@ -146,7 +140,6 @@ class GFlowNetSampler(Sampler):
             forward_policy=forward_policy,
             backward_policy=backward_policy,
             state_flow=state_flow,
-            buffer=conf.env.buffer,
             logger=logger,
         )
 
@@ -160,15 +153,11 @@ class GFlowNetSampler(Sampler):
 
 
 class RandomGFlowNetSampler(Sampler):
-    def __init__(self, acquisition, conf, device, float_precision):
+    def __init__(self, env_maker, acquisition, conf, device, float_precision):
         super().__init__(acquisition, device, float_precision)
         import hydra
 
-        self.env = hydra.utils.instantiate(
-            conf.env,
-            device=device,
-            float_precision=float_precision,
-        )
+        self.env = env_maker()
 
     def get_samples(self, n_samples, candidate_set=None):
         if hasattr(self.env, "get_uniform_terminating_states"):

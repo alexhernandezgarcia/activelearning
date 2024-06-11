@@ -1,5 +1,4 @@
 defaults:
-  - env: grid #grid #ccube
   - policy: base
   - agent: base
   - logger: base

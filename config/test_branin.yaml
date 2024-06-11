@@ -1,8 +1,9 @@
 defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: branin
+  - env: grid
   - oracle: branin
-  - sampler: random_gflownet #greedy #gflownet #random
+  - sampler: random #random_gflownet #greedy #gflownet #random
   - selector: score #selector #score
   - surrogate: gp
   - acquisition: botorch_mve
@@ -12,11 +13,17 @@ defaults:
 
 logger:
   project_name: test_branin
-  run_name: ${dataset.grid_size}_gflownet_gp_mve
+  run_name: ${env.length}_random_gp_mve
 
 dataset:
-  grid_size: 100
   train_path: ~/activelearning/data/branin/data_100_train.csv
+  
+env:
+  # Number of cells per dimension
+  length: 100 
+  # Mapping coordinates
+  cell_min: -1
+  cell_max: 1
 
 sampler: 
   conf:
@@ -30,12 +37,6 @@ sampler:
         online: False #True
       project_name: "test_gflownet"
       run_name: "identity_lr5e-4"
-    env:
-      # Number of cells per dimension
-      length: 100 
-      # Mapping coordinates
-      cell_min: -1
-      cell_max: 1
     proxy:
       # Reward function: power or boltzmann
       # boltzmann: exp(1.0 * reward_beta * proxy)

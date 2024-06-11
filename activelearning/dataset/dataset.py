@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset, DataLoader
 import torch
 from gflownet.utils.common import set_float_precision
+from gflownet.envs.base import GFlowNetEnv
 from abc import ABC, abstractmethod
 from typing import Optional, Union
 import numpy as np
@@ -24,6 +25,7 @@ class Data(Dataset):
     def __getitem__(
         self, index: Union[int, slice, list, np.array]
     ) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+
         x_set = self.X_data[index].to(self.float)
         y_set = None
         if self.y_data is not None:
@@ -56,10 +58,12 @@ class DatasetHandler(ABC):
 
     def __init__(
         self,
+        env: GFlowNetEnv,
         float_precision: int = 64,
         batch_size=256,
         shuffle=True,
     ):
+        self.env = env
         self.float = set_float_precision(float_precision)
         self.batch_size = batch_size
         self.shuffle = shuffle

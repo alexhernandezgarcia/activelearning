@@ -35,9 +35,18 @@ def main(config):
     # TODO: rethink where this configuration should go
     n_samples = config.n_samples
 
+    # --- Environment
+    env_maker = hydra.utils.instantiate(
+        config.env,
+        device=config.device,
+        float_precision=config.float_precision,
+        _partial_=True,
+    )
+
     # --- Dataset
     dataset_handler = hydra.utils.instantiate(
         config.dataset,
+        env=env_maker(),
         float_precision=config.float_precision,
     )
 
@@ -130,6 +139,7 @@ def main(config):
         # also starts with a clean slate; TODO: experiment with NOT training from scratch
         sampler = hydra.utils.instantiate(
             config.sampler,
+            env_maker=env_maker,
             acquisition=acquisition,
             device=config.device,
             float_precision=config.float_precision,

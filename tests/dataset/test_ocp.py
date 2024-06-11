@@ -8,7 +8,10 @@ def ocp_dataset_handler_base():
     ocp_checkpoint_path = "/network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt"
     dataset_path = "/network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset"
     dataset_handler = OCPDatasetHandler(
-        ocp_checkpoint_path, dataset_path, float_precision=32
+        # env=env,
+        ocp_checkpoint_path,
+        dataset_path,
+        float_precision=32,
     )
     return dataset_handler
 
