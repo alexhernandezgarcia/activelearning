@@ -4,8 +4,7 @@ import torch
 from torch_geometric.data import Batch
 from ocpmodels.modules.normalizer import Normalizer
 from ocpmodels.common.utils import make_trainer_from_dir
-
-# from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
+from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
 
 
 class OCPData(Data):
@@ -138,7 +137,7 @@ class OCPDatasetHandler(DatasetHandler):
 
     def __init__(
         self,
-        # env: CrystalSurfaceEnv,
+        env: CrystalSurfaceEnv,  # TODO: which parts of this environment can we use in the dataset handler? are there any faenet processing functions etc?
         checkpoint_path,
         data_path,
         normalize_labels=True,
@@ -151,7 +150,7 @@ class OCPDatasetHandler(DatasetHandler):
         # device="cpu",
     ):
         super().__init__(
-            env=None,
+            env=env,
             float_precision=float_precision,
             batch_size=batch_size,
             shuffle=shuffle,

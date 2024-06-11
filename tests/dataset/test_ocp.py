@@ -1,14 +1,16 @@
 import pytest
 import torch
 from activelearning.dataset.ocp import OCPDatasetHandler
+from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
 
 
 @pytest.fixture
 def ocp_dataset_handler_base():
     ocp_checkpoint_path = "/network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt"
     dataset_path = "/network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset"
+    env = CrystalSurfaceEnv()
     dataset_handler = OCPDatasetHandler(
-        # env=env,
+        env,
         ocp_checkpoint_path,
         dataset_path,
         float_precision=32,
@@ -20,7 +22,9 @@ def ocp_dataset_handler_base():
 def ocp_dataset_handler_train_split():
     ocp_checkpoint_path = "/network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt"
     dataset_path = "/network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset"
+    env = CrystalSurfaceEnv()
     dataset_handler = OCPDatasetHandler(
+        env,
         ocp_checkpoint_path,
         dataset_path,
         train_fraction=0.1,
