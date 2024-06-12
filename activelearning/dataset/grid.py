@@ -4,6 +4,7 @@ from torch.nn.utils.rnn import pad_sequence
 import pandas as pd
 import torch
 from gflownet.envs.grid import Grid as GridEnv
+from typing import Optional, Callable
 
 
 class GridData(Data):
@@ -14,6 +15,8 @@ class GridData(Data):
         y_data: array(N, 1); scores at each position
         normalize_scores: bool; maps the scores to [0; 1]
         grid_size: int; specifies the width and height of the grid (grid_size x grid_size); used to normalize the state positions
+        state2result: function that takes raw states (X_data) and transforms them into the desired format;
+            in case of GFN environments, this can be the states2proxy function
 
     """
 
@@ -23,7 +26,7 @@ class GridData(Data):
         X_data,
         y_data=None,
         normalize_scores=True,
-        state2result=None,
+        state2result: Optional[Callable[[torch.Tensor], any]] = None,
         float=torch.float64,
     ):
         super().__init__(X_data, y_data, float=float)
