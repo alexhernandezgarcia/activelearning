@@ -3,7 +3,7 @@ defaults:
   - dataset: branin
   - env: grid
   - oracle: branin
-  - sampler: random_gflownet #random_gflownet #greedy #gflownet #random
+  - sampler: gflownet #random_gflownet #greedy #gflownet #random
   - selector: score #selector #score
   - surrogate: gp
   - acquisition: botorch_mve

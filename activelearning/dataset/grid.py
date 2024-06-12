@@ -14,7 +14,6 @@ class GridData(Data):
         X_data: array(N, d) in the domain [0; grid_size], where d is the dimensionality of the grid world (e.g. for Branin d=2; for Hartmann d=6); states (i.e., grid positions)
         y_data: array(N, 1); scores at each position
         normalize_scores: bool; maps the scores to [0; 1]
-        grid_size: int; specifies the width and height of the grid (grid_size x grid_size); used to normalize the state positions
         state2result: function that takes raw states (torch.Tensor) (aka environment format) and transforms them into the desired format;
             in case of GFN environments, this can be the states2proxy function
 
@@ -22,16 +21,16 @@ class GridData(Data):
 
     def __init__(
         self,
-        grid_size,
         X_data,
         y_data=None,
         state2result: Optional[Callable[[torch.Tensor], any]] = None,
         normalize_scores=True,
         float=torch.float64,
     ):
-        super().__init__(X_data, y_data, state2result=state2result, float=float)
+        super().__init__(
+            X_data=X_data, y_data=y_data, state2result=state2result, float=float
+        )
         self.normalize_scores = normalize_scores
-        self.grid_size = grid_size
         self.stats = self.get_statistics(y_data)
 
     def get_statistics(self, y):
@@ -168,7 +167,6 @@ class GridDatasetHandler(DatasetHandler):
             train_scores = train_scores[train_index]
 
         self.train_data = GridData(
-            self.env.length,
             train_states,
             train_scores,
             float=self.float,
@@ -177,7 +175,6 @@ class GridDatasetHandler(DatasetHandler):
 
         if len(test_states) > 0:
             self.test_data = GridData(
-                self.env.length,
                 test_states,
                 test_scores,
                 float=self.float,
@@ -260,6 +257,9 @@ class GridDatasetHandler(DatasetHandler):
 
         return energies
 
+    def get_custom_dataset(self, samples: torch.Tensor) -> Data:
+        return GridData(samples, state2result=self.env.states2proxy)
+
 
 class BraninDatasetHandler(GridDatasetHandler):
     def __init__(self, **kwargs):
@@ -273,9 +273,7 @@ class BraninDatasetHandler(GridDatasetHandler):
         yi = np.arange(0, self.env.length)
         grid = np.array(np.meshgrid(xi, yi))
         grid_flat = torch.tensor(grid.T, dtype=self.float).reshape(-1, 2)
-        candidate_set = GridData(
-            self.env.length, grid_flat, state2result=self.env.states2proxy
-        )
+        candidate_set = GridData(grid_flat, state2result=self.env.states2proxy)
         if as_dataloader:
             candidate_set = DataLoader(
                 candidate_set,
@@ -336,9 +334,7 @@ class HartmannDatasetHandler(GridDatasetHandler):
         # grid = np.array(np.meshgrid(*[xi, yi] * 3))
         # grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 6)
         grid_flat = CandidateGridData(self.env.length, self.env.n_dim, step=step)
-        candidate_set = GridData(
-            self.env.length, grid_flat, state2result=self.env.states2proxy
-        )
+        candidate_set = GridData(grid_flat, state2result=self.env.states2proxy)
         if as_dataloader:
             candidate_set = DataLoader(
                 candidate_set,

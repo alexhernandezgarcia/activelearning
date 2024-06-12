@@ -42,10 +42,12 @@ class Data(Dataset):
         return len(self.X_data)
 
     def get_raw_item(
-        self, index: Union[int, slice, list, np.array]
+        self, index: Union[int, slice, list, np.array] = None
     ) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+        if index is None:
+            return self.X_data, self.y_data
         if self.y_data is None:
-            return self.X_data[0]
+            return self.X_data[index]
         return self.X_data[index], self.y_data[index]
 
     def preprocess(self, X, y):
@@ -115,6 +117,14 @@ class DatasetHandler(ABC):
 
     @abstractmethod
     def get_candidate_set(self) -> tuple[Union[Data, DataLoader], Optional[any]]:
+        pass
+
+    """
+    returns a set of sample states as a Data Object
+    """
+
+    @abstractmethod
+    def get_custom_dataset(self, samples: torch.Tensor) -> Data:
         pass
 
     """
