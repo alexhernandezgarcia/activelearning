@@ -15,7 +15,7 @@ class GridData(Data):
         y_data: array(N, 1); scores at each position
         normalize_scores: bool; maps the scores to [0; 1]
         grid_size: int; specifies the width and height of the grid (grid_size x grid_size); used to normalize the state positions
-        state2result: function that takes raw states (X_data) and transforms them into the desired format;
+        state2result: function that takes raw states (torch.Tensor) (aka environment format) and transforms them into the desired format;
             in case of GFN environments, this can be the states2proxy function
 
     """
@@ -25,15 +25,14 @@ class GridData(Data):
         grid_size,
         X_data,
         y_data=None,
-        normalize_scores=True,
         state2result: Optional[Callable[[torch.Tensor], any]] = None,
+        normalize_scores=True,
         float=torch.float64,
     ):
-        super().__init__(X_data, y_data, float=float)
+        super().__init__(X_data, y_data, state2result=state2result, float=float)
         self.normalize_scores = normalize_scores
         self.grid_size = grid_size
         self.stats = self.get_statistics(y_data)
-        self.state2result = state2result
 
     def get_statistics(self, y):
         """
@@ -106,12 +105,12 @@ class GridDatasetHandler(DatasetHandler):
 
         self.initialise_dataset()
 
-    def proxy2state(self, proxy_state):
-        """
-        Converts a proxy state into the raw state format.
-        """
-        domain_01 = (proxy_state + 1) / 2
-        return domain_01 * (self.env.length - 1)
+    # def proxy2state(self, proxy_state):
+    #     """
+    #     Converts a proxy state into the raw state format.
+    #     """
+    #     domain_01 = (proxy_state + 1) / 2
+    #     return domain_01 * (self.env.length - 1)
 
     def maxY(self):
         _, train_y = self.train_data[:]
@@ -246,7 +245,7 @@ class GridDatasetHandler(DatasetHandler):
 
         # append to in-memory dataset
         # TODO: also save a fraction to test_data?
-        self.train_data.append(self.proxy2state(states), energies)
+        self.train_data.append(states, energies)
 
         if save_path is not None:
             readable_states = [self.env.state2readable(state) for state in states]
@@ -270,11 +269,13 @@ class BraninDatasetHandler(GridDatasetHandler):
         import numpy as np
 
         # define candidate set
-        xi = self.env.cells
-        yi = self.env.cells
+        xi = np.arange(0, self.env.length)
+        yi = np.arange(0, self.env.length)
         grid = np.array(np.meshgrid(xi, yi))
         grid_flat = torch.tensor(grid.T, dtype=self.float).reshape(-1, 2)
-        candidate_set = GridData(self.env.length, grid_flat, state2result=None)[:]
+        candidate_set = GridData(
+            self.env.length, grid_flat, state2result=self.env.states2proxy
+        )
         if as_dataloader:
             candidate_set = DataLoader(
                 candidate_set,
@@ -330,8 +331,8 @@ class HartmannDatasetHandler(GridDatasetHandler):
         import numpy as np
 
         # define candidate set
-        xi = self.env.cells
-        yi = self.env.cells
+        xi = np.arange(0, self.grid_size)
+        yi = np.arange(0, self.grid_size)
         # grid = np.array(np.meshgrid(*[xi, yi] * 3))
         # grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 6)
         grid_flat = CandidateGridData(self.env.length, self.env.n_dim, step=step)

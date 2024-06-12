@@ -3,7 +3,7 @@ import torch
 from gflownet.utils.common import set_float_precision
 from gflownet.envs.base import GFlowNetEnv
 from abc import ABC, abstractmethod
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 import numpy as np
 
 
@@ -12,6 +12,7 @@ class Data(Dataset):
         self,
         X_data: torch.Tensor,
         y_data: Optional[torch.Tensor] = None,
+        state2result: Optional[Callable[[torch.Tensor], any]] = None,
         float: Union[torch.dtype, int] = torch.float64,
     ) -> None:
         self.float = float
@@ -20,6 +21,7 @@ class Data(Dataset):
         if y_data is not None:
             self.y_data = y_data
 
+        self.state2result = state2result
         self.shape = X_data.shape
 
     def __getitem__(
@@ -39,8 +41,15 @@ class Data(Dataset):
     def __len__(self):
         return len(self.X_data)
 
+    def get_raw_item(
+        self, index: Union[int, slice, list, np.array]
+    ) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
+        if self.y_data is None:
+            return self.X_data[0]
+        return self.X_data[index], self.y_data[index]
+
     def preprocess(self, X, y):
-        return X, y
+        return self.state2result(X), y
 
     def append(self, X, y):
         """
