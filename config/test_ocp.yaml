@@ -11,11 +11,11 @@ defaults:
   - logger: wandb
   # cime4r export significantly increases runtime --> only use when really needed; 
   # note: does not work when using gflownet yet, because gflownet produces new samples --> TODO
-  - plotter: cime4r_ocp
+  - plotter: null # cime4r_ocp
 
 logger:
   project_name: test_ocp_training
-  run_name: random_epochs-20_samples-100_mve_${seed}_max
+  run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}_max
 
 dataset:
   checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt

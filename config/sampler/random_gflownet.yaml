@@ -2,3 +2,5 @@ _target_: activelearning.sampler.sampler.RandomGFlowNetSampler
 
 defaults:
   - conf: gflownet
+
+id: random-gfn

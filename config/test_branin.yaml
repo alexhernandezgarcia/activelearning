@@ -4,7 +4,7 @@ defaults:
   - env: grid
   - oracle: branin
   - sampler: gflownet #random_gflownet #greedy #gflownet #random
-  - selector: score #selector #score
+  - selector: selector #selector #score
   - surrogate: gp
   - acquisition: botorch_mve
   - user: default
@@ -13,7 +13,7 @@ defaults:
 
 logger:
   project_name: test_branin
-  run_name: ${env.length}_random_gp_mve
+  run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}
 
 dataset:
   train_path: ~/activelearning/data/branin/data_100_train.csv

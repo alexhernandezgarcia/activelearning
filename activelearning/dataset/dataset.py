@@ -45,6 +45,8 @@ class Data(Dataset):
         self, index: Union[int, slice, list, np.array] = None
     ) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         if index is None:
+            if self.y_data is None:
+                return self.X_data
             return self.X_data, self.y_data
         if self.y_data is None:
             return self.X_data[index]
@@ -128,12 +130,11 @@ class DatasetHandler(ABC):
         pass
 
     """
-    prepares a set of sample data instances
-    only needed if there is a missmatch between the data used for the surrogate and the data for the oracle
+    transforms states into oracle format. by default the format is the same format as states2proxy
     """
 
-    def prepare_dataset_for_oracle(self, samples, sample_idcs):
-        return samples
+    def states2oracle(self, samples):
+        return self.get_custom_dataset(samples)
 
     def prepare_oracle_dataloader(self, dataset: Data, sample_idcs=None):
         return dataset

@@ -15,6 +15,7 @@ from typing import Union
 import torch
 from botorch.models.gpytorch import GPyTorchModel
 from functools import partial
+from activelearning.dataset.dataset import Data
 
 
 class Acquisition(ABC):
@@ -24,13 +25,14 @@ class Acquisition(ABC):
         dataset_handler: DatasetHandler,
         device: Union[str, torch.device],
         float_precision: Union[int, torch.dtype],
+        **kwargs
     ) -> None:
         self.dataset_handler = dataset_handler
         self.device = device
         self.float = set_float_precision(float_precision)
         self.surrogate_model = surrogate_model
 
-    def __call__(self, candidate_set: torch.Tensor) -> torch.Tensor:
+    def __call__(self, candidate_set: Data) -> torch.Tensor:
         """
         Evaluates the acquisition function on a set of candidates.
         """
@@ -48,7 +50,9 @@ class Acquisition(ABC):
             return self.get_acquisition_values(candidate_set)
 
     @abstractmethod
-    def get_acquisition_values(self, candidate_set: torch.Tensor) -> torch.Tensor:
+    def get_acquisition_values(
+        self, candidate_set: Union[torch.Tensor, Data]
+    ) -> torch.Tensor:
         pass
 
     def setup(self, env: any) -> None:
@@ -64,12 +68,13 @@ class BOTorchMaxValueEntropyAcquisition(Acquisition):
         dataset_handler=None,
         device="cpu",
         float_precision=64,
+        **kwargs
     ):
         super().__init__(surrogate_model, dataset_handler, device, float_precision)
         self.acq_fn_class = acq_fn_class
 
-    def get_acquisition_values(self, candidate_set):
-        candidate_set = candidate_set.to(self.device).to(self.float)
+    def get_acquisition_values(self, candidate_set: Union[torch.Tensor, Data]):
+        candidate_set = candidate_set[:].to(self.device).to(self.float)
         self.acq_fn = self.acq_fn_class(
             self.surrogate_model,
             candidate_set=candidate_set,
@@ -86,6 +91,7 @@ class BOTorchMonteCarloAcquisition(Acquisition):
         dataset_handler: DatasetHandler,
         device="cpu",
         float_precision=64,
+        **kwargs
     ):
         super().__init__(surrogate_model, dataset_handler, device, float_precision)
         base_class = (
@@ -104,6 +110,6 @@ class BOTorchMonteCarloAcquisition(Acquisition):
                 best_f,
             )
 
-    def get_acquisition_values(self, candidate_set):
+    def get_acquisition_values(self, candidate_set: Union[torch.Tensor, Data]):
         candidate_set = candidate_set.to(self.device).to(self.float)
         return self.acq_fn(candidate_set.unsqueeze(1)).detach()

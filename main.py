@@ -160,14 +160,14 @@ def main(config):
             maximize=True,
         )
         samples_selected, selected_idcs = selector(
-            n_samples=n_samples, candidate_set=samples, index_set=sample_indices
+            n_samples=n_samples,
+            candidate_set=dataset_handler.get_custom_dataset(samples),
+            index_set=sample_indices,
         )
 
-        oracle_samples = dataset_handler.prepare_dataset_for_oracle(
-            samples_selected, selected_idcs
-        )
+        oracle_samples = dataset_handler.states2oracle(samples_selected)
         scores = oracle(oracle_samples).cpu()
-        scores = dataset_handler.update_dataset(oracle_samples.cpu(), scores)
+        scores = dataset_handler.update_dataset(samples_selected, scores)
 
         print("Proposed Candidates:", oracle_samples)
         print("Oracle Scores:", scores)

@@ -19,6 +19,7 @@ from gpytorch.constraints import GreaterThan
 from torch.optim import SGD, Adam
 from tqdm import tqdm
 from activelearning.utils.logger import Logger
+from activelearning.dataset.dataset import Data
 
 
 class GPSurrogate(Surrogate):
@@ -100,7 +101,9 @@ class GPSurrogate(Surrogate):
         #     iterator.set_postfix(loss=loss.item())
         #     optimizer.step()
 
-    def get_predictions(self, states: Union[torch.Tensor, DataLoader]) -> torch.Tensor:
+    def get_predictions(
+        self, states: Union[torch.Tensor, Data, DataLoader]
+    ) -> torch.Tensor:
         self.model.eval()
         self.model.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
@@ -125,7 +128,7 @@ class GPSurrogate(Surrogate):
                     )
                 return torch.concat([y_mean.unsqueeze(0), y_std.unsqueeze(0)], dim=0)
             else:
-                states_proxy = states.clone().to(self.device).to(self.float)
+                states_proxy = states[:].to(self.device).to(self.float)
                 posterior = self.model.posterior(states_proxy)
                 y_mean = posterior.mean
                 y_std = posterior.variance.sqrt()
@@ -160,6 +163,7 @@ class SVGPSurrogate(GPSurrogate):
         train_epochs: int = 150,
         lr: float = 0.1,
         logger: Logger = None,
+        id: str = "",
         **kwargs: any,
     ) -> None:
         super().__init__(

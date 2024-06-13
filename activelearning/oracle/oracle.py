@@ -49,7 +49,7 @@ try:
             )
 
         def __call__(self, states):
-            return Branin.proxy2reward(self, Branin.__call__(self, states))
+            return Branin.proxy2reward(self, Branin.__call__(self, states[:]))
 
 except ImportError:
     print("please install gflownet to use the branin proxy")

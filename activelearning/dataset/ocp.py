@@ -121,8 +121,7 @@ class OCPData(Data):
 
     def append(self, X: Batch, y: torch.Tensor):
         y = self.target_normalizer.denorm(y).cpu()
-        data_to_append = X.to_data_list()
-        # TODO: we should overwrite the target value with the oracle value, but the oracle value is off
+        data_to_append = X  # .to_data_list()
         for i in range(len(data_to_append)):
             # overwriting the target value with the oracle value
             data_to_append[i].y_relaxed = y[i]
@@ -320,9 +319,16 @@ class OCPDatasetHandler(DatasetHandler):
             samples,
             state2result=self.state2proxy,
             target_normalizer=self.trainer.normalizers["target"],
+            return_target=False,
         )
 
-    def prepare_dataset_for_oracle(self, samples):
+    """
+    Transforms states into oracle format. 
+    For ocp and faenet, we need the raw input data with the faenet trainer's collate function.
+    This results in a torch_geometric DataBatch object.
+    """
+
+    def states2oracle(self, samples) -> Batch:
         oracle_loader = DataLoader(
             samples,
             collate_fn=self.trainer.parallel_collater,

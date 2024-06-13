@@ -1,1 +1,3 @@
 _target_: activelearning.sampler.sampler.RandomSampler
+
+id: random

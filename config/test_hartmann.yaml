@@ -13,7 +13,7 @@ defaults:
 
 logger:
   project_name: test_hartmann
-  run_name: 10_greedy_gp_mve
+  run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}
 
 dataset:
   train_path: ~/activelearning/my_package/storage/hartmann/data_train.csv

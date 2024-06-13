@@ -5,3 +5,6 @@ train_epochs: 150
 lr: 0.1
 mll_args: 
   num_data: 100 # number of training data instances
+
+
+id: svdkl-${surrogate.train_epochs}-epochs

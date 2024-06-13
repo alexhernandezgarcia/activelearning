@@ -258,7 +258,7 @@ class GridDatasetHandler(DatasetHandler):
         return energies
 
     def get_custom_dataset(self, samples: torch.Tensor) -> Data:
-        return GridData(samples, state2result=self.env.states2proxy)
+        return GridData(torch.Tensor(samples), state2result=self.env.states2proxy)
 
 
 class BraninDatasetHandler(GridDatasetHandler):
