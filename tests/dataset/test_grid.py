@@ -13,14 +13,14 @@ import numpy as np
 def grid_data_1():
     X_data = torch.tensor([[0, 0], [0, 1], [1, 0]])
     y_data = torch.tensor([2.0, 1.5, 0.7])
-    return GridData(grid_size=10, X_data=X_data, y_data=y_data)
+    return GridData(X_data=X_data, y_data=y_data)
 
 
 @pytest.fixture
 def grid_data_2():
     X_data = torch.tensor([[1, 0], [2, 1], [1, 7]])
     y_data = torch.tensor([2.1, 0.5, 0.9])
-    return GridData(grid_size=3, X_data=X_data, y_data=y_data)
+    return GridData(X_data=X_data, y_data=y_data)
 
 
 @pytest.mark.parametrize(
@@ -58,9 +58,7 @@ def test__grid_data__initializes_properly(grid_data, request):
 )
 def test__grid_data__state2proxy(states, states2proxy):
     env = GridEnv(length=10)
-    data = GridData(
-        grid_size=env.length, X_data=states, y_data=None, state2result=env.states2proxy
-    )
+    data = GridData(X_data=states, y_data=None, state2result=env.states2proxy)
     x = data[:]
     assert torch.equal(states2proxy, x)
 
@@ -91,7 +89,6 @@ def test__grid_data__state2proxy(states, states2proxy):
 def test__grid_data__target_normalization(score, score_norm):
     X_data = torch.tensor([[0, 0], [0, 1], [1, 0]])
     data = GridData(
-        grid_size=10,
         X_data=X_data,
         y_data=score,
         normalize_scores=True,
@@ -156,22 +153,20 @@ def test__branin__state2proxy(branin_dataset_handler):
         ),
     ],
 )
-def test__branin__proxy2state(branin_dataset_handler, states, states2proxy):
+def test__branin__states2proxy(branin_dataset_handler, states, states2proxy):
     proxy_states = branin_dataset_handler.env.states2proxy(states)
     assert torch.equal(states2proxy, proxy_states)
-    raw_states = branin_dataset_handler.proxy2state(proxy_states)
-    assert torch.equal(states, raw_states)
 
 
 @pytest.mark.parametrize(
-    "new_proxy_states, all_states, new_scores, all_scores",
+    "new_states, all_states, new_scores, all_scores",
     [
         (
             torch.Tensor(
                 [
-                    [-1.0, -1.0],
-                    [0.1111111111111111, 0.1111111111111111],
-                    [1.0, 1.0],
+                    [0, 0],
+                    [5, 5],
+                    [9, 9],
                 ]
             ),
             torch.Tensor(
@@ -207,9 +202,9 @@ def test__branin__proxy2state(branin_dataset_handler, states, states2proxy):
     ],
 )
 def test__branin__update_dataset(
-    branin_dataset_handler, new_proxy_states, all_states, new_scores, all_scores
+    branin_dataset_handler, new_states, all_states, new_scores, all_scores
 ):
-    branin_dataset_handler.update_dataset(new_proxy_states, new_scores)
+    branin_dataset_handler.update_dataset(new_states, new_scores)
     assert torch.equal(branin_dataset_handler.train_data.X_data, all_states)
     assert torch.equal(branin_dataset_handler.train_data.y_data, all_scores)
 
@@ -251,20 +246,7 @@ def test__branin__candidate_set(branin_dataset_handler):
     assert np.all(
         np.equal(
             xi,
-            np.array(
-                [
-                    -1.0,
-                    -0.7777777777777778,
-                    -0.5555555555555556,
-                    -0.33333333333333337,
-                    -0.11111111111111116,
-                    0.11111111111111116,
-                    0.33333333333333326,
-                    0.5555555555555554,
-                    0.7777777777777777,
-                    1.0,
-                ]
-            ),
+            np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
         )
     )
 
@@ -307,5 +289,11 @@ def hartmann_dataset_handler():
 def test__hartmann__candidate_set(hartmann_dataset_handler, indices, states):
     candidate_set, xi, yi = hartmann_dataset_handler.get_candidate_set()
     assert np.all(np.equal(xi, yi))
+    assert np.all(
+        np.equal(
+            xi,
+            np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+        )
+    )
     test_states = candidate_set.dataset[indices]
     assert torch.equal(states, test_states)

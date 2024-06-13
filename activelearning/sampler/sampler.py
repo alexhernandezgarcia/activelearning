@@ -49,13 +49,13 @@ class GreedySampler(Sampler):
                 )
             acq_values = torch.cat(acq_values)
             idx_pick = torch.argsort(acq_values, descending=True)[:n_samples]
-            return (candidate_set.dataset.get_raw_item(idx_pick), idx_pick)
+            return (candidate_set.dataset.get_raw_items(idx_pick), idx_pick)
         else:
             acq_values = self.acquisition(
                 candidate_set[:].to(self.device).to(self.float_precision)
             ).detach()
             idx_pick = torch.argsort(acq_values, descending=True)[:n_samples]
-            return (candidate_set.get_raw_item(idx_pick), idx_pick)
+            return (candidate_set.get_raw_items(idx_pick), idx_pick)
 
 
 class RandomSampler(Sampler):
@@ -71,11 +71,11 @@ class RandomSampler(Sampler):
             idx_pick = torch.randint(
                 0, len(candidate_set.dataset), size=(n_samples,), device=self.device
             )
-            return (candidate_set.dataset.get_raw_item(idx_pick), idx_pick)
+            return (candidate_set.dataset.get_raw_items(idx_pick), idx_pick)
         idx_pick = torch.randint(
             0, len(candidate_set), size=(n_samples,), device=self.device
         )
-        return (candidate_set.get_raw_item(idx_pick), idx_pick)
+        return (candidate_set.get_raw_items(idx_pick), idx_pick)
 
 
 class GFlowNetSampler(Sampler):

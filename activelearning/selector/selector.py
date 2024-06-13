@@ -24,8 +24,8 @@ class Selector:
         index_set: Optional[torch.Tensor] = None,
     ):
         if index_set is None:
-            return candidate_set.get_raw_item(slice(0, n_samples)), None
-        return candidate_set.get_raw_item(slice(0, n_samples)), index_set[:n_samples]
+            return candidate_set.get_raw_items(slice(0, n_samples)), None
+        return candidate_set.get_raw_items(slice(0, n_samples)), index_set[:n_samples]
 
 
 class ScoreSelector(Selector):
@@ -40,5 +40,5 @@ class ScoreSelector(Selector):
         scores = self.score_fn(candidate_set[:].to(self.device).to(self.float))
         idx_pick = torch.argsort(scores, descending=self.maximize)[:n_samples]
         if index_set is None:
-            return candidate_set.get_raw_item(idx_pick), None
-        return candidate_set.get_raw_item(idx_pick), index_set[idx_pick]
+            return candidate_set.get_raw_items(idx_pick), None
+        return candidate_set.get_raw_items(idx_pick), index_set[idx_pick]

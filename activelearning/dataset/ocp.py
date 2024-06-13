@@ -5,7 +5,7 @@ from torch_geometric.data import Batch
 from ocpmodels.modules.normalizer import Normalizer
 from ocpmodels.common.utils import make_trainer_from_dir
 from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
-from torch_scatter import scatter
+from typing import Optional, Union, Callable
 
 
 class OCPData(Data):
@@ -91,8 +91,19 @@ class OCPData(Data):
                 return x, idcs_in_dataset
             return x
 
+    def get_raw_items(self, key: Union[int, slice, list] = None):
+        if isinstance(key, int):
+            return self.get_raw_item(key)
+
+        if isinstance(key, slice):
+            start, stop, step = key.indices(len(self))
+            states = [self.get_raw_item(i) for i in range(start, stop, step)]
+            return states
+
+        states = [self.get_raw_item(i) for i in key]
+        return states
+
     def get_raw_item(self, index):
-        # TODO: handle slices and lists...
         if index < len(self.subset_idcs):
             # map to actual index of original dataset
             index = self.subset_idcs[index]
@@ -130,7 +141,7 @@ class OCPRawDataMapper(Dataset):
         return len(self.subset_idcs)
 
     def __getitem__(self, key):
-        return self.candidate_data.get_raw_item(self.subset_idcs[key])
+        return self.candidate_data.get_raw_items(self.subset_idcs[key])
 
 
 class OCPDatasetHandler(DatasetHandler):

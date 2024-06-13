@@ -41,7 +41,7 @@ class Data(Dataset):
     def __len__(self):
         return len(self.X_data)
 
-    def get_raw_item(
+    def get_raw_items(
         self, index: Union[int, slice, list, np.array] = None
     ) -> Union[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         if index is None:

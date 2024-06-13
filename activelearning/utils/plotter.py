@@ -247,7 +247,7 @@ class OCPCIME4RExportHelper(CIME4RExportHelper):
 
         # init original train data
         for i in range(len(self.dataset_handler.train_data)):
-            datapoint = self.dataset_handler.train_data.get_raw_item(i)
+            datapoint = self.dataset_handler.train_data.get_raw_items(i)
             idx = datapoint.idx_in_dataset
             target = datapoint.y_relaxed
             cime4r_df.loc[idx, "measured_target"] = target

@@ -52,3 +52,32 @@ def test__ocp_data__init(ocp_dataset_handler, train_shape, test_shape, request):
     ocp_dataset_handler = request.getfixturevalue(ocp_dataset_handler)
     assert ocp_dataset_handler.train_data.shape == train_shape
     assert ocp_dataset_handler.test_data.shape == test_shape
+
+
+@pytest.mark.parametrize(
+    "ocp_dataset_handler",
+    [
+        "ocp_dataset_handler_base",
+        "ocp_dataset_handler_train_split",
+    ],
+)
+def test__ocp_dataloader(ocp_dataset_handler, request):
+    ocp_dataset_handler = request.getfixturevalue(ocp_dataset_handler)
+    train_dataloader, test_dataloader = ocp_dataset_handler.get_dataloader()
+    next(iter(train_dataloader))
+    next(iter(test_dataloader))
+    assert True
+
+
+@pytest.mark.parametrize(
+    "ocp_dataset_handler",
+    [
+        "ocp_dataset_handler_base",
+        "ocp_dataset_handler_train_split",
+    ],
+)
+def test__ocp_candidate_set(ocp_dataset_handler, request):
+    ocp_dataset_handler = request.getfixturevalue(ocp_dataset_handler)
+    candidate_set, _, _ = ocp_dataset_handler.get_candidate_set(return_index=True)
+    next(iter(candidate_set))
+    assert True
