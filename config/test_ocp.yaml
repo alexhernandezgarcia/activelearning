@@ -3,7 +3,7 @@ defaults:
   - dataset: ocp
   - oracle: ocp
   - env: crystal_surface
-  - sampler: random # surface_gflownet # greedy # random
+  - sampler: random_gflownet # surface_gflownet # greedy # random # random_gflownet
   - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
   - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
