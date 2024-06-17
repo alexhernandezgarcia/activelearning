@@ -1,1 +1,3 @@
 _target_: activelearning.surrogate.gp_surrogate.SingleTaskGPRegressor
+
+id: gp

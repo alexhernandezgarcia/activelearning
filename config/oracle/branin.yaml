@@ -2,3 +2,4 @@ _target_: activelearning.oracle.oracle.BraninOracle
 
 fidelity: 1
 do_domain_map: True
+negate: False

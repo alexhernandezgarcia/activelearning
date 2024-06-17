@@ -3,3 +3,5 @@ _target_: activelearning.acquisition.acquisition.BOTorchMonteCarloAcquisition
 acq_fn_class: 
   _target_: botorch.acquisition.monte_carlo.qNoisyExpectedImprovement
   _partial_: true
+  
+id: nei

@@ -3,6 +3,8 @@ from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils.rnn import pad_sequence
 import pandas as pd
 import torch
+from gflownet.envs.grid import Grid as GridEnv
+from typing import Optional, Callable
 
 
 class GridData(Data):
@@ -12,21 +14,23 @@ class GridData(Data):
         X_data: array(N, d) in the domain [0; grid_size], where d is the dimensionality of the grid world (e.g. for Branin d=2; for Hartmann d=6); states (i.e., grid positions)
         y_data: array(N, 1); scores at each position
         normalize_scores: bool; maps the scores to [0; 1]
-        grid_size: int; specifies the width and height of the grid (grid_size x grid_size); used to normalize the state positions
+        state2result: function that takes raw states (torch.Tensor) (aka environment format) and transforms them into the desired format;
+            in case of GFN environments, this can be the states2proxy function
 
     """
 
     def __init__(
         self,
-        grid_size,
         X_data,
         y_data=None,
+        state2result: Optional[Callable[[torch.Tensor], any]] = None,
         normalize_scores=True,
         float=torch.float64,
     ):
-        super().__init__(X_data, y_data, float=float)
+        super().__init__(
+            X_data=X_data, y_data=y_data, state2result=state2result, float=float
+        )
         self.normalize_scores = normalize_scores
-        self.grid_size = grid_size
         self.stats = self.get_statistics(y_data)
 
     def get_statistics(self, y):
@@ -47,8 +51,6 @@ class GridData(Data):
         """
         append new instances to the data
         """
-        # X, y = self.deprocess(X, y) # append data in raw form (i.e., not normalized)
-        X *= self.grid_size
         super().append(X, y)
         self.stats = self.get_statistics(self.y_data)  # update the score statistics
 
@@ -57,23 +59,17 @@ class GridData(Data):
         - normalizes the scores
         - normalizes the states
         """
-        states = X / self.grid_size
+        states = X
+        if self.state2result is not None:
+            if len(states.shape) == 1:
+                states = self.state2result([states])[0]
+            else:
+                states = self.state2result(states)
         scores = None
         if self.normalize_scores and y is not None:
             scores = (y - self.stats["min"]) / (self.stats["max"] - self.stats["min"])
 
         return states, scores
-
-    # def deprocess(self, X, y):
-    #     """
-    #     - denormalizes the scores
-    #     - denormalizes the states
-    #     """
-    #     states = X * self.grid_size
-    #     if self.normalize_scores and self.y_data is not None:
-    #         scores = y * (self.stats["max"] - self.stats["min"]) + self.stats["min"]
-
-    #     return states, scores
 
 
 class GridDatasetHandler(DatasetHandler):
@@ -87,8 +83,7 @@ class GridDatasetHandler(DatasetHandler):
 
     def __init__(
         self,
-        grid_size,
-        normalize_scores=True,
+        env: GridEnv,
         train_fraction=0.8,
         batch_size=256,
         shuffle=True,
@@ -97,44 +92,24 @@ class GridDatasetHandler(DatasetHandler):
         float_precision=64,
     ):
         super().__init__(
-            float_precision=float_precision, batch_size=batch_size, shuffle=shuffle
+            env=env,
+            float_precision=float_precision,
+            batch_size=batch_size,
+            shuffle=shuffle,
         )
 
-        self.normalize_scores = normalize_scores
         self.train_fraction = train_fraction
         self.train_path = train_path
         self.test_path = test_path
-        self.grid_size = grid_size
 
         self.initialise_dataset()
 
-    def statetorch2readable(self, state, alphabet={}):
-        """
-        Dataset Handler in activelearning deals only in tensors. This function converts the tesnor to readble format to save the train dataset
-        """
-        assert torch.eq(state.to(torch.long), state).all()
-        state = state.to(torch.long)
-        state = state.detach().cpu().numpy()
-        return str(state).replace("(", "[").replace(")", "]").replace(",", "")
-
-    def readable2state(self, readable):
-        """
-        Converts a human-readable string representing a state into a state as a list of
-        positions.
-        """
-        return [float(el) for el in readable.strip("[]").split(" ") if el != ""]
-
-    def state2readable(self, state):
-        """
-        Converts a state (a list of positions) into a human-readable string
-        representing a state.
-        """
-        return (
-            str(state.to(torch.int16).tolist())
-            .replace("(", "[")
-            .replace(")", "]")
-            .replace(",", "")
-        )
+    # def proxy2state(self, proxy_state):
+    #     """
+    #     Converts a proxy state into the environment state format.
+    #     """
+    #     domain_01 = (proxy_state + 1) / 2
+    #     return domain_01 * (self.env.length - 1)
 
     def maxY(self):
         _, train_y = self.train_data[:]
@@ -160,7 +135,7 @@ class GridDatasetHandler(DatasetHandler):
             train_scores = torch.tensor(train_samples_y)
             train_states = torch.stack(
                 [
-                    torch.tensor(self.readable2state(sample))
+                    torch.tensor(self.env.readable2state(sample))
                     for sample in train_samples_X
                 ]
             )
@@ -174,7 +149,10 @@ class GridDatasetHandler(DatasetHandler):
             test_samples_y = test["energies"].values.tolist()
             test_scores = torch.tensor(test_samples_y)
             test_states = torch.stack(
-                [torch.tensor(self.readable2state(sample)) for sample in test_samples_X]
+                [
+                    torch.tensor(self.env.readable2state(sample))
+                    for sample in test_samples_X
+                ]
             )
 
         # if we don't have test data and we specified a train_fraction,
@@ -189,20 +167,18 @@ class GridDatasetHandler(DatasetHandler):
             train_scores = train_scores[train_index]
 
         self.train_data = GridData(
-            self.grid_size,
             train_states,
             train_scores,
-            normalize_scores=self.normalize_scores,
             float=self.float,
+            state2result=self.env.states2proxy,
         )
 
         if len(test_states) > 0:
             self.test_data = GridData(
-                self.grid_size,
                 test_states,
                 test_scores,
-                normalize_scores=self.normalize_scores,
                 float=self.float,
+                state2result=self.env.states2proxy,
             )
         else:
             self.test_data = None
@@ -269,7 +245,7 @@ class GridDatasetHandler(DatasetHandler):
         self.train_data.append(states, energies)
 
         if save_path is not None:
-            readable_states = [self.state2readable(state) for state in states]
+            readable_states = [self.env.state2readable(state) for state in states]
             readable_dataset = {
                 "samples": readable_states,
                 "energies": energies.tolist(),
@@ -279,7 +255,10 @@ class GridDatasetHandler(DatasetHandler):
             df = pd.DataFrame(readable_dataset)
             df.to_csv(save_path)
 
-        return self.get_dataloader()
+        return energies
+
+    def get_custom_dataset(self, samples: torch.Tensor) -> Data:
+        return GridData(torch.Tensor(samples), state2result=self.env.states2proxy)
 
 
 class BraninDatasetHandler(GridDatasetHandler):
@@ -290,17 +269,21 @@ class BraninDatasetHandler(GridDatasetHandler):
         import numpy as np
 
         # define candidate set
-        xi = np.arange(0, self.grid_size)
-        yi = np.arange(0, self.grid_size)
+        xi = np.arange(0, self.env.length)
+        yi = np.arange(0, self.env.length)
         grid = np.array(np.meshgrid(xi, yi))
         grid_flat = torch.tensor(grid.T, dtype=self.float).reshape(-1, 2)
-        candidate_set = GridData(self.grid_size, grid_flat)[:]
+        candidate_set = GridData(grid_flat, state2result=self.env.states2proxy)
         if as_dataloader:
             candidate_set = DataLoader(
                 candidate_set,
                 batch_size=self.batch_size,
             )
-        return candidate_set, xi / self.grid_size, yi / self.grid_size
+        return (
+            candidate_set,
+            xi,
+            yi,
+        )
 
 
 class CandidateGridData(Dataset):
@@ -346,15 +329,15 @@ class HartmannDatasetHandler(GridDatasetHandler):
         import numpy as np
 
         # define candidate set
-        xi = np.arange(0, self.grid_size, step)
-        yi = np.arange(0, self.grid_size, step)
+        xi = np.arange(0, self.env.length)
+        yi = np.arange(0, self.env.length)
         # grid = np.array(np.meshgrid(*[xi, yi] * 3))
         # grid_flat = torch.tensor(grid.T, dtype=torch.float64).reshape(-1, 6)
-        grid_flat = CandidateGridData(self.grid_size, 6, step=step)
-        candidate_set = GridData(self.grid_size, grid_flat)
+        grid_flat = CandidateGridData(self.env.length, self.env.n_dim, step=step)
+        candidate_set = GridData(grid_flat, state2result=self.env.states2proxy)
         if as_dataloader:
             candidate_set = DataLoader(
                 candidate_set,
                 batch_size=self.batch_size,
             )
-        return candidate_set, xi / self.grid_size, yi / self.grid_size
+        return candidate_set, xi, yi

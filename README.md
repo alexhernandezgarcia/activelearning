@@ -36,6 +36,29 @@ cd ocp
 pip install -e .
 ```
 
+## Run Examples
+To run the different examples you can use the following command:
+
+```bash
+python main.py --config-name <config-filename> user=<user-filename>
+```
+
+### Pre-Defined Config Files
+The following pre-defined config files are available:
+- test_branin
+- test_hartmann
+- test_ocp
+
+### Customize Config Options
+Some config options can be customized independently of the task. Here is a list of possible options for each component:
+- sampler: random | greedy | random_gflownet | gflownet
+- selector: selector | score
+- surrogate: gp | dkl | svdkl_kernel_wrapper
+- acquisition: botorch_ei | botorch_mve | botorch_nei
+- user: default | <custom_user_file>
+- logger: wandb | base
+
+
 ## Citation
 If you use this code for your own work, please consider citing our published work:
 ```

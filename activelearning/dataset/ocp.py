@@ -4,27 +4,44 @@ import torch
 from torch_geometric.data import Batch
 from ocpmodels.modules.normalizer import Normalizer
 from ocpmodels.common.utils import make_trainer_from_dir
+from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
+from typing import Optional, Union, Callable
 
 
 class OCPData(Data):
+    """
+    Implements the "Data" class for OCP data.
+
+        data: DeupDataset - https://github.com/RolnickLab/ocp/blob/6a7ad7e41e6be6db9164586e4e944d72eeca9160/ocpmodels/datasets/lmdb_dataset.py#L254
+            the target is given in the property "y_relaxed" and is a minimization task (smaller is better);
+            when an item is returned, the target will be multiplied by -1 to turn it into a maximization task;
+        target_normalizer: mean and std normalizer - https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/modules/normalizer.py#L11
+        state2result: function that takes raw states (graph) (aka environment format) and transforms them into the desired format;
+            in case of GFN environments, this can be the states2proxy function
+        subset_idcs: specifies which subset of the data will be used (useful, if we want to have subsets for training and testing)
+        return_target: specifies whether the target should be returned;
+            if True, the target will be returned along the feature vector;
+            the target will be turned into a maximization task by multiplying by -1;
+        return_index: if True, the original index of an item will be returned along with the feature vector;
+    """
+
     def __init__(
         self,
         data,
         target_normalizer,
+        state2result=None,
         subset_idcs: torch.Tensor = None,
         float=torch.float64,
         return_target=True,
         return_index=False,
     ):
-        """
-        subset_idcs: specifies which subset of the data will be used (useful, if we want to have subsets for training and testing)
-        """
         if subset_idcs is None:
             subset_idcs = torch.arange(len(data))
 
         self.subset_idcs = subset_idcs
         self.float = float
         self.data = data
+        self.state2result = state2result
         self.appended_data = []
         self.return_target = return_target
         self.return_index = return_index
@@ -37,14 +54,8 @@ class OCPData(Data):
 
     def get_item_from_index(self, index):
         datapoint = self.get_raw_item(index)
-        hidden_states = datapoint.deup_q
-        # state_idcs = datapoint.batch
-        # since we only use one datapoint, we can just sum over this one, without the use of scatter
-        # return scatter(hidden_states, state_idcs, dim=0, reduce="add"), torch.Tensor(
-        #     [datapoint.y_relaxed]
-        # )
         return (
-            hidden_states.mean(0).unsqueeze(0),
+            self.state2result(datapoint),
             torch.Tensor([datapoint.y_relaxed]),
             torch.Tensor([datapoint.idx_in_dataset]),
         )
@@ -74,11 +85,23 @@ class OCPData(Data):
 
         x, y = self.preprocess(x.to(self.float).squeeze(), y.to(self.float).squeeze())
         if self.return_target:
-            return x, y
+            return x, y * -1  # turn into maximization problem
         else:
             if self.return_index:
                 return x, idcs_in_dataset
             return x
+
+    def get_raw_items(self, key: Union[int, slice, list] = None):
+        if isinstance(key, int):
+            return self.get_raw_item(key)
+
+        if isinstance(key, slice):
+            start, stop, step = key.indices(len(self))
+            states = [self.get_raw_item(i) for i in range(start, stop, step)]
+            return states
+
+        states = [self.get_raw_item(i) for i in key]
+        return states
 
     def get_raw_item(self, index):
         if index < len(self.subset_idcs):
@@ -98,8 +121,7 @@ class OCPData(Data):
 
     def append(self, X: Batch, y: torch.Tensor):
         y = self.target_normalizer.denorm(y).cpu()
-        data_to_append = X.to_data_list()
-        # TODO: we should overwrite the target value with the oracle value, but the oracle value is off
+        data_to_append = X  # .to_data_list()
         for i in range(len(data_to_append)):
             # overwriting the target value with the oracle value
             data_to_append[i].y_relaxed = y[i]
@@ -118,13 +140,14 @@ class OCPRawDataMapper(Dataset):
         return len(self.subset_idcs)
 
     def __getitem__(self, key):
-        return self.candidate_data.get_raw_item(self.subset_idcs[key])
+        return self.candidate_data.get_raw_items(self.subset_idcs[key])
 
 
 class OCPDatasetHandler(DatasetHandler):
 
     def __init__(
         self,
+        env: CrystalSurfaceEnv,  # TODO: which parts of this environment can we use in the dataset handler? are there any faenet processing functions etc?
         checkpoint_path,
         data_path,
         normalize_labels=True,
@@ -137,7 +160,10 @@ class OCPDatasetHandler(DatasetHandler):
         # device="cpu",
     ):
         super().__init__(
-            float_precision=float_precision, batch_size=batch_size, shuffle=shuffle
+            env=env,
+            float_precision=float_precision,
+            batch_size=batch_size,
+            shuffle=shuffle,
         )
 
         self.train_fraction = train_fraction
@@ -174,16 +200,19 @@ class OCPDatasetHandler(DatasetHandler):
             test_idcs = index[int(len(ocp_train_data) * self.train_fraction) :]
             self.train_data = OCPData(
                 ocp_train_data,
+                state2result=self.state2proxy,
                 subset_idcs=train_idcs,
                 target_normalizer=self.trainer.normalizers["target"],
             )
             self.test_data = OCPData(
                 ocp_train_data,
+                state2result=self.state2proxy,
                 subset_idcs=test_idcs,
                 target_normalizer=self.trainer.normalizers["target"],
             )
             self.candidate_data = OCPData(
                 ocp_train_data,
+                state2result=self.state2proxy,
                 # using all data instances as candidates in this case (uncomment, if we only want to use test set)
                 # subset_idcs=test_idcs,
                 return_target=False,
@@ -192,17 +221,26 @@ class OCPDatasetHandler(DatasetHandler):
         else:
             self.train_data = OCPData(
                 self.trainer.datasets["deup-train-val_id"],
+                state2result=self.state2proxy,
                 target_normalizer=self.trainer.normalizers["target"],
             )
             self.test_data = OCPData(
                 self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
+                state2result=self.state2proxy,
                 target_normalizer=self.trainer.normalizers["target"],
             )
             self.candidate_data = OCPData(
                 self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
+                state2result=self.state2proxy,
                 return_target=False,
                 target_normalizer=self.trainer.normalizers["target"],
             )
+
+    def state2proxy(self, state):
+        hidden_states = state.deup_q
+        return hidden_states.mean(0).unsqueeze(0)
+        # since we only use one datapoint, we can just sum over this one, without the use of scatter
+        # return scatter(hidden_states, states.batch, dim=0, reduce="mean")
 
     def maxY(self):
         # return 10  # -> TODO: what are the actual bounds?
@@ -258,7 +296,9 @@ class OCPDatasetHandler(DatasetHandler):
             # for saving lmdb datasets
             print("TODO: save dataset to file system")
 
-        return self.get_dataloader()
+        return (
+            y * -1
+        )  # turn into maximization problem because the oracle returns minimization...
 
     def get_candidate_set(self, return_index=False, as_dataloader=True):
         if not as_dataloader:
@@ -274,18 +314,21 @@ class OCPDatasetHandler(DatasetHandler):
         )
         return test_loader, None, None
 
-    def prepare_dataset_for_oracle(self, samples, sample_idcs):
-        if sample_idcs is None:
-            return samples
+    def get_custom_dataset(self, samples):
+        return OCPData(
+            samples,
+            state2result=self.state2proxy,
+            target_normalizer=self.trainer.normalizers["target"],
+            return_target=False,
+        )
 
-        # return self.prepare_oracle_dataloader(self.candidate_data, sample_idcs)
-        samples = []
-        for idx in sample_idcs:
-            item = self.candidate_data.get_raw_item(idx)
-            item.pos = item.pos.to(self.float)
-            samples.append(item)
-            # samples.append(self.trainer.datasets["deup-val_ood_cat-val_ood_ads"][idx])
+    """
+    Transforms states into oracle format. 
+    For ocp and faenet, we need the states with the faenet trainer's collate function.
+    This results in a torch_geometric DataBatch object.
+    """
 
+    def states2oracle(self, samples) -> Batch:
         oracle_loader = DataLoader(
             samples,
             collate_fn=self.trainer.parallel_collater,
@@ -298,13 +341,13 @@ class OCPDatasetHandler(DatasetHandler):
         return next(iter(oracle_loader))[0]
 
     def prepare_oracle_dataloader(self, dataset: OCPData, sample_idcs=None):
-        raw_candidate_set = OCPRawDataMapper(dataset, sample_idcs)
-        raw_loader = DataLoader(
-            raw_candidate_set,
+        candidate_set = OCPRawDataMapper(dataset, sample_idcs)
+        loader = DataLoader(
+            candidate_set,
             collate_fn=self.trainer.parallel_collater,
             num_workers=1,  # trainer.config["optim"]["num_workers"], # there ocurs a "AssertionError: can only test a child process" error when using several workers with cuda
             pin_memory=True,
             # batch_sampler=trainer.samplers["deup-train-val_id"],
             batch_size=self.batch_size,
         )
-        return raw_loader
+        return loader

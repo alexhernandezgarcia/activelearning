@@ -19,6 +19,7 @@ from gpytorch.constraints import GreaterThan
 from torch.optim import SGD, Adam
 from tqdm import tqdm
 from activelearning.utils.logger import Logger
+from activelearning.dataset.dataset import Data
 
 
 class GPSurrogate(Surrogate):
@@ -61,7 +62,7 @@ class GPSurrogate(Surrogate):
 
         self.model = self.model_class(
             train_x,
-            train_y.unsqueeze(-1) * -1,  # turn into maximization problem
+            train_y.unsqueeze(-1),
             outcome_transform=self.outcome_transform,
             likelihood=self.likelihood,
             **self.kwargs,
@@ -100,7 +101,9 @@ class GPSurrogate(Surrogate):
         #     iterator.set_postfix(loss=loss.item())
         #     optimizer.step()
 
-    def get_predictions(self, states: Union[torch.Tensor, DataLoader]) -> torch.Tensor:
+    def get_predictions(
+        self, states: Union[torch.Tensor, Data, DataLoader]
+    ) -> torch.Tensor:
         self.model.eval()
         self.model.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
@@ -125,7 +128,7 @@ class GPSurrogate(Surrogate):
                     )
                 return torch.concat([y_mean.unsqueeze(0), y_std.unsqueeze(0)], dim=0)
             else:
-                states_proxy = states.clone().to(self.device).to(self.float)
+                states_proxy = states[:].to(self.device).to(self.float)
                 posterior = self.model.posterior(states_proxy)
                 y_mean = posterior.mean
                 y_std = posterior.variance.sqrt()
@@ -160,6 +163,7 @@ class SVGPSurrogate(GPSurrogate):
         train_epochs: int = 150,
         lr: float = 0.1,
         logger: Logger = None,
+        id: str = "",
         **kwargs: any,
     ) -> None:
         super().__init__(
@@ -181,8 +185,8 @@ class SVGPSurrogate(GPSurrogate):
         batch_x, batch_y = next(iter(train_data))
         batch_x = batch_x.to(self.device).to(self.float)
         batch_y = batch_y
-        batch_y = (
-            batch_y.to(self.device).to(self.float) * -1
+        batch_y = batch_y.to(self.device).to(
+            self.float
         )  # turn into maximization problem
 
         self.model = self.model_class(
@@ -217,8 +221,8 @@ class SVGPSurrogate(GPSurrogate):
             batch_losses = []
             for x_batch, y_batch in train_data:
                 x_batch = x_batch.to(self.device).to(self.float)
-                y_batch = (
-                    y_batch.to(self.device).to(self.float) * -1
+                y_batch = y_batch.to(self.device).to(
+                    self.float
                 )  # turn into maximization problem
                 optimizer.zero_grad()
                 output = self.model(x_batch)

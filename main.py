@@ -35,9 +35,18 @@ def main(config):
     # TODO: rethink where this configuration should go
     n_samples = config.n_samples
 
+    # --- Environment
+    env_maker = hydra.utils.instantiate(
+        config.env,
+        device=config.device,
+        float_precision=config.float_precision,
+        _partial_=True,
+    )
+
     # --- Dataset
     dataset_handler = hydra.utils.instantiate(
         config.dataset,
+        env=env_maker(),
         float_precision=config.float_precision,
     )
 
@@ -130,6 +139,7 @@ def main(config):
         # also starts with a clean slate; TODO: experiment with NOT training from scratch
         sampler = hydra.utils.instantiate(
             config.sampler,
+            env_maker=env_maker,
             acquisition=acquisition,
             device=config.device,
             float_precision=config.float_precision,
@@ -147,32 +157,32 @@ def main(config):
             score_fn=acquisition,
             device=config.device,
             float_precision=config.float_precision,
-            maximize=False,
+            maximize=True,
         )
         samples_selected, selected_idcs = selector(
-            n_samples=n_samples, candidate_set=samples, index_set=sample_indices
+            n_samples=n_samples,
+            candidate_set=dataset_handler.get_custom_dataset(samples),
+            index_set=sample_indices,
         )
 
-        oracle_samples = dataset_handler.prepare_dataset_for_oracle(
-            samples_selected, selected_idcs
-        )
+        oracle_samples = dataset_handler.states2oracle(samples_selected)
         scores = oracle(oracle_samples).cpu()
-        dataset_handler.update_dataset(oracle_samples.cpu(), scores)
+        scores = dataset_handler.update_dataset(samples_selected, scores)
 
         print("Proposed Candidates:", oracle_samples)
         print("Oracle Scores:", scores)
-        print("Best Score:", scores.min())
-        best_scores.append(scores.min())
+        print("Best Score:", scores.max())
+        best_scores.append(scores.max())
         all_scores[i] = scores
         if logger is not None:
             scores_flat = torch.stack(list(all_scores.values())).flatten()
-            logger.log_metric(scores_flat.min(), "top_score")
-            mean_top_k = scores_flat.topk(n_samples, largest=False).values.mean()
+            logger.log_metric(scores_flat.max(), "top_score")
+            mean_top_k = scores_flat.topk(n_samples, largest=True).values.mean()
             logger.log_metric(mean_top_k, "mean_topk_score")
-            logger.log_metric(scores.min(), "best_score")
+            logger.log_metric(scores.max(), "best_score")
             logger.log_metric(torch.median(scores), "median_score")
             logger.log_metric(torch.mean(scores), "mean_score")
-            logger.log_metric(scores.max(), "worst_score")
+            logger.log_metric(scores.min(), "worst_score")
             logger.log_metric(scores, "scores")
 
             logger.log_step(i)

@@ -2,17 +2,30 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: hartmann
   - oracle: hartmann
-  - selector: score
-  - sampler: random
+  - env: grid
+  - sampler: greedy
+  - selector: selector
   - surrogate: gp
   - acquisition: botorch_mve
-  - logger: base
+  - user: default
+  - logger: base #wandb
+  - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
 
+logger:
+  project_name: test_hartmann
+  run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}
 
 dataset:
-  grid_size: 10
   train_path: ~/activelearning/my_package/storage/hartmann/data_train.csv
   batch_size: 16384
+
+env:
+  # Number of cells per dimension
+  length: 10
+  n_dim: 6
+  # Mapping coordinates
+  cell_min: -1
+  cell_max: 1
 
 sampler: 
   conf:
@@ -26,13 +39,7 @@ sampler:
         online: True
       project_name: "test_hartmann_gflownet"
       run_name: "identity_lr5e-4 newdata"
-    env:
-      # Number of cells per dimension
-      length: 10
-      n_dim: 6
-      # Mapping coordinates
-      cell_min: 0   # -1
-      cell_max: 0.99 # 1
+    proxy:
       # Reward function: power or boltzmann
       # boltzmann: exp(-1.0 * reward_beta * proxy)
       # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
@@ -40,10 +47,11 @@ sampler:
       reward_func: power
       # Minimum reward
       reward_min: 1e-8
-      # Beta parameter of the reward function
-      reward_beta: 1.0
-      # Reward normalization for "power" reward function
-      reward_norm: 1.0
+      reward_function_kwargs: 
+        # Beta parameter of the reward function
+        beta: 1.0
+        # Reward normalization for "power" reward function
+        # norm: 1.0
 
 device: cpu
 float_precision: 32

@@ -50,11 +50,10 @@ class PlotHelper:
                 res = torch.concat([res, batch_res], dim=-1)
 
         else:
-            res = fn(space)
+            res = fn(space.to(self.device)).to("cpu").detach()
 
         if output_index is not None:
             res = res[output_index]
-        res = res.to("cpu").detach()
         # ax.matshow(res)
         # https://matplotlib.org/stable/gallery/images_contours_and_fields/irregulardatagrid.html#sphx-glr-gallery-images-contours-and-fields-irregulardatagrid-py
         cntr = ax.contourf(
@@ -201,18 +200,21 @@ class BraninCIME4RExportHelper(CIME4RExportHelper):
     def init_dataframe(self):
         candidate_set, _, _ = self.dataset_handler.get_candidate_set()
         cols = ["state_%i_desc" % i for i in range(candidate_set.shape[1])]
-        cime4r_df = pd.DataFrame(candidate_set, columns=cols)
+        cime4r_df = pd.DataFrame(candidate_set[:], columns=cols)
+
+        raw_state = candidate_set.get_raw_items()
+        state_cols = []
+        for i in range(raw_state.shape[1]):
+            cime4r_df["state_%i" % i] = raw_state[:, i].to(torch.int)
+            state_cols.append("state_%i" % i)
+
         cime4r_df["experiment_cycle"] = -1
-        cime4r_df["measured_target"] = 1.0
+        cime4r_df["measured_target"] = 0.0
         cime4r_df["SMILES_dummy"] = "*"
-        idx = [tuple(state) for state in candidate_set.tolist()]
-        cime4r_df.index = (
-            idx  # TODO: use different logic for ocp data -> could use data idx or sth
-        )
+        cime4r_df = cime4r_df.set_index(state_cols)
 
         # init original train data
-        train_x, _ = self.dataset_handler.train_data[:]
-        train_y = self.dataset_handler.train_data.y_data
+        train_x, train_y = self.dataset_handler.train_data.get_raw_items()
         train_idcs = [
             tuple([round(state[0], 1), round(state[1], 1)])
             for state in train_x.tolist()
@@ -248,7 +250,7 @@ class OCPCIME4RExportHelper(CIME4RExportHelper):
 
         # init original train data
         for i in range(len(self.dataset_handler.train_data)):
-            datapoint = self.dataset_handler.train_data.get_raw_item(i)
+            datapoint = self.dataset_handler.train_data.get_raw_items(i)
             idx = datapoint.idx_in_dataset
             target = datapoint.y_relaxed
             cime4r_df.loc[idx, "measured_target"] = target
