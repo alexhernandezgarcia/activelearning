@@ -9,13 +9,18 @@ def ocp_dataset_handler_base():
     ocp_checkpoint_path = "/network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt"
     dataset_path = "/network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset"
     env = CrystalSurfaceEnv()
-    dataset_handler = OCPDatasetHandler(
-        env,
-        ocp_checkpoint_path,
-        dataset_path,
-        float_precision=32,
-    )
-    return dataset_handler
+    try:
+        dataset_handler = OCPDatasetHandler(
+            env,
+            ocp_checkpoint_path,
+            dataset_path,
+            float_precision=32,
+        )
+        return dataset_handler
+    except AssertionError:
+        pytest.skip(
+            "folder not found. make sure that you have access to '/networks/scratch/a/alexandre.duval/ocp/'"
+        )
 
 
 @pytest.fixture
@@ -23,14 +28,19 @@ def ocp_dataset_handler_train_split():
     ocp_checkpoint_path = "/network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt"
     dataset_path = "/network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset"
     env = CrystalSurfaceEnv()
-    dataset_handler = OCPDatasetHandler(
-        env,
-        ocp_checkpoint_path,
-        dataset_path,
-        train_fraction=0.1,
-        float_precision=32,  # use train_fraction to create a train-test split from the training dataset
-    )
-    return dataset_handler
+    try:
+        dataset_handler = OCPDatasetHandler(
+            env,
+            ocp_checkpoint_path,
+            dataset_path,
+            train_fraction=0.1,
+            float_precision=32,  # use train_fraction to create a train-test split from the training dataset
+        )
+        return dataset_handler
+    except AssertionError:
+        pytest.skip(
+            "folder not found. make sure that you have access to '/networks/scratch/a/alexandre.duval/ocp/'"
+        )
 
 
 @pytest.mark.parametrize(
