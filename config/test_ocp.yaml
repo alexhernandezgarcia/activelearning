@@ -3,7 +3,7 @@ defaults:
   - dataset: ocp
   - oracle: ocp
   - env: crystal_surface
-  - sampler: random_gflownet # surface_gflownet # greedy # random # random_gflownet
+  - sampler: surface_gflownet # surface_gflownet # greedy # random # random_gflownet
   - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
   - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
@@ -34,8 +34,8 @@ surrogate:
   train_epochs: 20
   lr: 0.01
 
-device: cuda
-float_precision: 64
+device: cpu # cuda
+float_precision: 32
 budget: 10
 n_samples: 100
 seed: 98765

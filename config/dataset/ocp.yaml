@@ -11,3 +11,4 @@ target_std: 2.279365062713623
 batch_size: 256
 train_fraction: 1.0
 shuffle: True
+device: ${device}

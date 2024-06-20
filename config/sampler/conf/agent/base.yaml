@@ -11,7 +11,7 @@ optimizer:
   lr_decay_period: 1000000
   lr_decay_gamma: 0.5
   z_dim: 16
-  lr_z_mult: 100
+  lr_z_mult: 10
   method: adam
   # Threshold loss for early stopping
   early_stopping: 0.0
@@ -33,7 +33,7 @@ optimizer:
   # Train to sample ratio
   train_to_sample_ratio: 1
   # Number of training iterations
-  n_train_steps: 500 # 5000 # <---
+  n_train_steps: 5 #500 # 5000 # <---
   # From original implementation
   bootstrap_tau: 0.0
   clip_grad_norm: 0.0

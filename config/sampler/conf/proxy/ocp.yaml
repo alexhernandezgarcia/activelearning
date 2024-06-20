@@ -1,0 +1,5 @@
+defaults:
+  - base
+
+_target_: activelearning.sampler.proxy.OCPProxy
+n_cpu_threads: 1

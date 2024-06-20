@@ -84,7 +84,16 @@ class GFlowNetSampler(Sampler):
     Then it generates n samples proportionally to the reward.
     """
 
-    def __init__(self, env_maker, acquisition, conf, device, float_precision, **kwargs):
+    def __init__(
+        self,
+        env_maker,
+        acquisition,
+        dataset_handler,
+        conf,
+        device,
+        float_precision,
+        **kwargs
+    ):
         super().__init__(acquisition, device, float_precision)
         import hydra
 
@@ -127,6 +136,7 @@ class GFlowNetSampler(Sampler):
             device=device,
             float_precision=float_precision,
             acquisition=acquisition,
+            dataset_handler=dataset_handler,
         )
 
         # GFlowNet Agent
@@ -154,7 +164,6 @@ class GFlowNetSampler(Sampler):
 class RandomGFlowNetSampler(Sampler):
     def __init__(self, env_maker, acquisition, conf, device, float_precision, **kwargs):
         super().__init__(acquisition, device, float_precision)
-        import hydra
 
         self.env = env_maker()
 
