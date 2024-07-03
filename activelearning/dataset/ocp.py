@@ -56,10 +56,17 @@ class OCPData(Data):
 
     def get_item_from_index(self, index):
         datapoint = self.get_raw_item(index)
+        x = self.state2result(datapoint)
+        y = None
+        if self.return_target:
+            y = datapoint.y_relaxed
+        idx_dataset = None
+        if self.return_index:
+            idx_dataset = datapoint.idx_in_dataset
         return (
-            self.state2result(datapoint),
-            torch.Tensor([datapoint.y_relaxed]),
-            torch.Tensor([datapoint.idx_in_dataset]),
+            x,
+            y,
+            idx_dataset,
         )
 
     def __getitem__(self, key):
@@ -67,25 +74,47 @@ class OCPData(Data):
             x, y, idcs_in_dataset = self.get_item_from_index(key)
         elif isinstance(key, slice):
             start, stop, step = key.indices(len(self))
-            x = torch.Tensor([])
-            y = torch.Tensor([])
-            idcs_in_dataset = torch.Tensor([])
+            x = []
+            y = []
+            idcs_in_dataset = []
             for i in range(start, stop, step):
                 x_i, y_i, idx_in_dataset = self.get_item_from_index(i)
-                x = torch.concat([x, x_i])
-                y = torch.concat([y, y_i])
-                idcs_in_dataset = torch.concat([idcs_in_dataset, idx_in_dataset])
+                x.append(x_i)
+                if y_i is not None:
+                    y.append(y_i)
+                if idx_in_dataset is not None:
+                    idcs_in_dataset.append(idx_in_dataset)
+            x = torch.concat(x, dim=0)
+            if len(y) > 0:
+                y = torch.Tensor(y, dtype=self.float)
+            else:
+                y = None
+            if len(idcs_in_dataset) > 0:
+                idcs_in_dataset = torch.Tensor(idcs_in_dataset)
+            else:
+                idcs_in_dataset = None
         else:
-            x = torch.Tensor([])
-            y = torch.Tensor([])
-            idcs_in_dataset = torch.Tensor([])
+            x = []
+            y = []
+            idcs_in_dataset = []
             for i in key:
                 x_i, y_i, idx_in_dataset = self.get_item_from_index(i)
-                x = torch.concat([x, x_i])
-                y = torch.concat([y, y_i])
-                idcs_in_dataset = torch.concat([idcs_in_dataset, idx_in_dataset])
+                x.append(x_i)
+                if y_i is not None:
+                    y.append(y_i)
+                if idx_in_dataset is not None:
+                    idcs_in_dataset.append(idx_in_dataset)
+            x = torch.concat(x, dim=0)
+            if len(y) > 0:
+                y = torch.Tensor(y, dtype=self.float)
+            else:
+                y = None
+            if len(idcs_in_dataset) > 0:
+                idcs_in_dataset = torch.Tensor(idcs_in_dataset)
+            else:
+                idcs_in_dataset = None
 
-        x, y = self.preprocess(x.to(self.float).squeeze(), y.to(self.float).squeeze())
+        x, y = self.preprocess(x, y)
         if self.return_target:
             return x, y * -1  # turn into maximization problem
         else:
@@ -119,7 +148,9 @@ class OCPData(Data):
         return len(self.subset_idcs) + len(self.appended_data)
 
     def preprocess(self, X, y):
-        return X, self.target_normalizer.norm(y).cpu()
+        if y is not None:
+            return X.to(self.float), self.target_normalizer.norm(y).cpu()
+        return X.to(self.float), y
 
     def append(self, X: Batch, y: torch.Tensor):
         y = self.target_normalizer.denorm(y).cpu()
@@ -185,12 +216,14 @@ class OCPDatasetHandler(DatasetHandler):
                 state2result=self.state2surrogate,
                 subset_idcs=train_idcs,
                 target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
             )
             self.test_data = OCPData(
                 ocp_train_data,
                 state2result=self.state2surrogate,
                 subset_idcs=test_idcs,
                 target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
             )
             self.candidate_data = OCPData(
                 ocp_train_data,
@@ -199,23 +232,27 @@ class OCPDatasetHandler(DatasetHandler):
                 # subset_idcs=test_idcs,
                 return_target=False,
                 target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
             )
         else:
             self.train_data = OCPData(
                 self.trainer.datasets["deup-train-val_id"],
                 state2result=self.state2surrogate,
                 target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
             )
             self.test_data = OCPData(
                 self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
                 state2result=self.state2surrogate,
                 target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
             )
             self.candidate_data = OCPData(
                 self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
                 state2result=self.state2surrogate,
                 return_target=False,
                 target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
             )
 
     def load_ocp_trainer(
@@ -257,19 +294,19 @@ class OCPDatasetHandler(DatasetHandler):
     def state2surrogate(self, state):
         if hasattr(state, "deup_q"):
             hidden_states = state.deup_q
+            # since we only use one datapoint and we don't have "batch" in the state, we can just sum over this one, without the use of scatter
+            hidden_states = hidden_states.mean(0)
         else:
             hidden_states = self.faenet(state, retrieve_hidden=True)["hidden_state"]
-        assert (
-            len(state.batch) == hidden_states.shape[0]
-        ), "The output of the hidden state must be in graph format. To use an already scattered hidden state, the following line must be changed."
-        hidden_states = scatter(
-            hidden_states,
-            state.batch.to(self.device).to(torch.int64),
-            dim=0,
-            reduce="mean",
-        )
-        # since we only use one datapoint, we could just sum over this one, without the use of scatter
-        # hidden_states = hidden_states.mean(0).unsqueeze(0)
+            assert (
+                len(state.batch) == hidden_states.shape[0]
+            ), "The output of the hidden state must be in graph format. To use an already scattered hidden state, the following line must be changed."
+            hidden_states = scatter(
+                hidden_states,
+                state.batch.to(self.device).to(torch.int64),
+                dim=0,
+                reduce="mean",
+            )
         return hidden_states
 
     def maxY(self):
@@ -350,6 +387,7 @@ class OCPDatasetHandler(DatasetHandler):
             state2result=self.state2surrogate,
             target_normalizer=self.trainer.normalizers["target"],
             return_target=False,
+            float=self.float,
         )
 
     """

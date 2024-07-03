@@ -4,6 +4,7 @@ from typing import List
 from torchtyping import TensorType
 from multiprocessing import Pool
 from gflownet.utils.common import tfloat
+from torch_geometric.data import Data
 
 
 class AcquisitionProxy(Proxy):
@@ -32,7 +33,7 @@ class OCPProxy(Proxy):
 
     @torch.no_grad()
     def __call__(
-        self, states: List[List[List]], verbose: bool = False
+        self, states: List[List[List[Data]]], verbose: bool = False
     ) -> TensorType["batch"]:
         """
         Forward pass of the proxy.
