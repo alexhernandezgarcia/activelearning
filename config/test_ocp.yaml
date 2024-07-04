@@ -18,7 +18,8 @@ logger:
   run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}_max
 
 dataset:
-  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
+  # checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
+  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.0/best_checkpoint.pt
   data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
   # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
   train_fraction: 0.1
