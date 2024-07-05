@@ -19,7 +19,7 @@ class OCPData(Data):
             the target is given in the property "y_relaxed" and is a minimization task (smaller is better);
             when an item is returned, the target will be multiplied by -1 to turn it into a maximization task;
         target_normalizer: mean and std normalizer - https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/modules/normalizer.py#L11
-        state2result: function that takes raw states (torch.Tensor) (aka environment format) and transforms them into the desired format;
+        state2result: function that takes raw states (graph) (aka environment format) and transforms them into the desired format;
             in case of GFN environments, this can be the states2proxy function
         subset_idcs: specifies which subset of the data will be used (useful, if we want to have subsets for training and testing)
         return_target: specifies whether the target should be returned;
@@ -399,7 +399,7 @@ class OCPDatasetHandler(DatasetHandler):
 
     """
     Transforms states into oracle format. 
-    For ocp and faenet, we need the raw input data with the faenet trainer's collate function.
+    For ocp and faenet, we need the states with the faenet trainer's collate function.
     This results in a torch_geometric DataBatch object.
     """
 
@@ -416,13 +416,13 @@ class OCPDatasetHandler(DatasetHandler):
         return next(iter(oracle_loader))[0]
 
     def prepare_oracle_dataloader(self, dataset: OCPData, sample_idcs=None):
-        raw_candidate_set = OCPRawDataMapper(dataset, sample_idcs)
-        raw_loader = DataLoader(
-            raw_candidate_set,
+        candidate_set = OCPRawDataMapper(dataset, sample_idcs)
+        loader = DataLoader(
+            candidate_set,
             collate_fn=self.trainer.parallel_collater,
             num_workers=1,  # trainer.config["optim"]["num_workers"], # there ocurs a "AssertionError: can only test a child process" error when using several workers with cuda
             pin_memory=True,
             # batch_sampler=trainer.samplers["deup-train-val_id"],
             batch_size=self.batch_size,
         )
-        return raw_loader
+        return loader

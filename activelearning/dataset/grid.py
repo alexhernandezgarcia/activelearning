@@ -106,7 +106,7 @@ class GridDatasetHandler(DatasetHandler):
 
     # def proxy2state(self, proxy_state):
     #     """
-    #     Converts a proxy state into the raw state format.
+    #     Converts a proxy state into the environment state format.
     #     """
     #     domain_01 = (proxy_state + 1) / 2
     #     return domain_01 * (self.env.length - 1)
