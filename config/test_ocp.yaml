@@ -3,7 +3,7 @@ defaults:
   - dataset: ocp
   - oracle: ocp
   - env: crystal_surface
-  - sampler: random_gflownet # surface_gflownet # greedy # random # random_gflownet
+  - sampler: surface_gflownet # surface_gflownet # greedy # random # random_gflownet
   - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
   - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
@@ -19,7 +19,7 @@ logger:
 
 dataset:
   # checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
-  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.0/best_checkpoint.pt
+  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.1/best_checkpoint.pt
   data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
   # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
   train_fraction: 0.1
