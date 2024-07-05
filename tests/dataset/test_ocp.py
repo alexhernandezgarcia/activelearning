@@ -2,33 +2,50 @@ import pytest
 import torch
 from activelearning.dataset.ocp import OCPDatasetHandler
 from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
+from gflownet.envs.crystals.atomgraphs.converter import PyxtalConverter
 
 
 @pytest.fixture
 def ocp_dataset_handler_base():
     ocp_checkpoint_path = "/network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt"
     dataset_path = "/network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset"
-    env = CrystalSurfaceEnv()
     try:
+        converter = PyxtalConverter(
+            n_pyxtal_samples=1,
+            adsorbate_smiles=["*O", "*OH"],
+            # path_adsorbate_db="/network/scratch/s/schmidtv/ocp/datasets/ocp/dataset-creation/adsorbate_db_2021apr28.pkl",
+            path_adsorbate_db="/network/projects/_groups/ocp/oc20/dataset-creation/adsorbate_db_2021apr28_ase3.22.pkl",
+            n_cpu_threads=1,
+            no_tag_bulk=False,
+        )
+        env = CrystalSurfaceEnv(converter)
         dataset_handler = OCPDatasetHandler(
             env,
             ocp_checkpoint_path,
             dataset_path,
             float_precision=32,
         )
-        return dataset_handler
     except AssertionError:
         pytest.skip(
             "folder not found. make sure that you have access to '/networks/scratch/a/alexandre.duval/ocp/'"
         )
+    return dataset_handler
 
 
 @pytest.fixture
 def ocp_dataset_handler_train_split():
     ocp_checkpoint_path = "/network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt"
     dataset_path = "/network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset"
-    env = CrystalSurfaceEnv()
     try:
+        converter = PyxtalConverter(
+            n_pyxtal_samples=1,
+            adsorbate_smiles=["*O", "*OH"],
+            # path_adsorbate_db="/network/scratch/s/schmidtv/ocp/datasets/ocp/dataset-creation/adsorbate_db_2021apr28.pkl",
+            path_adsorbate_db="/network/projects/_groups/ocp/oc20/dataset-creation/adsorbate_db_2021apr28_ase3.22.pkl",
+            n_cpu_threads=1,
+            no_tag_bulk=False,
+        )
+        env = CrystalSurfaceEnv(converter)
         dataset_handler = OCPDatasetHandler(
             env,
             ocp_checkpoint_path,

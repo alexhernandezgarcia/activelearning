@@ -1,0 +1,10 @@
+_target_: gflownet.envs.crystals.atomgraphs.converter.AtomGraphConverter
+
+path_adsorbate_db: /network/scratch/s/schmidtv/ocp/datasets/ocp/dataset-creation/adsorbate_db_2021apr28.pkl
+adsorbate_smiles: "*O"
+# adsorbate_smiles:
+# - "*O"
+# - "*OH"
+n_cpu_threads: 1
+# Random placement of the adsorbate with the surface. False means Catkit.
+no_tag_bulk: True 

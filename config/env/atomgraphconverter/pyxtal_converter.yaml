@@ -1,0 +1,6 @@
+defaults:
+  - base
+
+_target_: gflownet.envs.crystals.atomgraphs.converter.PyxtalConverter
+
+n_pyxtal_samples: 1

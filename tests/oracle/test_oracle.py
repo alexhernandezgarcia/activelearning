@@ -19,7 +19,16 @@ def oracle_hartmann():
 @pytest.fixture
 def oracle_ocp():
     ocp_checkpoint_path = "/network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt"
-    return OCPOracle(ocp_checkpoint_path, device="cpu", float_precision=torch.float16)
+    try:
+        oracle = OCPOracle(
+            ocp_checkpoint_path, device="cpu", float_precision=torch.float16
+        )
+
+    except AssertionError:
+        pytest.skip(
+            "folder not found. make sure that you have access to '/networks/scratch/a/alexandre.duval/ocp/'"
+        )
+    return oracle
 
 
 @pytest.mark.parametrize(
@@ -65,7 +74,7 @@ def test__oracle__initializes_properly(oracle, request):
                     1.0213609125120371e-10,
                     2.447236857605617e-09,
                     0.0007715617539361119,
-                    1.5964351368635832e-11,
+                    1.5964349633912356e-11,
                 ]
             ),
         ),

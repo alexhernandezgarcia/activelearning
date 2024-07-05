@@ -2,10 +2,13 @@ from activelearning.dataset.dataset import DatasetHandler, Data
 from torch.utils.data import DataLoader, Dataset
 import torch
 from torch_geometric.data import Batch
-from ocpmodels.modules.normalizer import Normalizer
+from torch_geometric.data import Data as GraphData
 from ocpmodels.common.utils import make_trainer_from_dir
+from ocpmodels.common.gfn import FAENetWrapper
+from ocpmodels.datasets.data_transforms import get_transforms
 from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
-from typing import Optional, Union, Callable
+from typing import Optional, Union, Callable, List
+from torch_scatter import scatter
 
 
 class OCPData(Data):
@@ -54,10 +57,17 @@ class OCPData(Data):
 
     def get_item_from_index(self, index):
         datapoint = self.get_raw_item(index)
+        x = self.state2result(datapoint)
+        y = None
+        if self.return_target:
+            y = datapoint.y_relaxed
+        idx_dataset = None
+        if self.return_index:
+            idx_dataset = datapoint.idx_in_dataset
         return (
-            self.state2result(datapoint),
-            torch.Tensor([datapoint.y_relaxed]),
-            torch.Tensor([datapoint.idx_in_dataset]),
+            x,
+            y,
+            idx_dataset,
         )
 
     def __getitem__(self, key):
@@ -65,25 +75,47 @@ class OCPData(Data):
             x, y, idcs_in_dataset = self.get_item_from_index(key)
         elif isinstance(key, slice):
             start, stop, step = key.indices(len(self))
-            x = torch.Tensor([])
-            y = torch.Tensor([])
-            idcs_in_dataset = torch.Tensor([])
+            x = []
+            y = []
+            idcs_in_dataset = []
             for i in range(start, stop, step):
                 x_i, y_i, idx_in_dataset = self.get_item_from_index(i)
-                x = torch.concat([x, x_i])
-                y = torch.concat([y, y_i])
-                idcs_in_dataset = torch.concat([idcs_in_dataset, idx_in_dataset])
+                x.append(x_i)
+                if y_i is not None:
+                    y.append(y_i)
+                if idx_in_dataset is not None:
+                    idcs_in_dataset.append(idx_in_dataset)
+            x = torch.concat(x, dim=0)
+            if len(y) > 0:
+                y = torch.Tensor(y, dtype=self.float)
+            else:
+                y = None
+            if len(idcs_in_dataset) > 0:
+                idcs_in_dataset = torch.Tensor(idcs_in_dataset)
+            else:
+                idcs_in_dataset = None
         else:
-            x = torch.Tensor([])
-            y = torch.Tensor([])
-            idcs_in_dataset = torch.Tensor([])
+            x = []
+            y = []
+            idcs_in_dataset = []
             for i in key:
                 x_i, y_i, idx_in_dataset = self.get_item_from_index(i)
-                x = torch.concat([x, x_i])
-                y = torch.concat([y, y_i])
-                idcs_in_dataset = torch.concat([idcs_in_dataset, idx_in_dataset])
+                x.append(x_i)
+                if y_i is not None:
+                    y.append(y_i)
+                if idx_in_dataset is not None:
+                    idcs_in_dataset.append(idx_in_dataset)
+            x = torch.concat(x, dim=0)
+            if len(y) > 0:
+                y = torch.Tensor(y, dtype=self.float)
+            else:
+                y = None
+            if len(idcs_in_dataset) > 0:
+                idcs_in_dataset = torch.Tensor(idcs_in_dataset)
+            else:
+                idcs_in_dataset = None
 
-        x, y = self.preprocess(x.to(self.float).squeeze(), y.to(self.float).squeeze())
+        x, y = self.preprocess(x, y)
         if self.return_target:
             return x, y * -1  # turn into maximization problem
         else:
@@ -117,7 +149,9 @@ class OCPData(Data):
         return len(self.subset_idcs) + len(self.appended_data)
 
     def preprocess(self, X, y):
-        return X, self.target_normalizer.norm(y).cpu()
+        if y is not None:
+            return X.to(self.float), self.target_normalizer.norm(y).cpu()
+        return X.to(self.float), y
 
     def append(self, X: Batch, y: torch.Tensor):
         y = self.target_normalizer.denorm(y).cpu()
@@ -157,7 +191,7 @@ class OCPDatasetHandler(DatasetHandler):
         batch_size=256,
         shuffle=True,
         float_precision: int = 64,
-        # device="cpu",
+        device="cpu",
     ):
         super().__init__(
             env=env,
@@ -165,8 +199,66 @@ class OCPDatasetHandler(DatasetHandler):
             batch_size=batch_size,
             shuffle=shuffle,
         )
-
+        self.device = device
         self.train_fraction = train_fraction
+        self.load_ocp_trainer(
+            checkpoint_path, data_path, normalize_labels, target_mean, target_std
+        )
+
+        ocp_train_data = self.trainer.datasets["deup-train-val_id"]
+        # if we specified a train_fraction, use a random subsample from the train data
+        # as test data and don't use the test set at all
+        if self.train_fraction < 1.0:
+            index = torch.randperm(len(ocp_train_data))
+            train_idcs = index[: int(len(ocp_train_data) * self.train_fraction)]
+            test_idcs = index[int(len(ocp_train_data) * self.train_fraction) :]
+            self.train_data = OCPData(
+                ocp_train_data,
+                state2result=self.state2surrogate,
+                subset_idcs=train_idcs,
+                target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
+            )
+            self.test_data = OCPData(
+                ocp_train_data,
+                state2result=self.state2surrogate,
+                subset_idcs=test_idcs,
+                target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
+            )
+            self.candidate_data = OCPData(
+                ocp_train_data,
+                state2result=self.state2surrogate,
+                # using all data instances as candidates in this case (uncomment, if we only want to use test set)
+                # subset_idcs=test_idcs,
+                return_target=False,
+                target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
+            )
+        else:
+            self.train_data = OCPData(
+                self.trainer.datasets["deup-train-val_id"],
+                state2result=self.state2surrogate,
+                target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
+            )
+            self.test_data = OCPData(
+                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
+                state2result=self.state2surrogate,
+                target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
+            )
+            self.candidate_data = OCPData(
+                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
+                state2result=self.state2surrogate,
+                return_target=False,
+                target_normalizer=self.trainer.normalizers["target"],
+                float=self.float,
+            )
+
+    def load_ocp_trainer(
+        self, checkpoint_path, data_path, normalize_labels, target_mean, target_std
+    ):
         self.trainer = make_trainer_from_dir(
             checkpoint_path,
             mode="continue",
@@ -185,62 +277,38 @@ class OCPDatasetHandler(DatasetHandler):
                     },
                     "deup-val_ood_cat-val_ood_ads": {"src": data_path},
                 },
-                "cpu": True,  # device == "cpu",
+                "cpu": self.device == "cpu",
             },
             skip_imports=["qm7x", "gemnet", "spherenet", "painn", "comenet"],
             silent=True,
         )
+        self.trainer.load_checkpoint(checkpoint_path)
+        wrapper = FAENetWrapper(
+            faenet=self.trainer.model,
+            transform=get_transforms(self.trainer.config),
+            frame_averaging=self.trainer.config.get("frame_averaging", ""),
+            trainer_config=self.trainer.config,
+        )
+        wrapper.freeze()
+        self.faenet = wrapper
 
-        ocp_train_data = self.trainer.datasets["deup-train-val_id"]
-        # if we specified a train_fraction, use a random subsample from the train data
-        # as test data and don't use the test set at all
-        if self.train_fraction < 1.0:
-            index = torch.randperm(len(ocp_train_data))
-            train_idcs = index[: int(len(ocp_train_data) * self.train_fraction)]
-            test_idcs = index[int(len(ocp_train_data) * self.train_fraction) :]
-            self.train_data = OCPData(
-                ocp_train_data,
-                state2result=self.state2proxy,
-                subset_idcs=train_idcs,
-                target_normalizer=self.trainer.normalizers["target"],
-            )
-            self.test_data = OCPData(
-                ocp_train_data,
-                state2result=self.state2proxy,
-                subset_idcs=test_idcs,
-                target_normalizer=self.trainer.normalizers["target"],
-            )
-            self.candidate_data = OCPData(
-                ocp_train_data,
-                state2result=self.state2proxy,
-                # using all data instances as candidates in this case (uncomment, if we only want to use test set)
-                # subset_idcs=test_idcs,
-                return_target=False,
-                target_normalizer=self.trainer.normalizers["target"],
-            )
+    def state2surrogate(self, state):
+        if hasattr(state, "deup_q"):
+            hidden_states = state.deup_q
+            # since we only use one datapoint and we don't have "batch" in the state, we can just sum over this one, without the use of scatter
+            hidden_states = hidden_states.mean(0)
         else:
-            self.train_data = OCPData(
-                self.trainer.datasets["deup-train-val_id"],
-                state2result=self.state2proxy,
-                target_normalizer=self.trainer.normalizers["target"],
+            hidden_states = self.faenet(state, retrieve_hidden=True)["hidden_state"]
+            assert (
+                len(state.batch) == hidden_states.shape[0]
+            ), "The output of the hidden state must be in graph format. To use an already scattered hidden state, the following line must be changed."
+            hidden_states = scatter(
+                hidden_states,
+                state.batch.to(self.device).to(torch.int64),
+                dim=0,
+                reduce="mean",
             )
-            self.test_data = OCPData(
-                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
-                state2result=self.state2proxy,
-                target_normalizer=self.trainer.normalizers["target"],
-            )
-            self.candidate_data = OCPData(
-                self.trainer.datasets["deup-val_ood_cat-val_ood_ads"],
-                state2result=self.state2proxy,
-                return_target=False,
-                target_normalizer=self.trainer.normalizers["target"],
-            )
-
-    def state2proxy(self, state):
-        hidden_states = state.deup_q
-        return hidden_states.mean(0).unsqueeze(0)
-        # since we only use one datapoint, we can just sum over this one, without the use of scatter
-        # return scatter(hidden_states, states.batch, dim=0, reduce="mean")
+        return hidden_states
 
     def maxY(self):
         # return 10  # -> TODO: what are the actual bounds?
@@ -314,12 +382,19 @@ class OCPDatasetHandler(DatasetHandler):
         )
         return test_loader, None, None
 
-    def get_custom_dataset(self, samples):
+    def get_custom_dataset(self, samples: Union[List[List], List[GraphData]]):
+        if not isinstance(samples[0], GraphData):
+            sample_graphs = self.env.states2proxy(
+                samples
+            )  # returns List[List[List[GraphData]]]
+            flat_list = [x for xs1 in sample_graphs for xs2 in xs1 for x in xs2]
+            samples = flat_list
         return OCPData(
             samples,
-            state2result=self.state2proxy,
+            state2result=self.state2surrogate,
             target_normalizer=self.trainer.normalizers["target"],
             return_target=False,
+            float=self.float,
         )
 
     """

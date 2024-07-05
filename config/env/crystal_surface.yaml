@@ -1,5 +1,6 @@
 defaults:
   - base
+  - atomgraphconverter: pyxtal_converter
 
 _target_: gflownet.envs.crystals.surface.CrystalSurface
 

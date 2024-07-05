@@ -32,7 +32,9 @@ class Acquisition(ABC):
         self.float = set_float_precision(float_precision)
         self.surrogate_model = surrogate_model
 
-    def __call__(self, candidate_set: Data) -> torch.Tensor:
+    def __call__(
+        self, candidate_set: Union[Data, torch.utils.data.dataloader.DataLoader]
+    ) -> torch.Tensor:
         """
         Evaluates the acquisition function on a set of candidates.
         """
@@ -47,7 +49,7 @@ class Acquisition(ABC):
                 )
             return values
         else:
-            return self.get_acquisition_values(candidate_set)
+            return self.get_acquisition_values(candidate_set[:])
 
     @abstractmethod
     def get_acquisition_values(
@@ -111,5 +113,5 @@ class BOTorchMonteCarloAcquisition(Acquisition):
             )
 
     def get_acquisition_values(self, candidate_set: Union[torch.Tensor, Data]):
-        candidate_set = candidate_set.to(self.device).to(self.float)
+        candidate_set = candidate_set.to(self.device)
         return self.acq_fn(candidate_set.unsqueeze(1)).detach()
