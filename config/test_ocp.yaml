@@ -140,9 +140,9 @@ sampler:
         reward_function: rbf_exponential
         # Parameters of the reward function
         reward_function_kwargs:
-          beta: -8.0
+          beta: 8.0 # -8.0 # we want to maximize the acquisition values
           alpha: 1.0
-          center: -1.6 # Energy of reaction
+          center: 0 # -1.6 # Energy of reaction
           distance: squared
 
 
