@@ -75,4 +75,5 @@ def test__oracle__initializes_properly(oracle, request):
 def test__oracle__output(oracle, input, output, request):
     test_oracle = request.getfixturevalue(oracle)
     test_output = test_oracle(input)
+    print(test_output, test_oracle(input))
     assert torch.equal(test_output, output)
