@@ -2,11 +2,12 @@ from activelearning.dataset.dataset import DatasetHandler, Data
 from torch.utils.data import DataLoader, Dataset
 import torch
 from torch_geometric.data import Batch
+from torch_geometric.data import Data as GraphData
 from ocpmodels.common.utils import make_trainer_from_dir
 from ocpmodels.common.gfn import FAENetWrapper
 from ocpmodels.datasets.data_transforms import get_transforms
 from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
-from typing import Optional, Union, Callable
+from typing import Optional, Union, Callable, List
 from torch_scatter import scatter
 
 
@@ -381,7 +382,13 @@ class OCPDatasetHandler(DatasetHandler):
         )
         return test_loader, None, None
 
-    def get_custom_dataset(self, samples):
+    def get_custom_dataset(self, samples: Union[List[List], List[GraphData]]):
+        if not isinstance(samples[0], GraphData):
+            sample_graphs = self.env.states2proxy(
+                samples
+            )  # returns List[List[List[GraphData]]]
+            flat_list = [x for xs1 in sample_graphs for xs2 in xs1 for x in xs2]
+            samples = flat_list
         return OCPData(
             samples,
             state2result=self.state2surrogate,

@@ -25,11 +25,11 @@ class OCPProxy(Proxy):
         self.n_cpu_threads = n_cpu_threads
         self.dataset_handler = dataset_handler
 
-        if torch.cuda.is_available():
-            self.proxy_device = "cuda"
-            self.ENERGY_INVALID_SAMPLE = self.ENERGY_INVALID_SAMPLE.to(
-                self.proxy_device
-            )
+        # if torch.cuda.is_available():
+        #     self.proxy_device = "cuda"
+        #     self.ENERGY_INVALID_SAMPLE = self.ENERGY_INVALID_SAMPLE.to(
+        #         self.proxy_device
+        #     )
 
     @torch.no_grad()
     def __call__(
