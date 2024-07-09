@@ -8,7 +8,7 @@ from omegaconf import OmegaConf
 abs_config_dir = os.path.abspath("config/")
 
 with initialize_config_dir(version_base=None, config_dir=abs_config_dir):
-    config = compose(config_name="test_ocp.yaml", overrides=[])
+    config = compose(config_name="test_ocp_diff.yaml", overrides=[])
     print(OmegaConf.to_yaml(config))
     print(config)
 
@@ -19,7 +19,7 @@ import torch
 device = config.device
 # device = "cuda"
 n_iterations = config.budget  # TODO: replace with budget
-n_samples = config.n_samples
+n_samples = 3  # config.n_samples
 
 from gflownet.utils.common import set_float_precision
 
@@ -34,7 +34,7 @@ from activelearning.utils.common import set_seeds
 ocp_checkpoint_path = config.dataset.checkpoint_path
 dataset_path = config.dataset.data_path
 
-from activelearning.dataset.ocp import OCPDatasetHandler
+from activelearning.dataset.ocp import OCPDiffDatasetHandler, OCPDatasetHandler
 from activelearning.oracle.ocp import OCPOracle
 
 from activelearning.surrogate.feature_extractor.mlp import MLP
@@ -55,7 +55,7 @@ from functools import partial
 env_maker = hydra.utils.instantiate(config.env, _partial_=True)
 
 # --- Dataset
-dataset_handler = OCPDatasetHandler(
+dataset_handler = OCPDiffDatasetHandler(
     env=env_maker(),
     checkpoint_path=ocp_checkpoint_path,
     data_path=dataset_path,
@@ -98,6 +98,14 @@ feature_extractor = MLP(
 )
 feature_extractor.to(device)
 
+from activelearning.surrogate.surrogate_mapper.mapper import (
+    DifferenceMapper,
+    ConstantMapper,
+)
+
+surrogate_mapper_cls = DifferenceMapper
+# surrogate_mapper_cls = ConstantMapper
+
 # starts with a clean slate each iteration
 surrogate = DeepKernelSVGPSurrogate(
     feature_extractor,
@@ -107,6 +115,7 @@ surrogate = DeepKernelSVGPSurrogate(
     train_epochs=1,
     lr=0.01,
     logger=logger,
+    surrogate_mapper_cls=surrogate_mapper_cls,
 )
 surrogate.fit(train_data)
 
@@ -114,7 +123,7 @@ surrogate.fit(train_data)
 #     surrogate.model, device=device, float_precision=float_prec
 # )
 acq_fn = BOTorchMonteCarloAcquisition(
-    surrogate.model,
+    surrogate.get_model(),
     acq_fn_class=botorch.acquisition.monte_carlo.qExpectedImprovement,
     dataset_handler=dataset_handler,
     device=device,
@@ -145,3 +154,18 @@ sampler = hydra.utils.instantiate(
 sampler.fit()
 
 samples, sample_idcs = sampler.get_samples(n_samples * 5, candidate_set=candidate_set)
+
+print("--- selector")
+# --- Selector
+# selector = Selector(
+#     device=device,
+#     float_precision=float_prec,
+# )
+selector = ScoreSelector(
+    acq_fn, device=device, float_precision=float_prec, maximize=False
+)
+selected_samples, selected_idcs = selector(
+    n_samples=n_samples,
+    candidate_set=dataset_handler.states2selector(samples),
+    index_set=sample_idcs,
+)

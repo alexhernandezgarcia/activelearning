@@ -31,5 +31,5 @@ class Surrogate(ABC):
 
     def get_model(self):
         if self.surrogate_mapper_cls is not None:
-            self.surrogate_mapper_cls(self.model)
+            return self.surrogate_mapper_cls(self.model)
         return self.model

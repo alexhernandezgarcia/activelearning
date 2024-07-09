@@ -20,6 +20,7 @@ from torch.optim import SGD, Adam
 from tqdm import tqdm
 from activelearning.utils.logger import Logger
 from activelearning.dataset.dataset import Data
+from activelearning.utils.common import match_kwargs
 
 
 class GPSurrogate(Surrogate):
@@ -38,7 +39,7 @@ class GPSurrogate(Surrogate):
         mll_args: dict = {},
         **kwargs: any,
     ) -> None:
-        super().__init__(float_precision, device)
+        super().__init__(float_precision, device, **kwargs)
         # initializes the model components for GP Surrogate Models
         # e.g.:
         #   model_class = botorch.models.gp_regression_fidelity.SingleTaskGP
@@ -65,7 +66,7 @@ class GPSurrogate(Surrogate):
             train_y.unsqueeze(-1),
             outcome_transform=self.outcome_transform,
             likelihood=self.likelihood,
-            **self.kwargs,
+            **match_kwargs(self.kwargs, self.model_class),
         )
         gp_model = (
             self.model.model if hasattr(self.model, "model") else self.model
@@ -194,7 +195,7 @@ class SVGPSurrogate(GPSurrogate):
             batch_y.unsqueeze(-1),
             outcome_transform=self.outcome_transform,
             likelihood=self.likelihood,
-            **self.kwargs,
+            **match_kwargs(self.kwargs, self.model_class),
         )
         self.model.likelihood.noise_covar.register_constraint(
             "raw_noise", GreaterThan(1e-5)

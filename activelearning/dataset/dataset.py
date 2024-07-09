@@ -133,8 +133,11 @@ class DatasetHandler(ABC):
     transforms states into oracle format. by default the format is the same format as states2proxy
     """
 
-    def states2oracle(self, samples):
-        return self.get_custom_dataset(samples)
+    def states2oracle(self, states):
+        return self.get_custom_dataset(states)
 
     def prepare_oracle_dataloader(self, dataset: Data, sample_idcs=None):
         return dataset
+
+    def states2selector(self, states):
+        return self.get_custom_dataset(states)

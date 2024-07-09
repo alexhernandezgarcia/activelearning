@@ -104,6 +104,7 @@ class BOTorchMonteCarloAcquisition(Acquisition):
             self.acq_fn = acq_fn_class(
                 surrogate_model,
                 train_X.to(self.device).to(self.float),
+                _verify_output_shape=False,
             )
         else:
             best_f = dataset_handler.maxY()
@@ -114,4 +115,10 @@ class BOTorchMonteCarloAcquisition(Acquisition):
 
     def get_acquisition_values(self, candidate_set: Union[torch.Tensor, Data]):
         candidate_set = candidate_set.to(self.device)
+        # candidate_set = (
+        #     candidate_set
+        #     if len(candidate_set.shape) > 2
+        #     else candidate_set.unsqueeze(1)
+        # )
+        self.acq_fn.objective._verify_output_shape = False
         return self.acq_fn(candidate_set.unsqueeze(1)).detach()

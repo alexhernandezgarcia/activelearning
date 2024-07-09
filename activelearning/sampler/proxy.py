@@ -89,7 +89,7 @@ class OCPProxy(Proxy):
                     # Score the sample using the model
                     if verbose:
                         print("      gnn_output_from_graph...")
-                    gnn_output = self.gnn_output_from_graph(sample_graph)
+                    gnn_output = self.acq_output_from_graph(sample_graph)
                     gnn_output_per_adsorbate.append(gnn_output)
 
                 # If the process has produced invalid graphs, mark the sample as invalid
@@ -129,7 +129,7 @@ class OCPProxy(Proxy):
             print()
         return global_sample_score
 
-    def gnn_output_from_graph(self, graph):
+    def acq_output_from_graph(self, graph):
         # TODO: Use loaders before to have graph = batch ?
         dataset = self.dataset_handler.get_custom_dataset([graph])
         output = self.acquisition(dataset)
