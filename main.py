@@ -120,7 +120,7 @@ def main(config):
         # starts with a clean slate each iteration
         acquisition = hydra.utils.instantiate(
             config.acquisition,
-            surrogate.model,
+            surrogate.get_model,
             dataset_handler=dataset_handler,
             device=config.device,
             float_precision=config.float_precision,
