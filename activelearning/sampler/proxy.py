@@ -135,3 +135,99 @@ class OCPProxy(Proxy):
         output = self.acquisition(dataset)
 
         return output
+
+
+class OCPDiffProxy(Proxy):
+    ENERGY_INVALID_SAMPLE = torch.tensor([10])
+
+    def __init__(self, acquisition, dataset_handler, n_cpu_threads=1, **kwargs):
+        super().__init__(**kwargs)
+        self.acquisition = acquisition
+        self.n_cpu_threads = n_cpu_threads
+        self.dataset_handler = dataset_handler
+
+        # if torch.cuda.is_available():
+        #     self.proxy_device = "cuda"
+        #     self.ENERGY_INVALID_SAMPLE = self.ENERGY_INVALID_SAMPLE.to(
+        #         self.proxy_device
+        #     )
+
+    @torch.no_grad()
+    def __call__(
+        self, states: List[List[List[Data]]], verbose: bool = False
+    ) -> TensorType["batch"]:
+        """
+        Forward pass of the proxy.
+
+        Args:
+            states (List[List[List[Data]]]): States to infer on. Shape:
+                ``(batch, nr_samples, nr_adsorbates)``.
+                The length of the outer list: len(states) (i.e., batch_size):
+                The length of the middle list: nr of samples drawn per state (i.e., there are multiple possible ways to represent the graph; can be specified in the config, how many samples should be produced)
+                The length of the third list: nr of adsorbate smiles (i.e., for each smiles a graph is built)
+
+        Returns:
+            torch.Tensor: Proxy energies. Shape: ``(batch,)``.
+        """
+        if self.n_cpu_threads == 1:
+            # Run the evaluations in a single thread
+            if verbose:
+                print(f"Evaluating {len(states)} states:")
+            y = [self.evaluate_state(s, i, verbose) for i, s in enumerate(states)]
+        else:
+            # Run the evaluations in parallel
+            if verbose:
+                print("Ignoring verbose flag in multi-processing")
+            with Pool(processes=self.n_cpu_threads) as pool:
+                y = pool.map(self.evaluate_state, states)
+
+        return tfloat(y, self.device, self.float).view(-1)
+
+    def evaluate_state(self, samples, index=None, verbose=False) -> float:
+        """Attribute a reward score to a given state"""
+
+        if samples is None:
+            return self.ENERGY_INVALID_SAMPLE
+
+        # Score the PyXtal samples using the proxy
+        if len(samples) > 0:
+            pyxtal_sample_scores = []
+
+            # TODO : If possible, process the PyXtal samples in batches
+            for sid, adsorbate_samples in enumerate(samples):
+                # Convert the PyXtal crystal to the graph format expected by the model
+                if verbose:
+                    print(f"    Scoring PyXtal sample {sid+1}/{len(samples)}...")
+
+                # Score the sample using the model
+                if verbose:
+                    print("      gnn_output_from_graph...")
+                sample_score = self.acq_output_from_graph(adsorbate_samples)
+
+                pyxtal_sample_scores.append(sample_score)
+
+            global_sample_score = min(pyxtal_sample_scores)
+            if verbose:
+                print(f"  PyXtal global_sample_score: {global_sample_score}")
+                if len(pyxtal_sample_scores) > 1:
+                    print(
+                        f"  Mean: {torch.mean(torch.stack(pyxtal_sample_scores)): .4f}, std: {torch.std(torch.stack(pyxtal_sample_scores)): .4f}"
+                    )
+
+        else:
+            # PyXtal was unable to generate valid crystals given the state. Provide a
+            # default bad score.
+            if verbose:
+                print("  No valid samples generated")
+            global_sample_score = self.ENERGY_INVALID_SAMPLE
+
+        if verbose:
+            print()
+        return global_sample_score
+
+    def acq_output_from_graph(self, graph):
+        # TODO: Use loaders before to have graph = batch ?
+        dataset = self.dataset_handler.graphs2acquisition([graph])
+        output = self.acquisition(dataset)
+
+        return output

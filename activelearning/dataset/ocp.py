@@ -482,6 +482,10 @@ class OCPDiffDatasetHandler(OCPDatasetHandler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    def graphs2acquisition(self, states: List[List[GraphData]]):
+        # states: shape = (batch, 2)
+        return OCPTwinDataMapper(states, self.state2surrogate)
+
     def states2selector(self, states: List[List]):
         # returns List[List[List[GraphData]]] with shape (batch, no_pyxtal_samples, 2)
         sample_graphs = self.env.states2proxy(states)

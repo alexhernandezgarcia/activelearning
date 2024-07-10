@@ -141,3 +141,6 @@ class DatasetHandler(ABC):
 
     def states2selector(self, states):
         return self.get_custom_dataset(states)
+
+    def states2acquisition(self, states):
+        return self.get_custom_dataset(states)

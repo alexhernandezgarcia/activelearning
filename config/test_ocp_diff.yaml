@@ -3,7 +3,7 @@ defaults:
   - dataset: ocp_diff
   - oracle: ocp
   - env: crystal_surface
-  - sampler: random_gflownet # surface_gflownet # random_gflownet
+  - sampler: surface_gflownet # surface_gflownet # random_gflownet
   - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
   - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
@@ -111,7 +111,7 @@ sampler:
         lr: 0.0001
         z_dim: 16
         lr_z_mult: 100
-        n_train_steps: 100000
+        n_train_steps: 2 # 100000
         lr_decay_period: 11000
         lr_decay_gamma: 0.5
       replay_sampling: weighted
@@ -126,30 +126,30 @@ sampler:
         n_top_k: 5000
         top_k: 100
         top_k_period: -1
-
-      policy:
-        forward:
-          type: mlp
-          n_hid: 256
-          n_layers: 3
-          checkpoint: forward
-        backward:
-          type: mlp
-          n_hid: 256
-          n_layers: 3
-          shared_weights: False
-          checkpoint: backward
-      proxy:
-        reward_min: 1e-08
-        do_clip_rewards: True
-        # RBF exponential, to compute the proximity to a target
-        reward_function: rbf_exponential
-        # Parameters of the reward function
-        reward_function_kwargs:
-          beta: -8.0
-          alpha: 1.0
-          center: -1.6 # Energy of reaction
-          distance: squared
+    policy:
+      forward:
+        type: mlp
+        n_hid: 256
+        n_layers: 3
+        checkpoint: forward
+      backward:
+        type: mlp
+        n_hid: 256
+        n_layers: 3
+        shared_weights: False
+        checkpoint: backward
+    proxy:
+      _target_: activelearning.sampler.proxy.OCPDiffProxy
+      reward_min: 1e-08
+      do_clip_rewards: True
+      # RBF exponential, to compute the proximity to a target
+      reward_function: rbf_exponential
+      # Parameters of the reward function
+      reward_function_kwargs:
+        beta: -8.0
+        alpha: 1.0
+        center: -1.6 # Energy of reaction
+        distance: squared
 
 
 # Hydra config

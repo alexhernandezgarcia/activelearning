@@ -121,29 +121,29 @@ sampler:
         top_k: 100
         top_k_period: -1
 
-      policy:
-        forward:
-          type: mlp
-          n_hid: 256
-          n_layers: 3
-          checkpoint: forward
-        backward:
-          type: mlp
-          n_hid: 256
-          n_layers: 3
-          shared_weights: False
-          checkpoint: backward
-      proxy:
-        reward_min: 1e-08
-        do_clip_rewards: True
-        # RBF exponential, to compute the proximity to a target
-        reward_function: rbf_exponential
-        # Parameters of the reward function
-        reward_function_kwargs:
-          beta: 8.0 # -8.0 # we want to maximize the acquisition values
-          alpha: 1.0
-          center: 0 # -1.6 # Energy of reaction
-          distance: squared
+    policy:
+      forward:
+        type: mlp
+        n_hid: 256
+        n_layers: 3
+        checkpoint: forward
+      backward:
+        type: mlp
+        n_hid: 256
+        n_layers: 3
+        shared_weights: False
+        checkpoint: backward
+    proxy:
+      reward_min: 1e-08
+      do_clip_rewards: True
+      # RBF exponential, to compute the proximity to a target
+      reward_function: rbf_exponential
+      # Parameters of the reward function
+      reward_function_kwargs:
+        beta: 8.0 # -8.0 # we want to maximize the acquisition values
+        alpha: 1.0
+        center: 0 # -1.6 # Energy of reaction
+        distance: squared
 
 
 # Hydra config

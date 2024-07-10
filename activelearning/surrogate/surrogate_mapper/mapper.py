@@ -22,7 +22,6 @@ class DifferenceMapper(SurrogateMapper):
     """
 
     def posterior(self, X: torch.Tensor, posterior_transform=None) -> GPyTorchPosterior:
-        print(X.shape)
         x1 = X[:, :, :, 0]
         x2 = X[:, :, :, 1]
         out1 = self.model.posterior(x1, posterior_transform=posterior_transform)
@@ -39,7 +38,6 @@ class ConstantMapper(SurrogateMapper):
     """
 
     def posterior(self, X: torch.Tensor, posterior_transform=None) -> GPyTorchPosterior:
-        print(X.shape)
         out = self.model.posterior(X, posterior_transform=posterior_transform)
         dist = MultivariateNormal(out.mean.squeeze(-1) - 3.2, out.covariance_matrix)
         return GPyTorchPosterior(distribution=dist)
