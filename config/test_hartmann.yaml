@@ -11,6 +11,11 @@ defaults:
   - logger: base #wandb
   - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
 
+# acquisition:
+#   acq_fn_class:
+#     # use for botorch_ei acquisition function
+#     best_f: 1
+
 logger:
   project_name: test_hartmann
   run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}

@@ -3,13 +3,18 @@ defaults:
   - dataset: branin
   - env: grid
   - oracle: branin
-  - sampler: gflownet #random_gflownet #greedy #gflownet #random
-  - selector: selector #selector #score
+  - sampler: random #random_gflownet #greedy #gflownet #random
+  - selector: score #selector #score
   - surrogate: gp
-  - acquisition: botorch_mve
+  - acquisition: botorch_ucb #botorch_mve #botorch_ei #botorch_nei #botorch_ucb
   - user: default
   - logger: wandb #base #wandb
   - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
+
+# acquisition:
+#   acq_fn_class:
+#     # use for botorch_ei acquisition function
+#     best_f: 1
 
 logger:
   project_name: test_branin

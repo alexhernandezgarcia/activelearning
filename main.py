@@ -120,7 +120,7 @@ def main(config):
         # starts with a clean slate each iteration
         acquisition = hydra.utils.instantiate(
             config.acquisition,
-            surrogate.get_model,
+            surrogate.get_model(),
             dataset_handler=dataset_handler,
             device=config.device,
             float_precision=config.float_precision,
@@ -141,6 +141,7 @@ def main(config):
             config.sampler,
             env_maker=env_maker,
             acquisition=acquisition,
+            dataset_handler=dataset_handler,
             device=config.device,
             float_precision=config.float_precision,
             _recursive_=False,
@@ -161,7 +162,7 @@ def main(config):
         )
         samples_selected, selected_idcs = selector(
             n_samples=n_samples,
-            candidate_set=dataset_handler.get_custom_dataset(samples),
+            candidate_set=dataset_handler.states2selector(samples),
             index_set=sample_indices,
         )
 

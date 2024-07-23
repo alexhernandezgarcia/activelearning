@@ -85,9 +85,9 @@ class OCPData(Data):
                     y.append(y_i)
                 if idx_in_dataset is not None:
                     idcs_in_dataset.append(idx_in_dataset)
-            x = torch.concat(x, dim=0)
+            x = torch.stack(x)
             if len(y) > 0:
-                y = torch.Tensor(y, dtype=self.float)
+                y = torch.Tensor(y).to(dtype=self.float)
             else:
                 y = None
             if len(idcs_in_dataset) > 0:
@@ -105,9 +105,9 @@ class OCPData(Data):
                     y.append(y_i)
                 if idx_in_dataset is not None:
                     idcs_in_dataset.append(idx_in_dataset)
-            x = torch.concat(x, dim=0)
+            x = torch.stack(x)
             if len(y) > 0:
-                y = torch.Tensor(y, dtype=self.float)
+                y = torch.Tensor(y).to(dtype=self.float)
             else:
                 y = None
             if len(idcs_in_dataset) > 0:
@@ -307,14 +307,16 @@ class OCPDatasetHandler(DatasetHandler):
                 state.batch.to(self.device).to(torch.int64),
                 dim=0,
                 reduce="mean",
-            )
+            )[0]
         return hidden_states
 
     def states2selector(self, states: List[List]):
         sample_graphs = self.env.states2proxy(
             states
         )  # returns List[List[List[GraphData]]]
-        flat_list = [x for xs1 in sample_graphs for xs2 in xs1 for x in xs2]
+        flat_list = [
+            x for xs1 in sample_graphs if xs1 is not None for xs2 in xs1 for x in xs2
+        ]
         samples = flat_list
         return self.get_custom_dataset(samples)
 
@@ -332,7 +334,7 @@ class OCPDatasetHandler(DatasetHandler):
 
     def minY(self):
         # return -10  # -> TODO: what are the actual bounds?
-        return 5  # when target is standard normalized
+        return -5  # when target is standard normalized
         # ... this takes too long
         # train_loader, _ = self.get_dataloader()
         # min_y = torch.inf
@@ -464,20 +466,36 @@ class OCPTwinDataMapper(Dataset):
                 x1_i, x2_i = self.get_item_from_index(i)
                 x1.append(x1_i)
                 x2.append(x2_i)
-            x1 = torch.concat(x1, dim=0)
-            x2 = torch.concat(x2, dim=0)
+            x1 = torch.stack(x1)
+            x2 = torch.stack(x2)
         else:
             x1, x2 = [], []
             for i in key:
                 x1_i, x2_i = self.get_item_from_index(i)
                 x1.append(x1_i)
                 x2.append(x2_i)
-            x1 = torch.concat(x1, dim=0)
-            x2 = torch.concat(x2, dim=0)
+            x1 = torch.stack(x1)
+            x2 = torch.stack(x2)
         return torch.concat([x1.unsqueeze(-1), x2.unsqueeze(-1)], dim=-1)
 
 
 class OCPDiffDatasetHandler(OCPDatasetHandler):
+
+    def maxY(self):
+        # bounds derived from the DifferenceMapper surrogate mapper
+        # min = -5
+        # max = 5
+        # - compute difference (val1 - val2)
+        # min_diff = -5 - +5 = -10
+        # max_diff = +5 - -5 = +10
+        # ideal_diff = -1.6
+        # - compute distance (diff - -1.6).abs()
+        # min_dist = (-1.6 - -1.6).abs() = 0
+        # max_dist = (10 - -1.6).abs() = 11.6 * -1
+        return 0
+
+    def minY(self):
+        return -11.6
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -491,7 +509,7 @@ class OCPDiffDatasetHandler(OCPDatasetHandler):
         sample_graphs = self.env.states2proxy(states)
 
         # we assume the no_pyxtal_samples=1 and squeeze the samples to the shape (batch, 2)
-        sample_graphs = [x for xs1 in sample_graphs for x in xs1]
+        sample_graphs = [x for xs1 in sample_graphs if xs1 is not None for x in xs1]
 
         # acq_fn should be able to handle a tensor of shape (batch, faenet_feature_size, 2)
         return OCPTwinDataMapper(sample_graphs, self.state2surrogate)

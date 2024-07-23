@@ -2,16 +2,26 @@ defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: ocp_diff
   - oracle: ocp
-  - env: crystal_surface
+  - env: catalyst
   - sampler: surface_gflownet # surface_gflownet # random_gflownet
   - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
-  - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
+  # --> only acq_fn that do not require "training" data to make it's estimates (just needs max and min values as defined in the datasethandler)
+  - acquisition: botorch_ucb # botorch_ei
   - user: default
-  - logger: wandb
+  - logger: base # wandb
   # cime4r export significantly increases runtime --> only use when really needed; 
   # note: does not work when using gflownet yet, because gflownet produces new samples --> TODO
   - plotter: null # cime4r_ocp
+
+
+acquisition:
+  acq_fn_class:
+    # use for botorch_ei acquisition function
+    # best_f: 10
+    objective:
+      # _target_: botorch.acquisition.objective.IdentityMCObjective
+      _target_: activelearning.acquisition.objective.IdentityMCObjective
 
 logger:
   project_name: test_ocp_training
@@ -40,7 +50,7 @@ surrogate:
 device: cpu # cuda
 float_precision: 32
 budget: 10
-n_samples: 100
+n_samples: 10 #100
 seed: 98765
 maximize: False
 
@@ -57,21 +67,21 @@ env:
     do_sg_to_composition_constraints: True
     do_composition_to_sg_constraints: False
     composition_kwargs:
-      elements: [1, 3, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 19, 23, 25, 26, 27, 28, 29, 34]
-      max_diff_elem: 5
+      elements: [8, 14] # O, Si
+      max_diff_elem: 2 # 5
       min_diff_elem: 1
       min_atoms: 1
-      max_atoms: 80
+      max_atoms: 16 # 80
       min_atom_i: 1
-      max_atom_i: 16
+      max_atom_i: 8 # 16
       do_charge_check: True
     space_group_kwargs:
-      space_groups_subset: [16, 18, 19, 20, 21, 25, 26, 29, 30, 31, 33, 36, 38, 40, 41, 43, 44, 46, 47, 51, 52, 53, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 69, 70, 71, 72, 74, 82, 84, 85, 86, 87, 88, 92, 99, 102, 107, 113, 114, 121, 122, 123, 126, 129, 131, 136, 137, 138, 139, 140, 141, 198, 199, 205, 206, 216, 217, 220, 221, 224, 225, 227, 229, 230]
+      space_groups_subset: [1, 2, 3, 14, 15, 47, 62, 132, 147, 150, 154, 156, 164, 189, 203]
     lattice_parameters_kwargs:
-      min_length: 0.9
-      max_length: 100.0
-      min_angle: 50.0
-      max_angle: 150.0
+      min_length: 2.0 # CHANGED FROM 0.9
+      max_length: 50.0 # CHANGED FROM 100.0
+      min_angle: 60.0 # CHANGED FROM 50.0
+      max_angle: 140.0 # CHANGED FROM 150.0
       n_comp: 5
       beta_params_min: 0.1
       beta_params_max: 100.0
@@ -101,6 +111,9 @@ env:
 
 sampler: 
   conf:
+    logger:
+      do:
+        online: True
     agent:
       random_action_prob: 0.1
       optimizer:
@@ -111,7 +124,7 @@ sampler:
         lr: 0.0001
         z_dim: 16
         lr_z_mult: 100
-        n_train_steps: 2 # 100000
+        n_train_steps: 5000 # 100000
         lr_decay_period: 11000
         lr_decay_gamma: 0.5
       replay_sampling: weighted
@@ -126,6 +139,7 @@ sampler:
         n_top_k: 5000
         top_k: 100
         top_k_period: -1
+
     policy:
       forward:
         type: mlp
@@ -140,16 +154,19 @@ sampler:
         checkpoint: backward
     proxy:
       _target_: activelearning.sampler.proxy.OCPDiffProxy
-      reward_min: 1e-08
-      do_clip_rewards: True
-      # RBF exponential, to compute the proximity to a target
-      reward_function: rbf_exponential
-      # Parameters of the reward function
-      reward_function_kwargs:
-        beta: -8.0
+      # Reward function: power or boltzmann
+      # boltzmann: exp(1.0 * reward_beta * proxy)
+      # power: (1.0 * proxy / reward_norm) ** self.reward_beta
+      # identity: proxy
+      reward_function: boltzmann
+      # Minimum reward
+      reward_min: 1e-8
+      reward_function_kwargs: 
+        # Beta parameter of the reward function
+        beta: 3.0
         alpha: 1.0
-        center: -1.6 # Energy of reaction
-        distance: squared
+        # Reward normalization for "power" reward function
+        # norm: 1.0
 
 
 # Hydra config

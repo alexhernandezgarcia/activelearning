@@ -130,7 +130,6 @@ class OCPProxy(Proxy):
         return global_sample_score
 
     def acq_output_from_graph(self, graph):
-        # TODO: Use loaders before to have graph = batch ?
         dataset = self.dataset_handler.get_custom_dataset([graph])
         output = self.acquisition(dataset)
 
@@ -138,7 +137,7 @@ class OCPProxy(Proxy):
 
 
 class OCPDiffProxy(Proxy):
-    ENERGY_INVALID_SAMPLE = torch.tensor([10])
+    ENERGY_INVALID_SAMPLE = torch.tensor([0])
 
     def __init__(self, acquisition, dataset_handler, n_cpu_threads=1, **kwargs):
         super().__init__(**kwargs)
@@ -226,7 +225,6 @@ class OCPDiffProxy(Proxy):
         return global_sample_score
 
     def acq_output_from_graph(self, graph):
-        # TODO: Use loaders before to have graph = batch ?
         dataset = self.dataset_handler.graphs2acquisition([graph])
         output = self.acquisition(dataset)
 

@@ -23,8 +23,8 @@ n_samples = 3  # config.n_samples
 
 from gflownet.utils.common import set_float_precision
 
-float_prec = set_float_precision(config.float_precision)
-# float_prec = set_float_precision(32)
+# float_prec = set_float_precision(config.float_precision)
+float_prec = set_float_precision(64)
 
 
 from activelearning.utils.common import set_seeds
@@ -51,8 +51,10 @@ from gflownet.envs.crystals.surface import CrystalSurface
 from functools import partial
 
 # --- Environment
-# env_maker = partial(CrystalSurface, atomgraphconverter=hydra.utils.instantiate(config.env.atomgraphconverter))
-env_maker = hydra.utils.instantiate(config.env, _partial_=True)
+# env_maker = partial(CrystalSurface, float_precision=float_prec, atomgraphconverter=hydra.utils.instantiate(config.env.atomgraphconverter))
+env_maker = hydra.utils.instantiate(
+    config.env, float_precision=float_prec, _partial_=True
+)
 
 # --- Dataset
 dataset_handler = OCPDiffDatasetHandler(
@@ -112,15 +114,23 @@ surrogate = DeepKernelSVGPSurrogate(
     float_precision=float_prec,
     device=device,
     mll_args={"num_data": len(train_data.dataset)},
-    train_epochs=1,
+    train_epochs=1,  # 20,
     lr=0.01,
     logger=logger,
     surrogate_mapper_cls=surrogate_mapper_cls,
 )
 surrogate.fit(train_data)
 
+from botorch.acquisition.max_value_entropy_search import (
+    qLowerBoundMaxValueEntropy,
+)
+
 # acq_fn = BOTorchMaxValueEntropyAcquisition(
-#     surrogate.model, device=device, float_precision=float_prec
+#     surrogate.get_model(),
+#     acq_fn_class=qLowerBoundMaxValueEntropy,
+#     dataset_handler=dataset_handler,
+#     device=device,
+#     float_precision=float_prec,
 # )
 acq_fn = BOTorchMonteCarloAcquisition(
     surrogate.get_model(),
@@ -162,7 +172,7 @@ print("--- selector")
 #     float_precision=float_prec,
 # )
 selector = ScoreSelector(
-    acq_fn, device=device, float_precision=float_prec, maximize=False
+    acq_fn, device=device, float_precision=float_prec, maximize=True
 )
 selected_samples, selected_idcs = selector(
     n_samples=n_samples,
