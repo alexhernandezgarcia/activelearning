@@ -17,7 +17,7 @@ class AcquisitionProxy(Proxy):
 
 
 class OCPProxy(Proxy):
-    ENERGY_INVALID_SAMPLE = torch.tensor([10])
+    ENERGY_INVALID_SAMPLE = torch.tensor([-10])
 
     def __init__(self, acquisition, dataset_handler, n_cpu_threads=1, **kwargs):
         super().__init__(**kwargs)
@@ -137,7 +137,7 @@ class OCPProxy(Proxy):
 
 
 class OCPDiffProxy(Proxy):
-    ENERGY_INVALID_SAMPLE = torch.tensor([0])
+    ENERGY_INVALID_SAMPLE = torch.tensor([-2])
 
     def __init__(self, acquisition, dataset_handler, n_cpu_threads=1, **kwargs):
         super().__init__(**kwargs)
