@@ -1,0 +1,12 @@
+defaults:
+  - botorch
+
+acq_fn_class: 
+  _target_: botorch.acquisition.monte_carlo.qUpperConfidenceBound
+  beta: 0.1
+  sampler: 
+    _target_: botorch.sampling.SobolQMCNormalSampler
+    sample_shape: 500
+  _partial_: true
+  
+id: ucb

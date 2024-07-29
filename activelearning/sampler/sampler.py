@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import torch
 from gflownet.utils.common import set_device, set_float_precision
+from gflownet.utils.policy import parse_policy_config
 from activelearning.acquisition.acquisition import Acquisition
 from typing import Union, Tuple
 import torch
@@ -106,14 +107,17 @@ class GFlowNetSampler(Sampler):
         env = env_maker()
 
         # The policy is used to model the probability of a forward/backward action
+        forward_config = parse_policy_config(conf, kind="forward")
+        backward_config = parse_policy_config(conf, kind="backward")
+
         forward_policy = hydra.utils.instantiate(
-            conf.policy.forward,
+            forward_config,
             env=env,
             device=device,
             float_precision=float_precision,
         )
         backward_policy = hydra.utils.instantiate(
-            conf.policy.backward,
+            backward_config,
             env=env,
             device=device,
             float_precision=float_precision,

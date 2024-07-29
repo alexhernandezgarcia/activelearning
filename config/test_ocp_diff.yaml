@@ -1,30 +1,33 @@
 defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
-  - dataset: ocp
+  - dataset: ocp_diff
   - oracle: ocp
   - env: catalyst
-  - sampler: surface_gflownet # surface_gflownet # greedy # random # random_gflownet
+  - sampler: surface_gflownet # surface_gflownet # random_gflownet
   - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
-  # --> ei only returns 0.0; there might be sth wrong with the config of the acquisition function
-  - acquisition: botorch_ei #botorch_mve #botorch_ei #botorch_nei #botorch_ucb
+  # --> only acq_fn that do not require "training" data to make it's estimates (just needs max and min values as defined in the datasethandler)
+  - acquisition: botorch_ucb # botorch_ei
   - user: default
-  - logger: base
+  - logger: base # wandb
   # cime4r export significantly increases runtime --> only use when really needed; 
   # note: does not work when using gflownet yet, because gflownet produces new samples --> TODO
   - plotter: null # cime4r_ocp
 
+
 acquisition:
   acq_fn_class:
     # use for botorch_ei acquisition function
-    best_f: 3.7060
+    # best_f: 10
+    objective:
+      # _target_: botorch.acquisition.objective.IdentityMCObjective
+      _target_: activelearning.acquisition.objective.IdentityMCObjective
 
 logger:
   project_name: test_ocp_training
   run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}_max
 
 dataset:
-  # checkpoint_path: /network/scratch/a/alexandre.duval/ocp/runs/4648581/checkpoints/best_checkpoint.pt
   checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.1/best_checkpoint.pt
   data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
   # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
@@ -40,16 +43,23 @@ surrogate:
     n_output: 16
   train_epochs: 20
   lr: 0.01
+  surrogate_mapper_cls: 
+    _target_: activelearning.surrogate.surrogate_mapper.mapper.DifferenceMapper
+    _partial_: true
 
 device: cpu # cuda
-float_precision: 64 # 32
+float_precision: 32
 budget: 10
-n_samples: 100
+n_samples: 10 #100
 seed: 98765
 maximize: False
 
 
 env:
+  atomgraphconverter: 
+    adsorbate_smiles:
+    - "*O"
+    - "*OH"
   has_crystal_to_miller_constraints: True
   crystal_kwargs:
     do_sg_before_composition: True
@@ -102,7 +112,6 @@ env:
 sampler: 
   conf:
     logger:
-      project_name: "test_gfn_ocp"
       do:
         online: True
     agent:
@@ -144,6 +153,7 @@ sampler:
         shared_weights: False
         checkpoint: backward
     proxy:
+      _target_: activelearning.sampler.proxy.OCPDiffProxy
       # Reward function: power or boltzmann
       # boltzmann: exp(1.0 * reward_beta * proxy)
       # power: (1.0 * proxy / reward_norm) ** self.reward_beta
@@ -153,7 +163,7 @@ sampler:
       reward_min: 1e-8
       reward_function_kwargs: 
         # Beta parameter of the reward function
-        beta: 1.0
+        beta: 3.0
         alpha: 1.0
         # Reward normalization for "power" reward function
         # norm: 1.0

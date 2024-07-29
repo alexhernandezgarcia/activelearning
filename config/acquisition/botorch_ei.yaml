@@ -1,4 +1,5 @@
-_target_: activelearning.acquisition.acquisition.BOTorchMonteCarloAcquisition
+defaults:
+  - botorch
 
 acq_fn_class: 
   _target_: botorch.acquisition.monte_carlo.qExpectedImprovement # qNoisyExpectedImprovement

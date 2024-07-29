@@ -18,7 +18,7 @@ def ocp_dataset_handler_base():
             n_cpu_threads=1,
             no_tag_bulk=False,
         )
-        env = CrystalSurfaceEnv(converter)
+        env = CrystalSurfaceEnv(converter, float_precision=32)
         dataset_handler = OCPDatasetHandler(
             env,
             ocp_checkpoint_path,
@@ -45,7 +45,7 @@ def ocp_dataset_handler_train_split():
             n_cpu_threads=1,
             no_tag_bulk=False,
         )
-        env = CrystalSurfaceEnv(converter)
+        env = CrystalSurfaceEnv(converter, float_precision=32)
         dataset_handler = OCPDatasetHandler(
             env,
             ocp_checkpoint_path,
