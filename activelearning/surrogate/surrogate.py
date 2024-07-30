@@ -21,7 +21,7 @@ class Surrogate(ABC):
         self.surrogate_mapper_cls = surrogate_mapper_cls
 
     @abstractmethod
-    def fit(self, train_data: Union[torch.Tensor, DataLoader]) -> None:
+    def fit(self, train_data: Union[torch.Tensor, DataLoader], **kwargs) -> None:
         # fit the surrogate model: self.model
         pass
 

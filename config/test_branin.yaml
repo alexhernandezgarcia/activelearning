@@ -3,12 +3,12 @@ defaults:
   - dataset: branin
   - env: grid
   - oracle: branin
-  - sampler: random #random_gflownet #greedy #gflownet #random
+  - sampler: gflownet #random_gflownet #greedy #gflownet #random
   - selector: score #selector #score
-  - surrogate: gp
+  - surrogate: svdkl_kernel_wrapper #gp
   - acquisition: botorch_ucb #botorch_mve #botorch_ei #botorch_nei #botorch_ucb
   - user: default
-  - logger: wandb #base #wandb
+  - logger: base
   - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
 
 # acquisition:
@@ -16,9 +16,34 @@ defaults:
 #     # use for botorch_ei acquisition function
 #     best_f: 1
 
+surrogate:
+  mll_args: 
+    # number of training data instances
+    num_data: 4
+  feature_extractor:
+    n_input: 2
+    n_hidden: [16, 16]
+    n_output: 8
+  train_epochs: 5
+  lr: 0.01
+
 logger:
-  project_name: test_branin
+  do:
+    online: True
+    times: False
+  project_name: test_logger
   run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}
+  # Log dir
+  logdir:
+    root: ./logs
+    ckpts: ./ckpts
+    overwrite: True
+  debug: True
+  progress: True
+  tags: 
+      - branin
+      - al
+      - gfn
 
 dataset:
   train_path: ~/activelearning/data/branin/data_100_train.csv
@@ -36,12 +61,7 @@ sampler:
       random_action_prob: 0.0 # 0.01
       optimizer:
         lr: 5e-4
-        n_train_steps: 500 #5000 # 10000
-    logger:
-      do:
-        online: False #True
-      project_name: "test_gflownet"
-      run_name: "identity_lr5e-4"
+        n_train_steps: 50 #5000 # 10000
     proxy:
       # Reward function: power or boltzmann
       # boltzmann: exp(1.0 * reward_beta * proxy)

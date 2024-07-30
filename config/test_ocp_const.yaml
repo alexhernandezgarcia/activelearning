@@ -9,7 +9,7 @@ defaults:
   # --> ei only returns 0.0; there might be sth wrong with the config of the acquisition function
   - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
   - user: default
-  - logger: base # wandb
+  - logger: base
   # cime4r export significantly increases runtime --> only use when really needed; 
   # note: does not work when using gflownet yet, because gflownet produces new samples --> TODO
   - plotter: null # cime4r_ocp
@@ -105,9 +105,6 @@ env:
 
 sampler: 
   conf:
-    logger:
-      do:
-        online: True
     agent:
       random_action_prob: 0.1
       optimizer:

@@ -4,6 +4,7 @@ import torch
 from gflownet.utils.common import set_device, set_float_precision
 from gflownet.utils.policy import parse_policy_config
 from activelearning.acquisition.acquisition import Acquisition
+from activelearning.utils.logger import ActiveLearningLogger
 from typing import Union, Tuple
 import torch
 
@@ -12,11 +13,13 @@ class Sampler(ABC):
     def __init__(
         self,
         acquisition: Acquisition,
+        logger: ActiveLearningLogger,
         device: Union[str, torch.device],
         float_precision: Union[int, torch.dtype],
         **kwargs
     ) -> None:
         self.acquisition = acquisition
+        self.logger = logger
         # Device
         self.device = set_device(device)
         # Float precision
@@ -85,24 +88,15 @@ class GFlowNetSampler(Sampler):
     Then it generates n samples proportionally to the reward.
     """
 
-    def __init__(
-        self,
-        env_maker,
-        acquisition,
-        dataset_handler,
-        conf,
-        device,
-        float_precision,
-        **kwargs
-    ):
-        super().__init__(acquisition, device, float_precision)
+    def __init__(self, env_maker, dataset_handler, conf, **kwargs):
+        super().__init__(**kwargs)
         import hydra
 
-        logger = hydra.utils.instantiate(
-            conf.logger,
-            conf,
-            _recursive_=False,
-        )
+        # logger = hydra.utils.instantiate(
+        #     conf.logger,
+        #     conf,
+        #     _recursive_=False,
+        # )
 
         env = env_maker()
 
@@ -113,14 +107,14 @@ class GFlowNetSampler(Sampler):
         forward_policy = hydra.utils.instantiate(
             forward_config,
             env=env,
-            device=device,
-            float_precision=float_precision,
+            device=self.device,
+            float_precision=self.float_precision,
         )
         backward_policy = hydra.utils.instantiate(
             backward_config,
             env=env,
-            device=device,
-            float_precision=float_precision,
+            device=self.device,
+            float_precision=self.float_precision,
         )
 
         # State flow
@@ -128,8 +122,8 @@ class GFlowNetSampler(Sampler):
             state_flow = hydra.utils.instantiate(
                 conf.state_flow,
                 env=env,
-                device=device,
-                float_precision=float_precision,
+                device=self.device,
+                float_precision=self.float_precision,
                 base=forward_policy,
             )
         else:
@@ -137,28 +131,27 @@ class GFlowNetSampler(Sampler):
 
         reward = hydra.utils.instantiate(
             conf.proxy,
-            device=device,
-            float_precision=float_precision,
-            acquisition=acquisition,
+            device=self.device,
+            float_precision=self.float_precision,
+            acquisition=self.acquisition,
             dataset_handler=dataset_handler,
         )
 
         # GFlowNet Agent
         self.sampler = hydra.utils.instantiate(
             conf.agent,
-            device=device,
-            float_precision=float_precision,
+            device=self.device,
+            float_precision=self.float_precision,
             env_maker=env_maker,
             proxy=reward,
             forward_policy=forward_policy,
             backward_policy=backward_policy,
             state_flow=state_flow,
-            logger=logger,
+            logger=self.logger,
         )
 
     def fit(self):
         self.sampler.train()
-        # self.sampler.logger.end()
 
     def get_samples(self, n_samples, candidate_set=None):
         batch, times = self.sampler.sample_batch(n_forward=n_samples, train=False)

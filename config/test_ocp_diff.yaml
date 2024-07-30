@@ -9,7 +9,7 @@ defaults:
   # --> only acq_fn that do not require "training" data to make it's estimates (just needs max and min values as defined in the datasethandler)
   - acquisition: botorch_ucb # botorch_ei
   - user: default
-  - logger: base # wandb
+  - logger: base
   # cime4r export significantly increases runtime --> only use when really needed; 
   # note: does not work when using gflownet yet, because gflownet produces new samples --> TODO
   - plotter: null # cime4r_ocp
@@ -111,9 +111,6 @@ env:
 
 sampler: 
   conf:
-    logger:
-      do:
-        online: True
     agent:
       random_action_prob: 0.1
       optimizer:
