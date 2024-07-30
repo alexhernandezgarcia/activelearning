@@ -11,6 +11,7 @@ class SurrogateMapper(ABC):
         self.model = model
         self.num_outputs = model.num_outputs
         self.batch_shape = model.batch_shape
+        self._posterior_callback = None
 
     @abstractmethod
     def posterior(self, **kwargs) -> torch.Tensor:
@@ -37,7 +38,13 @@ class DifferenceMapper(SurrogateMapper):
 
         # -1 because smaller distances are better
         dist = MultivariateNormal(-1 * distance.squeeze(-1), covar_diff)
-        return GPyTorchPosterior(distribution=dist)
+        posterior = GPyTorchPosterior(distribution=dist)
+
+        # send results to a possible callback function
+        if self._posterior_callback is not None:
+            self._posterior_callback(posterior.mean, posterior.covariance_matrix)
+
+        return posterior
 
 
 class ConstantMapper(SurrogateMapper):

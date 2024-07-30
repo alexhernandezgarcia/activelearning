@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 from activelearning.surrogate.surrogate_mapper.mapper import SurrogateMapper
 from functools import partial
+from activelearning.utils.logger import ActiveLearningLogger
 
 
 class Surrogate(ABC):
@@ -13,12 +14,14 @@ class Surrogate(ABC):
         float_precision: Optional[Union[torch.dtype, int]] = 64,
         device: Optional[Union[str, torch.device]] = "cpu",
         surrogate_mapper_cls: partial[SurrogateMapper] = None,
+        logger: ActiveLearningLogger = None,
         **kwargs
     ) -> None:
         # use the kwargs for model specific configuration that is implemented in subclasses
         self.float = set_float_precision(float_precision)
         self.device = device
         self.surrogate_mapper_cls = surrogate_mapper_cls
+        self.logger = logger
 
     @abstractmethod
     def fit(self, train_data: Union[torch.Tensor, DataLoader], **kwargs) -> None:

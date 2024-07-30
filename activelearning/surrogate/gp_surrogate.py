@@ -18,7 +18,6 @@ from functools import partial
 from gpytorch.constraints import GreaterThan
 from torch.optim import SGD, Adam
 from tqdm import tqdm
-from activelearning.utils.logger import ActiveLearningLogger
 from activelearning.dataset.dataset import Data
 from activelearning.utils.common import match_kwargs
 
@@ -165,7 +164,6 @@ class SVGPSurrogate(GPSurrogate):
         mll_args: dict = {},
         train_epochs: int = 150,
         lr: float = 0.1,
-        logger: ActiveLearningLogger = None,
         id: str = "",
         **kwargs: any,
     ) -> None:
@@ -181,7 +179,6 @@ class SVGPSurrogate(GPSurrogate):
         )
         self.train_epochs = train_epochs
         self.lr = lr
-        self.logger = logger
 
     def fit(self, train_data: torch.utils.data.DataLoader, **kwargs) -> None:
         # fit the surrogate model
@@ -276,7 +273,6 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
         mll_args: dict = {},
         train_epochs: int = 150,
         lr: float = 0.1,
-        logger: ActiveLearningLogger = None,
         **kwargs: any,
     ):
         covar_module = DeepKernelWrapper(
@@ -300,6 +296,5 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
             mll_args=mll_args,
             train_epochs=train_epochs,
             lr=lr,
-            logger=logger,
             **kwargs,
         )

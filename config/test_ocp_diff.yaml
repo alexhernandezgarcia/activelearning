@@ -30,7 +30,7 @@ surrogate:
     n_input: 352
     n_hidden: [265, 512, 265]
     n_output: 16
-  train_epochs: 20
+  train_epochs: 2 # 20
   lr: 0.01
   surrogate_mapper_cls: 
     _target_: activelearning.surrogate.surrogate_mapper.mapper.DifferenceMapper
@@ -134,7 +134,7 @@ sampler:
         lr: 0.0001
         z_dim: 16
         lr_z_mult: 100
-        n_train_steps: 5000 # 100000
+        n_train_steps: 5 #5000 # 100000
         lr_decay_period: 11000
         lr_decay_gamma: 0.5
       replay_sampling: weighted
