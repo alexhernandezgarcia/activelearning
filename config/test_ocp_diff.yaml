@@ -1,8 +1,8 @@
 defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: ocp_diff
-  - oracle: ocp
   - env: catalyst
+  - oracle: ocp
   - sampler: surface_gflownet # surface_gflownet # random_gflownet
   - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
@@ -14,7 +14,6 @@ defaults:
   # note: does not work when using gflownet yet, because gflownet produces new samples --> TODO
   - plotter: null # cime4r_ocp
 
-
 acquisition:
   acq_fn_class:
     # use for botorch_ei acquisition function
@@ -22,16 +21,6 @@ acquisition:
     objective:
       # _target_: botorch.acquisition.objective.IdentityMCObjective
       _target_: activelearning.acquisition.objective.IdentityMCObjective
-
-logger:
-  project_name: test_ocp_training
-  run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}_max
-
-dataset:
-  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.1/best_checkpoint.pt
-  data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
-  # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
-  train_fraction: 0.1
 
 surrogate:
   mll_args: 
@@ -46,6 +35,30 @@ surrogate:
   surrogate_mapper_cls: 
     _target_: activelearning.surrogate.surrogate_mapper.mapper.DifferenceMapper
     _partial_: true
+
+logger:
+  do:
+    online: True
+    times: False
+  project_name: test_logger
+  run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}
+  # Log dir
+  logdir:
+    root: ./logs
+    ckpts: ./ckpts
+    overwrite: True
+  debug: True
+  progress: True
+  tags: 
+      - ocp-diff
+      - al
+      - gfn
+
+dataset:
+  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.1/best_checkpoint.pt
+  data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
+  # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
+  train_fraction: 0.1
 
 device: cpu # cuda
 float_precision: 32

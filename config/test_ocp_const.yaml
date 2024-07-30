@@ -1,13 +1,12 @@
 defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: ocp
-  - oracle: ocp
   - env: catalyst
+  - oracle: ocp
   - sampler: surface_gflownet # surface_gflownet # random_gflownet
   - selector: score # selector # score
   - surrogate: svdkl_kernel_wrapper
-  # --> ei only returns 0.0; there might be sth wrong with the config of the acquisition function
-  - acquisition: botorch_mve #botorch_mve #botorch_ei #botorch_nei
+  - acquisition: botorch_ucb #botorch_mve #botorch_ei #botorch_nei #botorch_ucb
   - user: default
   - logger: base
   # cime4r export significantly increases runtime --> only use when really needed; 
@@ -18,16 +17,6 @@ defaults:
 #   acq_fn_class:
 #     # use for botorch_ei acquisition function
 #     best_f: 10
-
-logger:
-  project_name: test_ocp_training
-  run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}_max
-
-dataset:
-  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.1/best_checkpoint.pt
-  data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
-  # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
-  train_fraction: 0.1
 
 surrogate:
   mll_args: 
@@ -43,12 +32,29 @@ surrogate:
     _target_: activelearning.surrogate.surrogate_mapper.mapper.ConstantMapper
     _partial_: true
 
-device: cpu # cuda
-float_precision: 32
-budget: 10
-n_samples: 100
-seed: 98765
-maximize: False
+logger:
+  do:
+    online: True
+    times: False
+  project_name: test_logger
+  run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}
+  # Log dir
+  logdir:
+    root: ./logs
+    ckpts: ./ckpts
+    overwrite: True
+  debug: True
+  progress: True
+  tags: 
+      - ocp-const
+      - al
+      - gfn
+
+dataset:
+  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.1/best_checkpoint.pt
+  data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
+  # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
+  train_fraction: 0.1
 
 
 env:
@@ -157,6 +163,15 @@ sampler:
         alpha: 1.0
         # Reward normalization for "power" reward function
         # norm: 1.0
+
+
+device: cpu # cuda
+float_precision: 32
+budget: 10
+n_samples: 100
+seed: 98765
+maximize: False
+
 
 
 # Hydra config

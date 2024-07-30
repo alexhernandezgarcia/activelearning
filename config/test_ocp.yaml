@@ -34,7 +34,7 @@ logger:
     online: True
     times: False
   project_name: test_logger
-  run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}
+  run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}
   # Log dir
   logdir:
     root: ./logs
@@ -117,7 +117,7 @@ sampler:
         lr: 0.0001
         z_dim: 16
         lr_z_mult: 100
-        n_train_steps: 50 # 5000 # 100000
+        n_train_steps: 5 # 5000 # 100000
         lr_decay_period: 11000
         lr_decay_gamma: 0.5
       replay_sampling: weighted
