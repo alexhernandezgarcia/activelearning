@@ -1,0 +1,55 @@
+defaults:
+  - crystal_surface
+  - atomgraphconverter: pyxtal_converter
+
+id: bluejay
+
+has_crystal_to_miller_constraints: True
+crystal_kwargs:
+  do_sg_before_composition: True
+  do_sg_to_lp_constraints: True
+  do_sg_to_composition_constraints: True
+  do_composition_to_sg_constraints: False
+  composition_kwargs:
+    # Cu, Pt, Ag, Au, Fe, Zn, Pd, Ir, C, Ge, Si
+    elements: [29, 78, 47, 79, 26, 30, 46, 77, 6, 32, 14]
+    max_diff_elem: 1 # 5
+    min_diff_elem: 1
+    min_atoms: 1
+    max_atoms: 1 # 80
+    min_atom_i: 1
+    max_atom_i: 1 # 16
+    do_charge_check: True
+  space_group_kwargs:
+    space_groups_subset: [1, 3, 16, 75, 143, 168, 195]
+  lattice_parameters_kwargs:
+    min_length: 2.0 # CHANGED FROM 0.9
+    max_length: 50.0 # CHANGED FROM 100.0
+    min_angle: 60.0 # CHANGED FROM 50.0
+    max_angle: 140.0 # CHANGED FROM 150.0
+    n_comp: 5
+    beta_params_min: 0.1
+    beta_params_max: 100.0
+    min_incr: 0.1
+    fixed_distr_params:
+      beta_weights: 1.0
+      beta_alpha: 10.0
+      beta_beta: 10.0
+      bernoulli_eos_prob: 0.1
+      bernoulli_bts_prob: 0.1
+    random_distr_params:
+      beta_weights: 1.0
+      beta_alpha: 10.0
+      beta_beta: 10.0
+      bernoulli_eos_prob: 0.1
+      bernoulli_bts_prob: 0.1
+miller_kwargs:
+  is_hexagonal_rhombohedral: False
+  max_increment: 1
+  max_dim_per_action: 1
+reward_func: identity
+reward_beta: 1
+buffer:
+  replay_capacity: 10
+  train: null
+  test: null
