@@ -6,7 +6,8 @@ do:
   online: False
   times: False
 
-project_name: "ActiveLearning"
+project_name: ActiveLearning
+run_name: default
 
 # Log dir
 logdir:

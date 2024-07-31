@@ -1,31 +1,8 @@
 defaults:
-  # - _self_ # with _self_ the overrides don't seem to work...
-  - dataset: branin
-  - env: grid
-  - oracle: branin
-  - sampler: gflownet #random_gflownet #greedy #gflownet #random
-  - selector: score #selector #score
-  - surrogate: svdkl_kernel_wrapper #gp
-  - acquisition: botorch_ucb #botorch_mve #botorch_ei #botorch_nei #botorch_ucb
-  - user: default
-  - logger: base
-  - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
-
-# acquisition:
-#   acq_fn_class:
-#     # use for botorch_ei acquisition function
-#     best_f: 1
-
-surrogate:
-  mll_args: 
-    # number of training data instances
-    num_data: 4
-  feature_extractor:
-    n_input: 2
-    n_hidden: [16, 16]
-    n_output: 8
-  train_epochs: 5
-  lr: 0.01
+  - main
+  - override /dataset: branin
+  - override /env: grid
+  - override /oracle: branin
 
 logger:
   do:
@@ -43,39 +20,16 @@ logger:
   tags: 
       - branin
       - al
-      - gfn
 
 dataset:
-  train_path: ~/activelearning/data/branin/data_100_train.csv
+  train_path: ~/activelearning/data/branin/data_10_train.csv
   
 env:
   # Number of cells per dimension
-  length: 100 
+  length: 10
   # Mapping coordinates
   cell_min: -1
   cell_max: 1
-
-sampler: 
-  conf:
-    agent:
-      random_action_prob: 0.0 # 0.01
-      optimizer:
-        lr: 5e-4
-        n_train_steps: 50 #5000 # 10000
-    proxy:
-      # Reward function: power or boltzmann
-      # boltzmann: exp(1.0 * reward_beta * proxy)
-      # power: (1.0 * proxy / reward_norm) ** self.reward_beta
-      # identity: proxy
-      reward_function: power
-      # Minimum reward
-      reward_min: 1e-8
-      reward_function_kwargs: 
-        # Beta parameter of the reward function
-        beta: 1.0
-        # Reward normalization for "power" reward function
-        # norm: 1.0
-      
 
 device: cpu
 float_precision: 32
@@ -83,16 +37,3 @@ budget: 10
 n_samples: 5
 seed: 31415
 maximize: False
-
-
-# Hydra config
-hydra:
-  # See: https://hydra.cc/docs/configure_hydra/workdir/
-  run:
-    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
-  sweep:
-    dir: ${user.logdir.root}/multirun/${now:%Y-%m-%d_%H-%M-%S}
-  job:
-    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
-    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
-    chdir: True
