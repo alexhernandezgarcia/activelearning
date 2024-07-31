@@ -1,0 +1,26 @@
+# @package _global_
+
+defaults:
+  - override /sampler: gflownet 
+
+sampler: 
+  conf:
+    agent:
+      random_action_prob: 0.0 # 0.01
+      optimizer:
+        lr: 5e-4
+        n_train_steps: 50 #5000 # 10000
+    proxy:
+      # Reward function: power or boltzmann
+      # boltzmann: exp(1.0 * reward_beta * proxy)
+      # power: (1.0 * proxy / reward_norm) ** self.reward_beta
+      # identity: proxy
+      reward_function: power
+      # Minimum reward
+      reward_min: 1e-8
+      reward_function_kwargs: 
+        # Beta parameter of the reward function
+        beta: 1.0
+        # Reward normalization for "power" reward function
+        # norm: 1.0
+      

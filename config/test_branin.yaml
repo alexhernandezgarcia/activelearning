@@ -6,7 +6,7 @@ defaults:
 
 logger:
   do:
-    online: True
+    online: False
     times: False
   project_name: test_logger
   run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}

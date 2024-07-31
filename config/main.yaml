@@ -5,7 +5,7 @@ defaults:
   - oracle: branin
   - sampler: random_gflownet #random_gflownet #greedy #gflownet #random
   - selector: score #selector #score
-  - surrogate: gp #gp
+  - surrogate: gp 
   - acquisition: botorch_ucb #botorch_mve #botorch_ei #botorch_nei #botorch_ucb
   - user: default
   - logger: base
