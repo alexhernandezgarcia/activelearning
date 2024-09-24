@@ -1,0 +1,61 @@
+# @package _global_
+
+defaults:
+  - override /sampler: surface_gflownet
+
+
+sampler: 
+  conf:
+    agent:
+      random_action_prob: 0.1
+      optimizer:
+        batch_size:
+          forward: 10
+          backward_replay: 0
+          backward_dataset: 0
+        lr: 0.0001
+        z_dim: 16
+        lr_z_mult: 100
+        n_train_steps: 5 # 5000 # 100000
+        lr_decay_period: 11000
+        lr_decay_gamma: 0.5
+      replay_sampling: weighted
+      train_sampling: permutation
+      evaluator:
+        first_it: False
+        period: -1
+        checkpoints_period: 500
+        n_trajs_logprobs: 100
+        logprobs_batch_size: 10
+        n: 10
+        n_top_k: 5000
+        top_k: 100
+        top_k_period: -1
+
+    policy:
+      forward:
+        type: mlp
+        n_hid: 256
+        n_layers: 3
+        checkpoint: forward
+      backward:
+        type: mlp
+        n_hid: 256
+        n_layers: 3
+        shared_weights: False
+        checkpoint: backward
+    proxy:
+      _target_: activelearning.sampler.proxy.OCPProxy
+      # Reward function: power or boltzmann
+      # boltzmann: exp(1.0 * reward_beta * proxy)
+      # power: (1.0 * proxy / reward_norm) ** self.reward_beta
+      # identity: proxy
+      reward_function: boltzmann
+      # Minimum reward
+      reward_min: 1e-8
+      reward_function_kwargs: 
+        # Beta parameter of the reward function
+        beta: 3.0
+        alpha: 1.0
+        # Reward normalization for "power" reward function
+        # norm: 1.0

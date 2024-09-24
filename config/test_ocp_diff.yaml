@@ -1,18 +1,6 @@
 defaults:
-  # - _self_ # with _self_ the overrides don't seem to work...
-  - dataset: ocp_diff
-  - env: catalyst
-  - oracle: ocp
-  - sampler: surface_gflownet # surface_gflownet # random_gflownet
-  - selector: score # selector # score
-  - surrogate: svdkl_kernel_wrapper
-  # --> only acq_fn that do not require "training" data to make it's estimates (just needs max and min values as defined in the datasethandler)
-  - acquisition: botorch_ucb # botorch_ei
-  - user: default
-  - logger: base
-  # cime4r export significantly increases runtime --> only use when really needed; 
-  # note: does not work when using gflownet yet, because gflownet produces new samples --> TODO
-  - plotter: null # cime4r_ocp
+  - test_ocp
+  - override /dataset: ocp_diff
 
 acquisition:
   acq_fn_class:
@@ -23,49 +11,18 @@ acquisition:
       _target_: activelearning.acquisition.objective.IdentityMCObjective
 
 surrogate:
-  mll_args: 
-    # number of training data instances
-    num_data: 4059 #40593 
-  feature_extractor:
-    n_input: 352
-    n_hidden: [265, 512, 265]
-    n_output: 16
-  train_epochs: 2 # 20
-  lr: 0.01
   surrogate_mapper_cls: 
     _target_: activelearning.surrogate.surrogate_mapper.mapper.DifferenceMapper
     _partial_: true
 
 logger:
   do:
-    online: True
+    online: False
     times: False
   project_name: test_logger
-  run_name: ${sampler.id}_${surrogate.id}_samples-${n_samples}_${acquisition.id}_${seed}
-  # Log dir
-  logdir:
-    root: ./logs
-    ckpts: ./ckpts
-    overwrite: True
-  debug: True
-  progress: True
   tags: 
       - ocp-diff
       - al
-      - gfn
-
-dataset:
-  checkpoint_path: /network/scratch/a/alexandre.duval/ocp/catalyst-ckpts/0.0.1/best_checkpoint.pt
-  data_path: /network/scratch/a/alexandre.duval/ocp/runs/4657270/deup_dataset
-  # we want to split the training set into 10% (train) and 90% (validation) for testing purposes
-  train_fraction: 0.1
-
-device: cpu # cuda
-float_precision: 32
-budget: 10
-n_samples: 10 #100
-seed: 98765
-maximize: False
 
 
 env:
@@ -73,95 +30,9 @@ env:
     adsorbate_smiles:
     - "*O"
     - "*OH"
-  has_crystal_to_miller_constraints: True
-  crystal_kwargs:
-    do_sg_before_composition: True
-    do_sg_to_lp_constraints: True
-    do_sg_to_composition_constraints: True
-    do_composition_to_sg_constraints: False
-    composition_kwargs:
-      elements: [8, 14] # O, Si
-      max_diff_elem: 2 # 5
-      min_diff_elem: 1
-      min_atoms: 1
-      max_atoms: 16 # 80
-      min_atom_i: 1
-      max_atom_i: 8 # 16
-      do_charge_check: True
-    space_group_kwargs:
-      space_groups_subset: [1, 2, 3, 14, 15, 47, 62, 132, 147, 150, 154, 156, 164, 189, 203]
-    lattice_parameters_kwargs:
-      min_length: 2.0 # CHANGED FROM 0.9
-      max_length: 50.0 # CHANGED FROM 100.0
-      min_angle: 60.0 # CHANGED FROM 50.0
-      max_angle: 140.0 # CHANGED FROM 150.0
-      n_comp: 5
-      beta_params_min: 0.1
-      beta_params_max: 100.0
-      min_incr: 0.1
-      fixed_distr_params:
-        beta_weights: 1.0
-        beta_alpha: 10.0
-        beta_beta: 10.0
-        bernoulli_eos_prob: 0.1
-        bernoulli_bts_prob: 0.1
-      random_distr_params:
-        beta_weights: 1.0
-        beta_alpha: 10.0
-        beta_beta: 10.0
-        bernoulli_eos_prob: 0.1
-        bernoulli_bts_prob: 0.1
-  miller_kwargs:
-    is_hexagonal_rhombohedral: False
-    max_increment: 1
-    max_dim_per_action: 1
-  reward_func: identity
-  reward_beta: 1
-  buffer:
-    replay_capacity: 10
-    train: null
-    test: null
 
 sampler: 
   conf:
-    agent:
-      random_action_prob: 0.1
-      optimizer:
-        batch_size:
-          forward: 10
-          backward_replay: 0
-          backward_dataset: 0
-        lr: 0.0001
-        z_dim: 16
-        lr_z_mult: 100
-        n_train_steps: 5 #5000 # 100000
-        lr_decay_period: 11000
-        lr_decay_gamma: 0.5
-      replay_sampling: weighted
-      train_sampling: permutation
-      evaluator:
-        first_it: False
-        period: -1
-        checkpoints_period: 500
-        n_trajs_logprobs: 100
-        logprobs_batch_size: 10
-        n: 10
-        n_top_k: 5000
-        top_k: 100
-        top_k_period: -1
-
-    policy:
-      forward:
-        type: mlp
-        n_hid: 256
-        n_layers: 3
-        checkpoint: forward
-      backward:
-        type: mlp
-        n_hid: 256
-        n_layers: 3
-        shared_weights: False
-        checkpoint: backward
     proxy:
       _target_: activelearning.sampler.proxy.OCPDiffProxy
       # Reward function: power or boltzmann
@@ -178,16 +49,3 @@ sampler:
         # Reward normalization for "power" reward function
         # norm: 1.0
 
-
-# Hydra config
-hydra:
-  # See: https://hydra.cc/docs/configure_hydra/workdir/
-  run:
-    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
-  sweep:
-    dir: ${user.logdir.root}/multirun/${now:%Y-%m-%d_%H-%M-%S}
-  job:
-    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
-    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
-    # need to have active learning directory for ocp config loading
-    chdir: False #True
