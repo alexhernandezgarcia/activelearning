@@ -82,7 +82,9 @@ try:
             )
 
         def __call__(self, states):
-            return Hartmann.proxy2reward(self, Hartmann.__call__(self, states.clone()))
+            return Hartmann.proxy2reward(
+                self, Hartmann.__call__(self, states[:].clone())
+            )
 
 except ImportError:
     print("please install gflownet to use the hartmann proxy")

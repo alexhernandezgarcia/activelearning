@@ -32,6 +32,12 @@ class Acquisition(ABC):
         self.device = device
         self.float = set_float_precision(float_precision)
         self.surrogate_model = surrogate_model
+        # TODO: can use this callback to log the posterior values
+
+    #     self.surrogate_model._posterior_callback = self._posterior_callback
+
+    # def _posterior_callback(self, mean, covar):
+    #     print("callback", mean, covar)
 
     def __call__(
         self, candidate_set: Union[Data, torch.utils.data.dataloader.DataLoader]
@@ -85,12 +91,12 @@ class BOTorchAcquisition(Acquisition):
         ):
             train_X, _ = dataset_handler.train_data[:]
             self.acq_fn = acq_fn_class(
-                surrogate_model,
+                self.surrogate_model,
                 train_X.to(self.device).to(self.float),
             )
         else:
             self.acq_fn = acq_fn_class(
-                surrogate_model,
+                self.surrogate_model,
             )
 
     def get_acquisition_values(self, candidate_set: Union[torch.Tensor, Data]):

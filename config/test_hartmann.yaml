@@ -1,14 +1,14 @@
 defaults:
   # - _self_ # with _self_ the overrides don't seem to work...
   - dataset: hartmann
-  - oracle: hartmann
   - env: grid
-  - sampler: greedy
-  - selector: selector
-  - surrogate: gp
-  - acquisition: botorch_mve
+  - oracle: hartmann
+  - sampler: gflownet #random_gflownet #greedy #gflownet #random
+  - selector: score #selector #score
+  - surrogate: svdkl_kernel_wrapper #gp
+  - acquisition: botorch_ucb #botorch_mve #botorch_ei #botorch_nei #botorch_ucb
   - user: default
-  - logger: base #wandb
+  - logger: base
   - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
 
 # acquisition:
@@ -16,13 +16,38 @@ defaults:
 #     # use for botorch_ei acquisition function
 #     best_f: 1
 
+surrogate:
+  mll_args: 
+    # number of training data instances
+    num_data: 25
+  feature_extractor:
+    n_input: 6
+    n_hidden: [16, 16]
+    n_output: 8
+  train_epochs: 5
+  lr: 0.01
+
 logger:
-  project_name: test_hartmann
+  do:
+    online: True
+    times: False
+  project_name: test_logger
   run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}
+  # Log dir
+  logdir:
+    root: ./logs
+    ckpts: ./ckpts
+    overwrite: True
+  debug: True
+  progress: True
+  tags: 
+      - hartmann
+      - al
+      - gfn
 
 dataset:
-  train_path: ~/activelearning/my_package/storage/hartmann/data_train.csv
-  batch_size: 16384
+  train_path: ~/activelearning/data/hartmann/data_train.csv
+  batch_size: 16
 
 env:
   # Number of cells per dimension
@@ -38,12 +63,7 @@ sampler:
       random_action_prob: 0.001 # 0.01 #0.001
       optimizer:
         lr: 5e-4
-        n_train_steps: 5000 # 10000
-    logger:
-      do:
-        online: True
-      project_name: "test_hartmann_gflownet"
-      run_name: "identity_lr5e-4 newdata"
+        n_train_steps: 50 #5000 # 10000
     proxy:
       # Reward function: power or boltzmann
       # boltzmann: exp(-1.0 * reward_beta * proxy)
