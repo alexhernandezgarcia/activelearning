@@ -1,22 +1,24 @@
+# @package _global_
+# Branin test experiment
+
 defaults:
-  # - _self_ # with _self_ the overrides don't seem to work...
-  - dataset: branin
-  - env: grid
-  - oracle: branin
-  - sampler: gflownet #random_gflownet #greedy #gflownet #random
-  - selector: selector #selector #score
-  - surrogate: gp
-  - acquisition: botorch_mve
-  - user: default
-  - logger: wandb #base #wandb
-  - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
+  - override /dataset: branin
+  - override /env: grid
+  - override /oracle: branin
+  - override /sampler: gflownet #random_gflownet #greedy #gflownet #random
+  - override /selector: selector #selector #score
+  - override /surrogate: gp
+  - override /acquisition: botorch_mve
+  - override /user: default
+  - override /logger: wandb #base #wandb
+  - override /plotter: null #cime4r_branin # not working with gflownet because it produces new samples
 
 logger:
   project_name: test_branin
   run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}
 
 dataset:
-  train_path: ~/activelearning/data/branin/data_100_train.csv
+  train_path: ${user.data.root}/branin/data_100_train.csv
   
 env:
   # Number of cells per dimension
@@ -58,16 +60,3 @@ budget: 10
 n_samples: 5
 seed: 31415
 maximize: False
-
-
-# Hydra config
-hydra:
-  # See: https://hydra.cc/docs/configure_hydra/workdir/
-  run:
-    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
-  sweep:
-    dir: ${user.logdir.root}/multirun/${now:%Y-%m-%d_%H-%M-%S}
-  job:
-    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
-    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
-    chdir: True
