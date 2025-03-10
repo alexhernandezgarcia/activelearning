@@ -1,7 +1,8 @@
 import pytest
 import torch
-from activelearning.oracle.oracle import BraninOracle, HartmannOracle
+
 from activelearning.oracle.ocp import OCPOracle
+from activelearning.oracle.oracle import BraninOracle, HartmannOracle
 
 
 @pytest.fixture

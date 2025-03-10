@@ -1,10 +1,12 @@
-from activelearning.dataset.dataset import DatasetHandler, Data
-from torch.utils.data import DataLoader, Dataset
-from torch.nn.utils.rnn import pad_sequence
+from typing import Callable, Optional
+
 import pandas as pd
 import torch
 from gflownet.envs.grid import Grid as GridEnv
-from typing import Optional, Callable
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import DataLoader, Dataset
+
+from activelearning.dataset.dataset import Data, DatasetHandler
 
 
 class GridData(Data):

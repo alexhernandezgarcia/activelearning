@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
+from typing import Tuple, Union
 
 import torch
 from gflownet.utils.common import set_device, set_float_precision
+
 from activelearning.acquisition.acquisition import Acquisition
-from typing import Union, Tuple
-import torch
 
 
 class Sampler(ABC):
@@ -13,7 +13,7 @@ class Sampler(ABC):
         acquisition: Acquisition,
         device: Union[str, torch.device],
         float_precision: Union[int, torch.dtype],
-        **kwargs
+        **kwargs,
     ) -> None:
         self.acquisition = acquisition
         # Device

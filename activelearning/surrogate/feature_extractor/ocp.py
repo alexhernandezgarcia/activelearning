@@ -1,10 +1,11 @@
 import torch.nn as nn
 import torch_geometric
-from activelearning.surrogate.feature_extractor.mlp import MLP
-from ocpmodels.common.utils import make_trainer_from_dir
 from ocpmodels.common.gfn import FAENetWrapper
+from ocpmodels.common.utils import make_trainer_from_dir
 from ocpmodels.datasets.data_transforms import get_transforms
 from torch_scatter import scatter
+
+from activelearning.surrogate.feature_extractor.mlp import MLP
 
 
 class FAENetFeatureExtractor(nn.Module):

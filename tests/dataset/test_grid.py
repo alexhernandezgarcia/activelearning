@@ -1,12 +1,13 @@
+import numpy as np
 import pytest
-from activelearning.dataset.grid import (
-    GridData,
-    BraninDatasetHandler,
-    HartmannDatasetHandler,
-)
 import torch
 from gflownet.envs.grid import Grid as GridEnv
-import numpy as np
+
+from activelearning.dataset.grid import (
+    BraninDatasetHandler,
+    GridData,
+    HartmannDatasetHandler,
+)
 
 
 @pytest.fixture

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from gflownet.utils.common import set_float_precision
 from typing import Union
+
 import torch
+from gflownet.utils.common import set_float_precision
 
 
 class Oracle(ABC):

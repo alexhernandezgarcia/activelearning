@@ -7,9 +7,9 @@ import random
 import sys
 
 import hydra
+import torch
 
 from activelearning.utils.common import set_seeds
-import torch
 
 
 @hydra.main(config_path="./config", config_name="main", version_base="1.1")

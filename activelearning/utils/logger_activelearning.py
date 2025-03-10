@@ -1,9 +1,11 @@
-from gflownet.utils.logger import Logger
-import torch
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import torch
+from gflownet.utils.logger import Logger
+
 import wandb
 
 

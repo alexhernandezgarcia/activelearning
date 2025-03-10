@@ -1,7 +1,8 @@
-from abc import abstractmethod, ABC
-from gflownet.utils.common import set_float_precision
+from abc import ABC, abstractmethod
 from typing import Optional, Union
+
 import torch
+from gflownet.utils.common import set_float_precision
 from torch.utils.data import DataLoader
 
 
@@ -10,7 +11,7 @@ class Surrogate(ABC):
         self,
         float_precision: Optional[Union[torch.dtype, int]] = 64,
         device: Optional[Union[str, torch.device]] = "cpu",
-        **kwargs
+        **kwargs,
     ) -> None:
         # use the kwargs for model specific configuration that is implemented in subclasses
         self.float = set_float_precision(float_precision)

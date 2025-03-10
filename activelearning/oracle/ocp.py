@@ -1,8 +1,9 @@
-from activelearning.oracle.oracle import Oracle
-from ocpmodels.common.gfn import FAENetWrapper
-from ocpmodels.datasets.data_transforms import get_transforms
-from ocpmodels.common.utils import make_trainer_from_dir
 import torch
+from ocpmodels.common.gfn import FAENetWrapper
+from ocpmodels.common.utils import make_trainer_from_dir
+from ocpmodels.datasets.data_transforms import get_transforms
+
+from activelearning.oracle.oracle import Oracle
 
 
 class OCPOracle(Oracle):

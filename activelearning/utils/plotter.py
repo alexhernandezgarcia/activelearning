@@ -1,8 +1,9 @@
+from abc import abstractmethod
+
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
-from abc import abstractmethod
 import pandas as pd
+import torch
 
 
 class PlotHelper:
@@ -20,7 +21,7 @@ class PlotHelper:
         output_index=None,
         size_x=None,
         size_y=None,
-        **kwargs
+        **kwargs,
     ):
         if size_x is None and size_y is None:
             size_x = int(len(space) ** (1 / 2))

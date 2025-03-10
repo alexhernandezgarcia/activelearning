@@ -1,21 +1,22 @@
 from abc import ABC, abstractmethod
+from functools import partial
+from typing import Union
+
+import torch
+from botorch.acquisition.cached_cholesky import CachedCholeskyMCSamplerMixin
 from botorch.acquisition.max_value_entropy_search import (
-    qLowerBoundMaxValueEntropy,
     DiscreteMaxValueBase,
+    qLowerBoundMaxValueEntropy,
 )
 from botorch.acquisition.monte_carlo import (
-    qExpectedImprovement,
     SampleReducingMCAcquisitionFunction,
+    qExpectedImprovement,
 )
-from botorch.acquisition.cached_cholesky import CachedCholeskyMCSamplerMixin
-from gflownet.utils.common import set_float_precision
-from activelearning.surrogate.surrogate import Surrogate
-from activelearning.dataset.dataset import DatasetHandler
-from typing import Union
-import torch
 from botorch.models.gpytorch import GPyTorchModel
-from functools import partial
-from activelearning.dataset.dataset import Data
+from gflownet.utils.common import set_float_precision
+
+from activelearning.dataset.dataset import Data, DatasetHandler
+from activelearning.surrogate.surrogate import Surrogate
 
 
 class Acquisition(ABC):
@@ -25,7 +26,7 @@ class Acquisition(ABC):
         dataset_handler: DatasetHandler,
         device: Union[str, torch.device],
         float_precision: Union[int, torch.dtype],
-        **kwargs
+        **kwargs,
     ) -> None:
         self.dataset_handler = dataset_handler
         self.device = device
@@ -68,7 +69,7 @@ class BOTorchMaxValueEntropyAcquisition(Acquisition):
         dataset_handler=None,
         device="cpu",
         float_precision=64,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(surrogate_model, dataset_handler, device, float_precision)
         self.acq_fn_class = acq_fn_class
@@ -91,7 +92,7 @@ class BOTorchMonteCarloAcquisition(Acquisition):
         dataset_handler: DatasetHandler,
         device="cpu",
         float_precision=64,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(surrogate_model, dataset_handler, device, float_precision)
         base_class = (

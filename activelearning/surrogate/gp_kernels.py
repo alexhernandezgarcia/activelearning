@@ -1,5 +1,5 @@
-from gpytorch.kernels import Kernel
 import torch
+from gpytorch.kernels import Kernel
 from gpytorch.means import ConstantMean
 
 

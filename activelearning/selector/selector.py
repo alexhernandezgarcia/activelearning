@@ -1,7 +1,7 @@
+from typing import Optional, Union
+
 import torch
 from gflownet.utils.common import set_device, set_float_precision
-from typing import Union, Optional
-import torch
 
 
 class Selector:
@@ -10,7 +10,7 @@ class Selector:
         self,
         device: Union[str, torch.device],
         float_precision: Union[int, torch.dtype],
-        **kwargs
+        **kwargs,
     ):
         # Device
         self.device = set_device(device)

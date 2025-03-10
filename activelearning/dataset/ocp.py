@@ -1,11 +1,13 @@
-from activelearning.dataset.dataset import DatasetHandler, Data
-from torch.utils.data import DataLoader, Dataset
+from typing import Callable, Optional, Union
+
 import torch
-from torch_geometric.data import Batch
-from ocpmodels.modules.normalizer import Normalizer
-from ocpmodels.common.utils import make_trainer_from_dir
 from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
-from typing import Optional, Union, Callable
+from ocpmodels.common.utils import make_trainer_from_dir
+from ocpmodels.modules.normalizer import Normalizer
+from torch.utils.data import DataLoader, Dataset
+from torch_geometric.data import Batch
+
+from activelearning.dataset.dataset import Data, DatasetHandler
 
 
 class OCPData(Data):

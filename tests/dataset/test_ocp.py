@@ -1,7 +1,8 @@
 import pytest
 import torch
-from activelearning.dataset.ocp import OCPDatasetHandler
 from gflownet.envs.crystals.surface import CrystalSurface as CrystalSurfaceEnv
+
+from activelearning.dataset.ocp import OCPDatasetHandler
 
 
 @pytest.fixture

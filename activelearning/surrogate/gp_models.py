@@ -1,8 +1,8 @@
 from botorch.models.gp_regression_fidelity import SingleTaskGP
 from botorch.models.utils.gpytorch_modules import (
+    MIN_INFERRED_NOISE_LEVEL,
     get_gaussian_likelihood_with_gamma_prior,
     get_matern_kernel_with_gamma_prior,
-    MIN_INFERRED_NOISE_LEVEL,
 )
 
 

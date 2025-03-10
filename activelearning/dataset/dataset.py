@@ -1,10 +1,11 @@
-from torch.utils.data import Dataset, DataLoader
-import torch
-from gflownet.utils.common import set_float_precision
-from gflownet.envs.base import GFlowNetEnv
 from abc import ABC, abstractmethod
-from typing import Optional, Union, Callable
+from typing import Callable, Optional, Union
+
 import numpy as np
+import torch
+from gflownet.envs.base import GFlowNetEnv
+from gflownet.utils.common import set_float_precision
+from torch.utils.data import DataLoader, Dataset
 
 
 class Data(Dataset):

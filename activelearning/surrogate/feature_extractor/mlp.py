@@ -1,5 +1,5 @@
-import torch.nn as nn
 import torch
+import torch.nn as nn
 from gflownet.utils.common import set_float_precision
 
 ACTIVATION_KEY = {

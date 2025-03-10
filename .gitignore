@@ -6,3 +6,6 @@ data
 _al_logger
 wandb
 .cache
+*.pyc
+*.pyo
+*.sw*
