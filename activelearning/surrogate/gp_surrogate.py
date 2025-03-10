@@ -1,25 +1,23 @@
-import torch
-from torch.utils.data import DataLoader
-import gpytorch
-from botorch.models.gp_regression_fidelity import SingleTaskGP
-from botorch.models.approximate_gp import SingleTaskVariationalGP
-from gpytorch.models.gp import GP
-from botorch.models.transforms.outcome import Standardize, OutcomeTransform
-from botorch.fit import fit_gpytorch_mll
-from botorch.settings import debug
-from botorch.models.model import Model
+from functools import partial
+from typing import Callable, Optional, Union
 
+import gpytorch
+import torch
+from botorch.fit import fit_gpytorch_mll
+from botorch.models.approximate_gp import SingleTaskVariationalGP
+from botorch.models.gp_regression_fidelity import SingleTaskGP
+from botorch.models.model import Model
+from botorch.models.transforms.outcome import OutcomeTransform, Standardize
+from gpytorch.constraints import GreaterThan
+from gpytorch.models.gp import GP
+from torch.optim import SGD, Adam
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from activelearning.dataset.dataset import Data
 from activelearning.surrogate.surrogate import Surrogate
 from activelearning.utils.helper_functions import dataloader_to_data
-from typing import Optional, Union, Callable
-import torch
-from functools import partial
-
-from gpytorch.constraints import GreaterThan
-from torch.optim import SGD, Adam
-from tqdm import tqdm
 from activelearning.utils.logger import Logger
-from activelearning.dataset.dataset import Data
 
 
 class GPSurrogate(Surrogate):
@@ -78,10 +76,9 @@ class GPSurrogate(Surrogate):
             **self.mll_args,
         )
         self.mll.to(train_x)
-        with debug(state=True):
-            self.mll = fit_gpytorch_mll(
-                self.mll
-            )  # for how many epochs does this function train? what optimizer does it use?
+        self.mll = fit_gpytorch_mll(
+            self.mll
+        )  # for how many epochs does this function train? what optimizer does it use?
 
         ### alternative custom training: (see: https://docs.gpytorch.ai/en/stable/examples/01_Exact_GPs/Simple_GP_Regression.html)
         ### tutorial from botorch: https://botorch.org/tutorials/fit_model_with_torch_optimizer
@@ -238,14 +235,16 @@ class SVGPSurrogate(GPSurrogate):
             self.logger.log_time_series(avg_losses, "avg_loss_surrogate")
 
 
+from functools import partial
+
+from botorch.models.utils.gpytorch_modules import (
+    get_matern_kernel_with_gamma_prior,
+)
+
 from activelearning.surrogate.gp_kernels import (
     DeepKernelConstantMean,
     DeepKernelWrapper,
 )
-from botorch.models.utils.gpytorch_modules import (
-    get_matern_kernel_with_gamma_prior,
-)
-from functools import partial
 
 
 class DeepKernelSVGPSurrogate(SVGPSurrogate):
