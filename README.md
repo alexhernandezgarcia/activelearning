@@ -102,14 +102,14 @@ to install an environment on `~/myenvs/activelearning-env`, with a CPU-only PyTo
 To run the different examples you can use the following command:
 
 ```bash
-python main.py --config-name <config-filename> user=<user-filename>
+python main.py user=<user-filename> +tests=branin
 ```
 
 ### Pre-Defined Config Files
 The following pre-defined config files are available:
-- test_branin
-- test_hartmann
-- test_ocp
+- branin
+- hartmann
+- ocp
 
 ### Customize Config Options
 Some config options can be customized independently of the task. Here is a list of possible options for each component:
