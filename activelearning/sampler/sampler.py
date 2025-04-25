@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Tuple, Union
 
 import torch
-from gflownet.utils.common import set_device, set_float_precision
+from gflownet.utils.common import gflownet_from_config, set_device, set_float_precision
 
 from activelearning.acquisition.acquisition import Acquisition
 
@@ -86,61 +86,13 @@ class GFlowNetSampler(Sampler):
 
     def __init__(self, env_maker, acquisition, conf, device, float_precision, **kwargs):
         super().__init__(acquisition, device, float_precision)
-        import hydra
 
-        logger = hydra.utils.instantiate(
-            conf.logger,
-            conf,
-            _recursive_=False,
-        )
+        # Set device and float precision in config
+        conf.device = device
+        conf.float_precision = float_precision
 
-        env = env_maker()
-
-        # The policy is used to model the probability of a forward/backward action
-        forward_policy = hydra.utils.instantiate(
-            conf.policy.forward,
-            env=env,
-            device=device,
-            float_precision=float_precision,
-        )
-        backward_policy = hydra.utils.instantiate(
-            conf.policy.backward,
-            env=env,
-            device=device,
-            float_precision=float_precision,
-        )
-
-        # State flow
-        if conf.state_flow is not None:
-            state_flow = hydra.utils.instantiate(
-                conf.state_flow,
-                env=env,
-                device=device,
-                float_precision=float_precision,
-                base=forward_policy,
-            )
-        else:
-            state_flow = None
-
-        reward = hydra.utils.instantiate(
-            conf.proxy,
-            device=device,
-            float_precision=float_precision,
-            acquisition=acquisition,
-        )
-
-        # GFlowNet Agent
-        self.sampler = hydra.utils.instantiate(
-            conf.agent,
-            device=device,
-            float_precision=float_precision,
-            env_maker=env_maker,
-            proxy=reward,
-            forward_policy=forward_policy,
-            backward_policy=backward_policy,
-            state_flow=state_flow,
-            logger=logger,
-        )
+        # Initialize a GFlowNet sampler from the configuration file
+        self.sampler = gflownet_from_config(conf)
 
     def fit(self):
         self.sampler.train()
