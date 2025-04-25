@@ -92,7 +92,10 @@ class GFlowNetSampler(Sampler):
         conf.float_precision = float_precision
 
         # Initialize a GFlowNet sampler from the configuration file
-        self.sampler = gflownet_from_config(conf)
+        self.sampler = gflownet_from_config(conf, env=env_maker())
+
+        # Set the acquisition function of the proxy
+        self.sampler.proxy.set_acquisition(acquisition)
 
     def fit(self):
         self.sampler.train()
