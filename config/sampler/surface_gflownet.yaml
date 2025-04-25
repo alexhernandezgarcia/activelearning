@@ -2,6 +2,11 @@
 _target_: activelearning.sampler.sampler.GFlowNetSampler
 
 defaults:
-  - conf: surface_gflownet
+  - gflownet: base
+  - policy: mlp_trajectorybalance
+  - proxy: base
+  - logger: base
+  - evaluator: base
+  - buffer: base
 
-id: surface-gfn
+id: surface-gflownet

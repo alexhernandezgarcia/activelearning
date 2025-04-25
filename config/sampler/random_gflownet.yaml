@@ -1,6 +1,11 @@
 _target_: activelearning.sampler.sampler.RandomGFlowNetSampler
 
 defaults:
-  - conf: gflownet
+  - gflownet: base
+  - policy: mlp_trajectorybalance
+  - proxy: acquisition
+  - logger: base
+  - evaluator: base
+  - buffer: base
 
 id: random-gfn

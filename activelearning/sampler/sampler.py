@@ -3,6 +3,7 @@ from typing import Tuple, Union
 
 import torch
 from gflownet.utils.common import gflownet_from_config, set_device, set_float_precision
+from omegaconf import OmegaConf
 
 from activelearning.acquisition.acquisition import Acquisition
 
@@ -84,15 +85,18 @@ class GFlowNetSampler(Sampler):
     Then it generates n samples proportionally to the reward.
     """
 
-    def __init__(self, env_maker, acquisition, conf, device, float_precision, **kwargs):
+    def __init__(self, env_maker, acquisition, device, float_precision, **kwargs):
         super().__init__(acquisition, device, float_precision)
 
+        # Re-create OmegaConf DictConfig
+        config = OmegaConf.create(kwargs)
+
         # Set device and float precision in config
-        conf.device = device
-        conf.float_precision = float_precision
+        config.device = device
+        config.float_precision = float_precision
 
         # Initialize a GFlowNet sampler from the configuration file
-        self.sampler = gflownet_from_config(conf, env=env_maker())
+        self.sampler = gflownet_from_config(config, env=env_maker())
 
         # Set the acquisition function of the proxy
         self.sampler.proxy.set_acquisition(acquisition)
@@ -107,9 +111,8 @@ class GFlowNetSampler(Sampler):
 
 
 class RandomGFlowNetSampler(Sampler):
-    def __init__(self, env_maker, acquisition, conf, device, float_precision, **kwargs):
+    def __init__(self, env_maker, acquisition, device, float_precision, **kwargs):
         super().__init__(acquisition, device, float_precision)
-        import hydra
 
         self.env = env_maker()
 
