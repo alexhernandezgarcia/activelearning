@@ -29,9 +29,3 @@ miller_kwargs:
   is_hexagonal_rhombohedral: False
   max_increment: 1
   max_dim_per_action: 1
-
-# Buffer
-buffer:
-  data_path: null
-  train: null
-  test: null
