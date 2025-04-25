@@ -14,7 +14,9 @@ logdir:
   overwrite: True
 debug: False
 lightweight: False
-progress: True
+progressbar:
+  skip: False
+  n_iters_mean: 10
 context: "0"
 notes: null # wandb run notes (e.g. "baseline")
 tags: 
