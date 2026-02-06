@@ -1,0 +1,3 @@
+_target_: activelearning.acquisition.acquisition.BOTorchAcquisition
+
+id: base

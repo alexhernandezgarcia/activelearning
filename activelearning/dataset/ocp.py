@@ -19,7 +19,7 @@ class OCPData(Data):
             the target is given in the property "y_relaxed" and is a minimization task (smaller is better);
             when an item is returned, the target will be multiplied by -1 to turn it into a maximization task;
         target_normalizer: mean and std normalizer - https://github.com/RolnickLab/ocp/blob/c93899a23947cb7c1e1409cf6d7d7d8b31430bdd/ocpmodels/modules/normalizer.py#L11
-        state2result: function that takes raw states (graph) (aka environment format) and transforms them into the desired format;
+        state2result: function that takes raw states (graph) and transforms them into the desired format;
             in case of GFN environments, this can be the states2proxy function
         subset_idcs: specifies which subset of the data will be used (useful, if we want to have subsets for training and testing)
         return_target: specifies whether the target should be returned;
@@ -85,9 +85,9 @@ class OCPData(Data):
                     y.append(y_i)
                 if idx_in_dataset is not None:
                     idcs_in_dataset.append(idx_in_dataset)
-            x = torch.concat(x, dim=0)
+            x = torch.stack(x)
             if len(y) > 0:
-                y = torch.Tensor(y, dtype=self.float)
+                y = torch.Tensor(y).to(dtype=self.float)
             else:
                 y = None
             if len(idcs_in_dataset) > 0:
@@ -105,9 +105,9 @@ class OCPData(Data):
                     y.append(y_i)
                 if idx_in_dataset is not None:
                     idcs_in_dataset.append(idx_in_dataset)
-            x = torch.concat(x, dim=0)
+            x = torch.stack(x)
             if len(y) > 0:
-                y = torch.Tensor(y, dtype=self.float)
+                y = torch.Tensor(y).to(dtype=self.float)
             else:
                 y = None
             if len(idcs_in_dataset) > 0:
@@ -307,8 +307,18 @@ class OCPDatasetHandler(DatasetHandler):
                 state.batch.to(self.device).to(torch.int64),
                 dim=0,
                 reduce="mean",
-            )
+            )[0]
         return hidden_states
+
+    def states2selector(self, states: List[List]):
+        sample_graphs = self.env.states2proxy(
+            states
+        )  # returns List[List[List[GraphData]]]
+        flat_list = [
+            x for xs1 in sample_graphs if xs1 is not None for xs2 in xs1 for x in xs2
+        ]
+        samples = flat_list
+        return self.get_custom_dataset(samples)
 
     def maxY(self):
         # return 10  # -> TODO: what are the actual bounds?
@@ -324,7 +334,7 @@ class OCPDatasetHandler(DatasetHandler):
 
     def minY(self):
         # return -10  # -> TODO: what are the actual bounds?
-        return 5  # when target is standard normalized
+        return -5  # when target is standard normalized
         # ... this takes too long
         # train_loader, _ = self.get_dataloader()
         # min_y = torch.inf
@@ -382,13 +392,7 @@ class OCPDatasetHandler(DatasetHandler):
         )
         return test_loader, None, None
 
-    def get_custom_dataset(self, samples: Union[List[List], List[GraphData]]):
-        if not isinstance(samples[0], GraphData):
-            sample_graphs = self.env.states2proxy(
-                samples
-            )  # returns List[List[List[GraphData]]]
-            flat_list = [x for xs1 in sample_graphs for xs2 in xs1 for x in xs2]
-            samples = flat_list
+    def get_custom_dataset(self, samples: List[GraphData]):
         return OCPData(
             samples,
             state2result=self.state2surrogate,
@@ -426,3 +430,86 @@ class OCPDatasetHandler(DatasetHandler):
             batch_size=self.batch_size,
         )
         return loader
+
+
+class OCPTwinDataMapper(Dataset):
+    """
+    data: List of List of gpytorch Graph Data; shape=(batch, 2)
+    state2result: function that takes raw states (graph) and transforms them into the desired format;
+        in case of GFN environments, this can be the states2proxy function
+    """
+
+    def __init__(self, data: List[List[GraphData]], state2result: Callable):
+        self.data = data
+        self.state2result = state2result
+
+    def __len__(self):
+        return len(self.data)
+
+    def get_raw_items(self, idx_pick):
+        items = [self.data[i] for i in idx_pick]
+        flat_list = [x for xs1 in items for x in xs1]
+        return flat_list
+
+    def get_item_from_index(self, index):
+        return self.state2result(self.data[index][0]), self.state2result(
+            self.data[index][1]
+        )
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            x1, x2 = self.get_item_from_index(key)
+        elif isinstance(key, slice):
+            start, stop, step = key.indices(len(self))
+            x1, x2 = [], []
+            for i in range(start, stop, step):
+                x1_i, x2_i = self.get_item_from_index(i)
+                x1.append(x1_i)
+                x2.append(x2_i)
+            x1 = torch.stack(x1)
+            x2 = torch.stack(x2)
+        else:
+            x1, x2 = [], []
+            for i in key:
+                x1_i, x2_i = self.get_item_from_index(i)
+                x1.append(x1_i)
+                x2.append(x2_i)
+            x1 = torch.stack(x1)
+            x2 = torch.stack(x2)
+        return torch.concat([x1.unsqueeze(-1), x2.unsqueeze(-1)], dim=-1)
+
+
+class OCPDiffDatasetHandler(OCPDatasetHandler):
+
+    def maxY(self):
+        # bounds derived from the DifferenceMapper surrogate mapper
+        # min = -5
+        # max = 5
+        # - compute difference (val1 - val2)
+        # min_diff = -5 - +5 = -10
+        # max_diff = +5 - -5 = +10
+        # ideal_diff = -1.6
+        # - compute distance (diff - -1.6).abs()
+        # min_dist = (-1.6 - -1.6).abs() = 0
+        # max_dist = (10 - -1.6).abs() = 11.6 * -1
+        return 0
+
+    def minY(self):
+        return -11.6
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def graphs2acquisition(self, states: List[List[GraphData]]):
+        # states: shape = (batch, 2)
+        return OCPTwinDataMapper(states, self.state2surrogate)
+
+    def states2selector(self, states: List[List]):
+        # returns List[List[List[GraphData]]] with shape (batch, no_pyxtal_samples, 2)
+        sample_graphs = self.env.states2proxy(states)
+
+        # we assume the no_pyxtal_samples=1 and squeeze the samples to the shape (batch, 2)
+        sample_graphs = [x for xs1 in sample_graphs if xs1 is not None for x in xs1]
+
+        # acq_fn should be able to handle a tensor of shape (batch, faenet_feature_size, 2)
+        return OCPTwinDataMapper(sample_graphs, self.state2surrogate)

@@ -1,0 +1,9 @@
+# @package _global_
+
+defaults:
+  - override /acquisition: botorch_ei
+
+acquisition:
+  acq_fn_class:
+    # use for botorch_ei acquisition function
+    best_f: 3.7060

@@ -1,0 +1,5 @@
+_target_: activelearning.dataset.ocp.OCPDiffDatasetHandler
+
+defaults:
+  - ocp
+  

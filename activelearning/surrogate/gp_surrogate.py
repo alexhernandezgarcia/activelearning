@@ -18,8 +18,8 @@ from functools import partial
 from gpytorch.constraints import GreaterThan
 from torch.optim import SGD, Adam
 from tqdm import tqdm
-from activelearning.utils.logger import Logger
 from activelearning.dataset.dataset import Data
+from activelearning.utils.common import match_kwargs
 
 
 class GPSurrogate(Surrogate):
@@ -38,7 +38,7 @@ class GPSurrogate(Surrogate):
         mll_args: dict = {},
         **kwargs: any,
     ) -> None:
-        super().__init__(float_precision, device)
+        super().__init__(float_precision, device, **kwargs)
         # initializes the model components for GP Surrogate Models
         # e.g.:
         #   model_class = botorch.models.gp_regression_fidelity.SingleTaskGP
@@ -54,7 +54,9 @@ class GPSurrogate(Surrogate):
         self.kwargs = kwargs
         self.mll_args = mll_args
 
-    def fit(self, train_data: Union[torch.Tensor, torch.utils.data.DataLoader]) -> None:
+    def fit(
+        self, train_data: Union[torch.Tensor, torch.utils.data.DataLoader], **kwargs
+    ) -> None:
         # fit the surrogate model
         train_x, train_y = dataloader_to_data(train_data)
         train_y = train_y.to(self.device).to(self.float)
@@ -65,7 +67,7 @@ class GPSurrogate(Surrogate):
             train_y.unsqueeze(-1),
             outcome_transform=self.outcome_transform,
             likelihood=self.likelihood,
-            **self.kwargs,
+            **match_kwargs(self.kwargs, self.model_class),
         )
         gp_model = (
             self.model.model if hasattr(self.model, "model") else self.model
@@ -162,7 +164,6 @@ class SVGPSurrogate(GPSurrogate):
         mll_args: dict = {},
         train_epochs: int = 150,
         lr: float = 0.1,
-        logger: Logger = None,
         id: str = "",
         **kwargs: any,
     ) -> None:
@@ -178,9 +179,8 @@ class SVGPSurrogate(GPSurrogate):
         )
         self.train_epochs = train_epochs
         self.lr = lr
-        self.logger = logger
 
-    def fit(self, train_data: torch.utils.data.DataLoader) -> None:
+    def fit(self, train_data: torch.utils.data.DataLoader, **kwargs) -> None:
         # fit the surrogate model
         batch_x, batch_y = next(iter(train_data))
         batch_x = batch_x.to(self.device).to(self.float)
@@ -194,7 +194,7 @@ class SVGPSurrogate(GPSurrogate):
             batch_y.unsqueeze(-1),
             outcome_transform=self.outcome_transform,
             likelihood=self.likelihood,
-            **self.kwargs,
+            **match_kwargs(self.kwargs, self.model_class),
         )
         self.model.likelihood.noise_covar.register_constraint(
             "raw_noise", GreaterThan(1e-5)
@@ -233,9 +233,25 @@ class SVGPSurrogate(GPSurrogate):
                 optimizer.step()
 
             avg_losses.append(sum(batch_losses) / len(batch_losses))
+            # self.logger.log_metrics(
+            #     {"Loss": sum(batch_losses) / len(batch_losses), "Epoch": epoch},
+            #     use_context=True,
+            #     step=0,
+            # )
 
         if self.logger is not None:
-            self.logger.log_time_series(avg_losses, "avg_loss_surrogate")
+            # TODO: solve this in a better way. currently this logs a figure of the training loss instead of the loss values. logging the loss values interferes with logging of gflownet training...
+            self.logger.log_time_series(
+                avg_losses,
+                "Mean Surrogate Loss",
+                use_context=True,
+                step=None,  # 0,
+                y_label="Loss",
+                x_label="Epochs",
+                y_lim_min=0,
+            )
+            # self.logger.log_metrics({"Loss": avg_losses}, use_context=True, step=0)
+        self.logger.save_surrogate(self.model, optimizer, final=True)
 
 
 from activelearning.surrogate.gp_kernels import (
@@ -257,7 +273,6 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
         mll_args: dict = {},
         train_epochs: int = 150,
         lr: float = 0.1,
-        logger: Logger = None,
         **kwargs: any,
     ):
         covar_module = DeepKernelWrapper(
@@ -281,6 +296,5 @@ class DeepKernelSVGPSurrogate(SVGPSurrogate):
             mll_args=mll_args,
             train_epochs=train_epochs,
             lr=lr,
-            logger=logger,
             **kwargs,
         )

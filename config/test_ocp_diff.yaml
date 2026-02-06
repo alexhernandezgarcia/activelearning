@@ -1,0 +1,51 @@
+defaults:
+  - test_ocp
+  - override /dataset: ocp_diff
+
+acquisition:
+  acq_fn_class:
+    # use for botorch_ei acquisition function
+    # best_f: 10
+    objective:
+      # _target_: botorch.acquisition.objective.IdentityMCObjective
+      _target_: activelearning.acquisition.objective.IdentityMCObjective
+
+surrogate:
+  surrogate_mapper_cls: 
+    _target_: activelearning.surrogate.surrogate_mapper.mapper.DifferenceMapper
+    _partial_: true
+
+logger:
+  do:
+    online: False
+    times: False
+  project_name: test_logger
+  tags: 
+      - ocp-diff
+      - al
+
+
+env:
+  atomgraphconverter: 
+    adsorbate_smiles:
+    - "*O"
+    - "*OH"
+
+sampler: 
+  conf:
+    proxy:
+      _target_: activelearning.sampler.proxy.OCPDiffProxy
+      # Reward function: power or boltzmann
+      # boltzmann: exp(1.0 * reward_beta * proxy)
+      # power: (1.0 * proxy / reward_norm) ** self.reward_beta
+      # identity: proxy
+      reward_function: boltzmann
+      # Minimum reward
+      reward_min: 1e-8
+      reward_function_kwargs: 
+        # Beta parameter of the reward function
+        beta: 3.0
+        alpha: 1.0
+        # Reward normalization for "power" reward function
+        # norm: 1.0
+

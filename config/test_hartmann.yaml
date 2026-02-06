@@ -1,24 +1,30 @@
 defaults:
-  # - _self_ # with _self_ the overrides don't seem to work...
-  - dataset: hartmann
-  - oracle: hartmann
-  - env: grid
-  - sampler: greedy
-  - selector: selector
-  - surrogate: gp
-  - acquisition: botorch_mve
-  - user: default
-  - logger: base #wandb
-  - plotter: null #cime4r_branin # not working with gflownet because it produces new samples
+  - main
+  - override /dataset: hartmann
+  - override /env: grid
+  - override /oracle: hartmann
 
 logger:
-  project_name: test_hartmann
+  do:
+    online: False
+    times: False
+  project_name: test_logger
   run_name: ${env.length}_${sampler.id}_${surrogate.id}_${acquisition.id}
+  # Log dir
+  logdir:
+    root: ./logs
+    ckpts: ./ckpts
+    overwrite: True
+  debug: True
+  progress: True
+  tags: 
+      - hartmann
+      - al
 
 dataset:
-  train_path: ~/activelearning/my_package/storage/hartmann/data_train.csv
-  batch_size: 16384
-
+  train_path: ~/activelearning/data/hartmann/data_train.csv
+  batch_size: 16
+  
 env:
   # Number of cells per dimension
   length: 10
@@ -27,48 +33,9 @@ env:
   cell_min: -1
   cell_max: 1
 
-sampler: 
-  conf:
-    agent:
-      random_action_prob: 0.001 # 0.01 #0.001
-      optimizer:
-        lr: 5e-4
-        n_train_steps: 5000 # 10000
-    logger:
-      do:
-        online: True
-      project_name: "test_hartmann_gflownet"
-      run_name: "identity_lr5e-4 newdata"
-    proxy:
-      # Reward function: power or boltzmann
-      # boltzmann: exp(-1.0 * reward_beta * proxy)
-      # power: (-1.0 * proxy / reward_norm) ** self.reward_beta
-      # identity: proxy
-      reward_func: power
-      # Minimum reward
-      reward_min: 1e-8
-      reward_function_kwargs: 
-        # Beta parameter of the reward function
-        beta: 1.0
-        # Reward normalization for "power" reward function
-        # norm: 1.0
-
 device: cpu
 float_precision: 32
 budget: 10
 n_samples: 5
 seed: 31415
 maximize: False
-
-
-# Hydra config
-hydra:
-  # See: https://hydra.cc/docs/configure_hydra/workdir/
-  run:
-    dir: ${user.logdir.root}/${now:%Y-%m-%d_%H-%M-%S}
-  sweep:
-    dir: ${user.logdir.root}/multirun/${now:%Y-%m-%d_%H-%M-%S}
-  job:
-    # See: https://hydra.cc/docs/upgrades/1.1_to_1.2/changes_to_job_working_dir/
-    # See: https://hydra.cc/docs/tutorials/basic/running_your_app/working_directory/#disable-changing-current-working-dir-to-jobs-output-dir
-    chdir: True
