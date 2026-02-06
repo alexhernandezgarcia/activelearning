@@ -220,8 +220,6 @@ class OCPDiffProxy(Proxy):
                 print("  No valid samples generated")
             global_sample_score = self.ENERGY_INVALID_SAMPLE
 
-        if verbose:
-            print()
         return global_sample_score
 
     def acq_output_from_graph(self, graph):

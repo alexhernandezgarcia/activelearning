@@ -55,7 +55,7 @@ replay_sampling: permutation
 # Train data set backward sampling
 train_sampling: permutation
 num_empirical_loss: 200000
-use_context: False
+use_context: True
 
 evaluator:
   _target_: gflownet.evaluator.base.BaseEvaluator

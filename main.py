@@ -27,10 +27,6 @@ def main(config):
     # Set other random seeds
     set_seeds(config.seed)
 
-    # Logger
-    # logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
-    logger = hydra.utils.instantiate(config.logger, conf=config, _recursive_=False)
-
     # Active learning variables
     # TODO: rethink where this configuration should go
     n_samples = config.n_samples
@@ -75,12 +71,20 @@ def main(config):
             fig="",
             ax="",
         )
+    # Logger
+    run_name = config.logger.run_name
+    # logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
 
     best_scores = []
     all_scores = {}
     for i in range(config.budget):
         train_data, test_data = dataset_handler.get_dataloader()
         print("--iteration", i, "- training on", len(train_data.dataset), "instances")
+        # Logger
+        # logger.set_context(i)
+        # TODO: initializing the logger every iteration is not ideal; is it possible in wandb to do this in a smarter way? (i.e., only have one run of wandb that logs the active learning loop and all subsequent model training + metrics?)
+        config.logger.run_name = run_name + "_it-%i" % i
+        logger = hydra.utils.instantiate(config.logger, config, _recursive_=False)
         # --- Surrogate (e.g., Bayesian Optimization)
         # starts with a clean slate each iteration
         if (
@@ -94,7 +98,7 @@ def main(config):
             float_precision=config.float_precision,
             logger=logger,
         )
-        surrogate.fit(train_data)
+        surrogate.fit(train_data, step=i)
 
         if plotter is not None:
             plotter.plot_function(
@@ -142,6 +146,7 @@ def main(config):
             env_maker=env_maker,
             acquisition=acquisition,
             dataset_handler=dataset_handler,
+            logger=logger,
             device=config.device,
             float_precision=config.float_precision,
             _recursive_=False,
@@ -177,31 +182,30 @@ def main(config):
         all_scores[i] = scores
         if logger is not None:
             scores_flat = torch.stack(list(all_scores.values())).flatten()
-            logger.log_metric(scores_flat.max(), "top_score")
             mean_top_k = scores_flat.topk(n_samples, largest=True).values.mean()
-            logger.log_metric(mean_top_k, "mean_topk_score")
-            logger.log_metric(scores.max(), "best_score")
-            logger.log_metric(torch.median(scores), "median_score")
-            logger.log_metric(torch.mean(scores), "mean_score")
-            logger.log_metric(scores.min(), "worst_score")
-            logger.log_metric(scores, "scores")
-
-            logger.log_step(i)
+            metrics = {
+                "top_score": scores_flat.max(),
+                "mean_topk_score": mean_top_k,
+                "best_score": scores.max(),
+                "median_score": torch.median(scores),
+                "mean_score": torch.mean(scores),
+                "worst_score": scores.min(),
+                "scores": scores,
+            }
+            logger.log_metrics(metrics, use_context=False, step=None)
 
         if plotter is not None and selected_idcs is not None:
             plotter.plot_scores(selected_idcs, scores, i + 1)
-
-    if logger is not None:
-        import matplotlib.pyplot as plt
-
-        plt.boxplot(all_scores.values(), labels=all_scores.keys())
-        plt.ylim(top=50, bottom=-50)
-        logger.log_figure(plt, "all_scores")
-        logger.log_step(i + 1)
         logger.end()
 
-    if plotter is not None:
-        plotter.end(filename=logger.run_name + ".csv")
+    # if logger is not None:
+    #     import matplotlib.pyplot as plt
+
+    #     plt.boxplot(all_scores.values(), labels=all_scores.keys())
+    #     plt.ylim(top=50, bottom=-50)
+
+    # if plotter is not None:
+    #     plotter.end(filename=logger.run_name + ".csv")
     print("Best Scores:", best_scores)
 
 
