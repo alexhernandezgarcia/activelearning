@@ -1,0 +1,15 @@
+# @package _global_
+
+defaults:
+  - override /surrogate: svdkl_kernel_wrapper 
+
+surrogate:
+  mll_args: 
+    # number of training data instances
+    num_data: 25
+  feature_extractor:
+    n_input: 6
+    n_hidden: [16, 16]
+    n_output: 8
+  train_epochs: 5
+  lr: 0.01

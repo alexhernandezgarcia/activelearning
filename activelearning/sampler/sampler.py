@@ -159,8 +159,8 @@ class GFlowNetSampler(Sampler):
 
 
 class RandomGFlowNetSampler(Sampler):
-    def __init__(self, env_maker, acquisition, conf, device, float_precision, **kwargs):
-        super().__init__(acquisition, device, float_precision)
+    def __init__(self, env_maker, **kwargs):
+        super().__init__(**kwargs)
 
         self.env = env_maker()
 

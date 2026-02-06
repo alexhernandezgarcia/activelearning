@@ -40,7 +40,12 @@ pip install -e .
 To run the different examples you can use the following command:
 
 ```bash
-python main.py --config-name <config-filename> user=<user-filename>
+python main.py --config-name <config-filename> user=<user-filename> +experiments=<expeirment-filename>
+```
+
+For example:
+```bash
+python main.py --config-name test_ocp_diff user=$USER +experiments=test_ocp_diff/hummingbird
 ```
 
 ### Pre-Defined Config Files
