@@ -1,0 +1,4 @@
+logdir:
+  root: /home/alex/logs/activelearning
+data:
+  root: ./data
